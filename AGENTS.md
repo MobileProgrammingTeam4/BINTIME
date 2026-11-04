@@ -7,7 +7,7 @@
 - 당신은 **BIN TIME의 개발 보조 에이전트**입니다. 사용자가 요청한 이슈 범위 안에서 코드·테스트·문서를 작성합니다.
 - 핵심 목표는 **5명/5주/61개 GitHub Issues** 계획에 맞춰 **Java/XML Android + Firebase + Gemini** 사용자 흐름을 안전하게 연결하는 것입니다.
 - 최신의 **명시적 팀 결정과 현재 요청**이 예전 문서 초안보다 우선합니다. 피그마는 화면/표현 기준, 실제 저장소 코드는 이미 구현된 구조와 버전의 기준, GitHub Issues의 수용 기준은 작업 범위 기준입니다. 충돌은 보고하고 임의로 요구사항을 바꾸지 않습니다.
-- **GitHub Projects와 GitHub Actions는 사용하지 않습니다.** 관련 보드·워크플로를 생성하거나 필수 작업으로 제안하지 않습니다. 기존 61개 Issues와 수동 라벨·Milestone·PR 흐름을 사용합니다.
+- **GitHub Actions 기반 PR–Issue 상태 동기화와 Android CI를 도입합니다.** 조직 Projects는 별도 생성·토큰·프로젝트 필드 설정이 끝나면 동기화합니다. 설정과 제한사항은 `docs/GITHUB_AUTOMATION.md`를 따릅니다. 이 작업은 사용자 요청에 의한 협업 자동화이며 기존 제품 요구사항은 변경하지 않습니다.
 - 관리자 승인 없이 배포, 외부 서비스 연결, 결제 설정 변경, 데이터 삭제·마이그레이션, 비밀 키 생성·교체·노출을 실행하지 않습니다.
 
 ## 1. 매 작업 시작 시 실행할 프리플라이트
@@ -198,7 +198,7 @@ MatchStatus: ACTIVE | ENDED
 
 - Firebase 운영 DB·Storage 삭제/백필/마이그레이션, 운영 배포, Rules 전체 교체.
 - 비밀번호·API 키·서비스 계정 파일을 코드나 로그에 출력/커밋.
-- 외부 계정/GitHub에 임의의 Issue·Projects·Actions 생성, 자동화 토큰 추가.
+- 사용자가 승인하지 않은 외부 계정/GitHub에 임의의 Issue·Projects·Actions 생성, 자동화 토큰 추가. 이 저장소의 사용자 승인된 자동화는 `docs/GITHUB_AUTOMATION.md` 범위에서만 변경합니다.
 - Figma와 다르게 독자적 UX 탭 추가, 기존 확정 조건 임의 완화.
 - 서버 Rules 우회용 테스트 전용 허용(`allow read, write: if true`) 배포.
 - 구식 설계 문서에 맞춰 최신 Issue의 담당자·우선순위·스프린트 변경.
@@ -242,14 +242,14 @@ firebase emulators:start
 
 빌드 불가/테스트 미실행/권한 없음은 숨기지 않습니다. 실제로 수행하지 않은 테스트를 통과로 기재하지 않습니다.
 
-## 9. GitHub Issues 중심 협업 (보드/자동화 없음)
+## 9. GitHub Issues·PR·Actions 협업
 
 - 이미 생성된 **61개 Issues**의 Sprint·담당자·우선순위·의존성·체크리스트를 기준으로 작업합니다.
-- 예상 상태 흐름은 **`Todo → In Progress → In Review → Done`**이나, Projects 필드가 아닌 **팀이 현재 사용하는 Issue 라벨/본문 체크리스트의 수동 갱신** 기준입니다. 실제 라벨명은 저장소에서 확인합니다.
+- 상태 흐름은 **`Todo → In Progress → In Review → Done`**입니다. Actions가 main에 병합된 뒤 PR 본문에 `Closes #실제번호`를 추가하면 `status:*` 이슈 라벨을 동기화합니다. 조직 Project 필드 동기화는 별도 토큰 설정을 마친 뒤에만 동작합니다.
 - `BT-027`처럼 **계획 ID와 GitHub `#27`은 다를 수 있습니다**. Issue를 참조하는 PR에는 실제 GitHub 번호를 사용합니다.
 - PR 제목/본문에는 BT ID와 실제 Issue, 변경 범위, 검증 결과, 스키마·보안 영향, UI 변경 시 화면 증거를 적습니다.
 - `main`/`develop` 등 브랜치 규칙은 기존 저장소 설정을 우선합니다. 브랜치 관리가 미정이면 `feature/<area>-<BT-ID>`를 권장합니다.
-- PR을 생성/병합해도 **상태 라벨이 자동 변경된다고 가정하지 않습니다**. 담당자가 수동으로 수정합니다.
+- 워크플로가 main에 병합되고 실제 Actions 실행이 성공하기 전에는 **자동 상태 변경을 완료로 간주하지 않습니다**. PR 본문에 이슈 번호가 없으면 수동으로 관리합니다.
 - 스프린트 4 기능 동결 이후에는 명확한 버그 수정·회귀 테스트 위주로 작업합니다.
 
 ## 10. Definition of Done
