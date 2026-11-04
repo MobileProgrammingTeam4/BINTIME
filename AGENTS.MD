@@ -1,0 +1,265 @@
+# AGENTS.md — BIN TIME AI 개발 에이전트 하네스
+
+> 이 파일은 GitHub 저장소의 **루트**에 둡니다. 코딩 에이전트(Cursor/Codex/Claude Code 등) 또는 자동 코드 생성 도구가 BIN TIME을 수정할 때 적용할 **작업 계약**입니다. `README.md`와 함께 읽습니다. **요구사항/계획을 이미 구현된 코드로 착각하지 마세요.**
+
+## 0. 역할과 우선순위
+
+- 당신은 **BIN TIME의 개발 보조 에이전트**입니다. 사용자가 요청한 이슈 범위 안에서 코드·테스트·문서를 작성합니다.
+- 핵심 목표는 **5명/5주/61개 GitHub Issues** 계획에 맞춰 **Java/XML Android + Firebase + Gemini** 사용자 흐름을 안전하게 연결하는 것입니다.
+- 최신의 **명시적 팀 결정과 현재 요청**이 예전 문서 초안보다 우선합니다. 피그마는 화면/표현 기준, 실제 저장소 코드는 이미 구현된 구조와 버전의 기준, GitHub Issues의 수용 기준은 작업 범위 기준입니다. 충돌은 보고하고 임의로 요구사항을 바꾸지 않습니다.
+- **GitHub Projects와 GitHub Actions는 사용하지 않습니다.** 관련 보드·워크플로를 생성하거나 필수 작업으로 제안하지 않습니다. 기존 61개 Issues와 수동 라벨·Milestone·PR 흐름을 사용합니다.
+- 관리자 승인 없이 배포, 외부 서비스 연결, 결제 설정 변경, 데이터 삭제·마이그레이션, 비밀 키 생성·교체·노출을 실행하지 않습니다.
+
+## 1. 매 작업 시작 시 실행할 프리플라이트
+
+1. `pwd`, `git status`, `git branch --show-current`, 폴더 구조를 확인합니다. 기존 사용자 변경 사항을 덮어쓰지 않습니다.
+2. 루트의 `README.md`와 `AGENTS.md`, 관련 BT Issue와 선행 이슈를 읽습니다. **BT-###은 계획 ID이며 실제 GitHub #번호가 아님**에 유의합니다.
+3. Android 프로젝트 위치(루트 또는 `android/`), `build.gradle(.kts)`, `settings.gradle(.kts)`, `gradlew` 및 `functions/`, `firebase.json`, Rules 파일의 실제 존재 여부를 확인합니다.
+4. 변경할 화면·경로·함수·데이터 필드, 담당 영역(A~E), 보안 영향, 검증 명령을 먼저 정리합니다.
+5. 필요한 **최소 범위로만 수정**합니다. 요청되지 않은 SDK 업그레이드·패키지 이동·의존성 추가·일괄 리팩터링을 하지 않습니다.
+6. 테스트 가능 범위는 실제 실행하고, 실행할 수 없는 경우 **실행하지 않았다고 명시**합니다. 시연 데이터와 운영 데이터를 혼동하지 않습니다.
+
+**기본 완료 보고 양식**
+
+```text
+[BT-ID / 실제 Issue #] 작업 요약
+- 변경 파일:
+- UI/데이터/서버 수정 사항:
+- 검증: 실제 실행 명령 / 통과 여부 / 미실행 사유
+- 보안/권한·스키마 영향:
+- 후속 작업 및 남은 위험:
+```
+
+## 2. 제품 불변 조건 (Hard constraints)
+
+### 화면·탭
+
+- BIN TIME은 **대학생 공강 메이트 앱**입니다. 데이팅 앱 기능/카피를 만들지 않습니다.
+- 매칭 탭은 **`매칭 찾기` / `보낸 요청` / `받은 요청` / `완료된 매칭`** 4개입니다.
+- 채팅 탭은 **`전체` / `매칭됨` / `매칭종료`** 3개입니다.
+- **`일반 매칭`/`즉석 매칭`을 별도 탭이나 서로 다른 기능으로 생성하지 않습니다.** 현재 겹침 우선/가까운 미래 탐색은 **하나의 매칭 검색 정책**입니다.
+- `매칭 스위치 OFF`, `매칭에 사용할 공강 없음`, `검색 결과 없음`의 UI 상태는 각각 구분합니다. **결과 없음 화면**을 생략하지 않습니다.
+- Figma 디자인: https://www.figma.com/design/jR1gI7EWb2WomXUuQvf67Z/2026%EB%85%842%ED%95%99%EA%B8%B0_%EB%AA%A8%EB%B0%94%EC%9D%BC2%EB%B6%84%EB%B0%98_%ED%8C%804?node-id=1-3
+
+### 인증
+
+- **Firebase Auth 이메일 링크 방식**을 사용합니다. 6자리 OTP 화면을 추가하지 않습니다.
+- 학교 이메일 허용 도메인 검증, **검증된 이메일당 한 계정** 정책, 로그인 복원·로그아웃·탈퇴를 고려합니다.
+- UID를 신뢰할 수 있는 토큰/SDK에서 확인합니다. 요청 본문의 UID를 신원으로 사용하지 않습니다.
+
+### 시간표·매칭
+
+- 수업 직접 입력 CRUD는 항상 제공하며, **다중 이미지 선택 → Gemini 인식 → 중복 제거 → 사용자 검수/수정 → 저장** 흐름을 별도 지원합니다.
+- 공강 선택 UI의 30분 눈금과 최소 매칭 겹침 필터를 구분합니다. 허용 최소 겹침 필터는 **`60`, `90`, `120`, `150`, `180`분**만; 기본 `60`. **`0`과 `30`은 필터 값이 아닙니다.**
+- 검색자와 후보의 **매칭 스위치 모두 ON**, 실제 공강 교집합 **`>=` 사용자가 선택한 최솟값**, 목적/차단/기존 매칭의 충돌 정책을 **AND 조건**으로 검증합니다.
+- **지금 겹치는 공강 우선**, 없으면 **가장 가까운 미래 공강**을 사용합니다. 날짜가 다른 슬롯을 잘못 비교하지 않습니다.
+- 매칭 적격 여부는 서버 규칙이 판정합니다. **Gemini 추천 점수로 부적격 후보를 복구하거나 우회하지 않습니다.**
+- 시간표/공강 변경 후 **기존 보낸 요청·받은 요청·확정 매칭·채팅을 보존**합니다. 신규 검색 데이터만 최신 공강으로 갱신하며 기존 요청/매칭의 **시간 스냅샷은 불변**입니다.
+
+### 요청·채팅·종료
+
+- 요청 상태: `PENDING`, `ACCEPTED`, `REJECTED`, `CANCELED`.
+- 매칭 상태: `ACTIVE`, `ENDED`.
+- 서버가 요청 수락/거절/취소를 검증하고 **동시 수락과 상충 요청**을 트랜잭션/멱등 처리로 보호합니다.
+- 매칭 자동 종료는 **확정된 겹침 시간 종료 시점**을 기준으로 하며, 채팅 옵션의 수동 종료도 지원합니다.
+- **ACTIVE 매칭은 채팅방 나가기 불가**. **ENDED 이후에만 나가기 허용**. 매칭 종료 후에도 채팅을 계속 사용할 수 있으며, 종료 이벤트로 기록을 삭제하거나 전송을 막지 않습니다.
+- 채팅 참여자만 메시지를 읽고 쓸 수 있습니다. AI 추천 답장 **3개를 칩으로 표시**하고, 사용자가 선택한 텍스트만 입력창에 채웁니다. **자동 전송 금지**.
+- 교내 장소 추천은 수업 위치·시간과 **검증된 교내 장소 목록**을 근거로 하며, 임의의 건물·매장·운영 시간을 지어내지 않습니다.
+- 후기 공개 조건, 차단/신고, 알림/FCM은 **해당 BT 이슈 수용 기준**에 맞춰 구현합니다.
+
+## 3. 실제 61개 이슈와 담당자 (변경 금지 기준)
+
+| 담당 | 범위 | 개수 | 소유 파일·백엔드 예시 |
+|---|---|---:|---|
+| **A (SM)** | 공통 구조·매칭 찾기·AI 매칭률·통합 | **13** | Android `common/`, `matching/`; `matchSettings`, AI 점수/캐시 |
+| **B** | 링크 인증·프로필·차단·신고 | **11** | Android `auth/`, `profile/`; Auth, `users`, `publicProfiles`, Storage |
+| **C** | 시간표·공강·Gemini 이미지 인식 | **12** | Android `timetable/`; `timetables`, `availability` |
+| **D** | 요청·매칭 수락/종료·알림 | **12** | Android `request/`, `notification/`; `matchRequests`, `matches`, FCM |
+| **E** | 채팅·AI 게이트웨이/답장/장소·후기 | **13** | Android `chat/`, `review/`; RTDB, Gemini Functions 게이트웨이 |
+
+**모두 Android 프론트엔드 구현에 참여**합니다. 소유 영역 밖의 API/Rules/Enum을 수정해야 할 때는 해당 담당자 및 SM에게 영향·테스트 계획을 명시합니다. 팀원 이름은 확정되어 있지 않으므로 임의의 실제 이름·GitHub 핸들을 추측하지 않습니다.
+
+| Sprint | Issue 범위 | 완료 게이트 |
+|---|---|---|
+| **1** | BT-001~012 | 환경·UI 목업·공통 모델, 전원 빌드 |
+| **2** | BT-013~024 | 링크 인증/시간표/요청/채팅 연결 + Gemini 서버 기반, 2계정 시연 |
+| **3** | BT-025~037 | AI 매칭률, 수락·채팅 E2E, 이미지 인식 검증 |
+| **4** | BT-038~051 | 종료·후기·답장·장소·보존·알림 통합, **BT-050 Feature Freeze** |
+| **5** | BT-052~061 | 회귀·보안·동시성·AI 검증, APK·발표 |
+
+**P0 42 / P1 18 / P2 1**. 원본 Issue의 우선순위를 임의로 하향/상향하지 마세요. 특히 **AI 매칭 점수(BT-027/028)는 P0**, 이미지 인식(BT-025/026)은 P1, AI 답장/장소(BT-041/042)는 P1, 종료 후 채팅(BT-043)과 시간표 변경에 따른 기존 데이터 보존(BT-047)은 P0입니다. **우선순위는 구식 README/AGENTS 초안보다 기존 61개 Issues가 우선**합니다.
+
+## 4. 기술 및 디렉터리 경계
+
+- Android **Java + XML Views**, Gradle 버전/플러그인 및 소스 경로는 **실제 코드**를 우선합니다. 새 Kotlin/Compose 코드로 임의 전환하지 않습니다.
+- Firebase **Authentication**, **Firestore**(업무 데이터), **Realtime Database**(채팅), **Storage**(이미지), **Cloud Functions(TypeScript)**(서버 로직).
+- Gemini는 **서버만 호출**합니다. 기획 모델 이름은 `Gemini 3.5 Flash-Lite`이며 실제 API 모델 ID를 하드코딩하기 전에 환경에서 확인합니다.
+- Android: `Activity/Fragment → ViewModel 또는 UI 제어자 → Repository → Firebase/Functions` 식으로 UI/데이터 책임을 나눕니다. 기존에 채택한 패턴이 있다면 그것을 존중합니다.
+- Functions: 인증·입력 검증·비즈니스 규칙·동시성 제어·AI 게이트웨이를 맡습니다. API 키는 Firebase Secrets 등 서버 환경에 둡니다.
+- 권장 구조는 아래와 같으나 **기존 디렉터리가 이미 있다면 이동·중복 생성하지 않습니다**.
+
+```text
+README.md
+AGENTS.md
+android/ (또는 저장소 루트 Android 프로젝트)
+  app/src/main/java/<existing-package>/
+    common/ auth/ profile/ timetable/ matching/ request/ chat/ notification/ review/
+  app/src/main/res/
+functions/
+  src/ (matching.ts, requests.ts, chat.ts, ai.ts, index.ts 등)
+firestore.rules
+firestore.indexes.json
+database.rules.json
+storage.rules
+firebase.json
+```
+
+- Java 클래스 `PascalCase`, 필드/메서드 `camelCase`, 상수 `UPPER_SNAKE_CASE`, XML 리소스 `snake_case`.
+- 네트워크·Gemini 작업으로 UI 스레드를 멈추지 않습니다. 로딩/빈 화면/오류/재시도 및 중복 클릭 방지를 구현합니다.
+- Firebase 리스너 등록과 해제는 Android Lifecycle에 맞춥니다. 비동기 콜백이 이미 종료된 화면을 변경하지 않게 합니다.
+
+## 5. Firestore·RTDB 공통 계약
+
+아래 이름은 팀의 **설계 기준**입니다. 실제 구현이 다르면 독자적으로 바꾸지 말고 담당자와 상의 후 스키마와 문서를 동기화합니다.
+
+```text
+Firestore
+users/{uid}
+  blockedUsers/{blockedUid}
+publicProfiles/{uid}
+timetables/{uid}/courses/{courseId}
+availability/{uid}
+matchSettings/{uid}
+matchRequests/{requestId}
+matches/{matchId}
+notifications/{uid}/items/{notificationId}
+reviews/{reviewId}
+reports/{reportId}
+
+Realtime Database
+chatRooms/{matchId}/members/{uid}
+chatRooms/{matchId}/messages/{messageId}
+userChatRooms/{uid}/{matchId}
+```
+
+| 데이터 | 필수 계약 또는 검증 |
+|---|---|
+| `Auth UID` | 문서 소유자와 참가자 판별에 사용. 클라이언트 입력만 신뢰 금지 |
+| `timetables/{uid}.revision` | 수정마다 증가, `availability.sourceRevision`과 비교 |
+| `availability` | 선택/계산된 공강 슬롯, 분 단위 정수 시간 및 요일 |
+| `matchSettings` | `isMatching`, `minOverlapMinutes`, `purposes`, `preferredTags` 등 |
+| `matchRequests` | `fromUid`, `toUid`, `status`, `meetingDate`, `startMinute`, `endMinute`, `overlapMinutes` 등 **시간 스냅샷** |
+| `matches` | `participantUids`, `requestId`, `status`, `meetingDate`, `startMinute`, `endMinute`, `chatReady` 등 **확정 스냅샷** |
+| `chatRooms` | `matchId`를 룸 식별자로 사용, 메시지 발신자·권한 검증 |
+| `userChatRooms` | 사용자별 목록/읽지 않음 수, 서버와 동기화 |
+| `reviews` / `reports` | 참여·공개/작성 권한, 개인정보 최소 수집 |
+
+시간 규칙:
+
+```text
+Timezone: Asia/Seoul
+meetingDate: YYYY-MM-DD
+dayOfWeek: 1(월) ~ 7(일)
+0 <= startMinute < endMinute <= 1440
+Intervals: [startMinute, endMinute)
+overlapMinutes = max(0, min(endA, endB) - max(startA, startB))
+Valid minOverlapMinutes: {60, 90, 120, 150, 180}
+Default minOverlapMinutes: 60
+RequestStatus: PENDING | ACCEPTED | REJECTED | CANCELED
+MatchStatus: ACTIVE | ENDED
+```
+
+- 서버 시간 기준으로 날짜와 종료를 판단합니다. 서로 다른 날짜/요일의 슬롯은 직접 겹침 비교하지 않습니다.
+- 원시 개인 시간표를 매칭 상대에게 그대로 반환하지 않습니다. 검색 결과는 필요한 공개 프로필·겹침 정보로 제한합니다.
+- 수업 변경으로 생성되는 **새 공강 계산**과 **기존 요청/매칭 스냅샷**을 엄격히 분리합니다.
+- Firestore와 RTDB는 **단일 원자적 트랜잭션이 아닙니다**. RTDB 채팅방 생성 실패 시 상태 표시·안전한 재시도·멱등성 구현이 필요합니다.
+- 보안 Rules는 사용자별 읽기/쓰기 및 채팅 참여자 접근을 검증합니다. Admin SDK 사용 Cloud Functions는 Rules를 우회하므로 **함수 안에서 권한을 직접 확인**해야 합니다.
+- 상태 변경(`matchRequests.status`, `matches.status`, 채팅방 참여자 등록/종료 상태 등)을 Android 임의 쓰기로 구현하지 않습니다.
+
+## 6. 서버 함수/AI 에이전트 작업 계약
+
+| 담당 | 함수/책임 예시 | 검증 의무 |
+|---|---|---|
+| A | `searchMatches`, 매칭 점수/추천 이유 | 양측 ON, 공강·최소 시간·태그·차단·충돌; 캐시 최신성 |
+| B | 학교 이메일/프로필 처리, 차단/신고 | 검증된 이메일, UID 소유권, 비공개 데이터 |
+| C | 공강 계산·이미지 OCR 결과 검수 파이프라인 | 중복/오인식, revision, 저장 전 사용자 확인 |
+| D | `createMatchRequest`, `respondToMatchRequest`, 자동 종료 | 동시 수락·중복 요청·상충 요청 정리, 스냅샷 보존 |
+| E | AI 공통 게이트웨이, 채팅 이벤트, 답장/장소/후기 | 채팅 참여자 확인, AI 출력 형식/실패 처리, 장소 검증 |
+
+- Gemini 호출 전에 **입력 최소화·개인정보 제거·인증/권한 검사**. 출력은 스키마 검사하고 비용/지연/실패/시간초과를 제어합니다.
+- Gemini 매칭 점수는 추천 정렬용. **필수 매칭 조건 검사 전 또는 대신 호출하지 않습니다.** AI 불가 시에도 P0 기본 흐름에 대해 실패 정책을 명확히 처리합니다.
+- AI 답장 3개는 **UI 제안**이며 사용자가 직접 선택·수정·전송합니다. 타인의 메시지나 개인 시간표 전체를 필요 이상으로 모델에 전송하지 않습니다.
+- 장소는 신뢰 가능한 **사전 검증된 캠퍼스 장소 데이터**만 후보로 제공하고 모델이 결과의 존재 여부를 결정하지 않게 합니다.
+- 모델/함수 명칭이 실제 계정에서 지원되는지 확인한 후 적용합니다. 앱에 API 키를 넣지 않습니다.
+
+## 7. 코드 변경·권한·실행 안전성
+
+**이 작업에 포함되지 않으면 하지 말 것:**
+
+- Firebase 운영 DB·Storage 삭제/백필/마이그레이션, 운영 배포, Rules 전체 교체.
+- 비밀번호·API 키·서비스 계정 파일을 코드나 로그에 출력/커밋.
+- 외부 계정/GitHub에 임의의 Issue·Projects·Actions 생성, 자동화 토큰 추가.
+- Figma와 다르게 독자적 UX 탭 추가, 기존 확정 조건 임의 완화.
+- 서버 Rules 우회용 테스트 전용 허용(`allow read, write: if true`) 배포.
+- 구식 설계 문서에 맞춰 최신 Issue의 담당자·우선순위·스프린트 변경.
+
+변경 시 지킬 것:
+
+1. **작고 독립적인 PR** 단위로 파일을 수정합니다. 주요 경로·데이터 계약 변경은 관련 담당자의 검토를 받습니다.
+2. 하드코딩 임시 데이터는 `Mock`으로 구분하고 실제 Firebase 데이터로 연결되는 이슈를 명시합니다. 더미 결과를 실제 성공으로 보고하지 않습니다.
+3. 사용자·네트워크·Firestore 권한 거부·AI 실패·중복 제출·수명주기 종료를 모두 처리합니다.
+4. 신규 컬렉션·필드·enum·함수·Rules/인덱스 변경 시 `README.md`/`AGENTS.md` 및 별도 스키마 문서를 동기화합니다.
+5. `google-services.json`은 팀 정책상 Git에 올리지 않습니다. `.env`, 서비스 계정 JSON, `local.properties`, 키스토어 및 API 키를 제외합니다.
+
+## 8. 검증 매트릭스 — 해당 작업 범위에서 수행
+
+| 영역 | 최소 검증 시나리오 |
+|---|---|
+| 이메일 인증 | 학교 도메인 허용/거부, 동일 이메일 재가입, 링크 유효/만료/재사용, 로그아웃·재접속 |
+| 시간표 | 수업 0개, 연속/겹침, 요일 경계, 이미지 다중 업로드·중복 추출·사용자 수정, 공강 revision |
+| 시간 겹침 | 0/30/59/60/89/90/119/120/149/150/179/180분, 시작·끝 경계, 날짜 차이 |
+| 매칭 | 양측 ON/OFF 조합, 필터·목적·태그, 차단 관계, 현재 공강 없음→미래, 결과 없음 화면 |
+| 요청 | 동일 요청 중복, 동시 수락, 수락/취소 경합, 시간 충돌, 기존 요청 스냅샷 보존 |
+| 매칭 종료 | 겹침 종료 시 자동 종료, 수동 종료, 중복 종료, 진행 중 나가기 금지, 종료 후 채팅 지속 |
+| 채팅 | 양측 실시간 전송, 비참여자 접근 거부, 읽지 않음, listener 중복, AI 칩 입력만·수동 전송 |
+| AI | 지연/오류/부정확 출력, 검증되지 않은 장소 배제, 인증되지 않은 호출 거부, 비밀 키 미노출 |
+| Rules | 자기 데이터 허용, 타인 개인정보 차단, 채팅 비참여자 차단, 클라이언트 매칭 상태 수정 차단 |
+
+테스트 명령은 **실제 파일이 있을 때** 사용합니다.
+
+```bash
+# Android wrapper 존재 시: 실제 앱 위치에서 실행
+./gradlew assembleDebug
+./gradlew testDebugUnitTest
+./gradlew lintDebug
+
+# functions/package.json 및 lockfile과 build script 존재 시
+cd functions && npm ci && npm run build
+
+# Firebase Emulator가 설정된 경우
+firebase emulators:start
+```
+
+빌드 불가/테스트 미실행/권한 없음은 숨기지 않습니다. 실제로 수행하지 않은 테스트를 통과로 기재하지 않습니다.
+
+## 9. GitHub Issues 중심 협업 (보드/자동화 없음)
+
+- 이미 생성된 **61개 Issues**의 Sprint·담당자·우선순위·의존성·체크리스트를 기준으로 작업합니다.
+- 예상 상태 흐름은 **`Todo → In Progress → In Review → Done`**이나, Projects 필드가 아닌 **팀이 현재 사용하는 Issue 라벨/본문 체크리스트의 수동 갱신** 기준입니다. 실제 라벨명은 저장소에서 확인합니다.
+- `BT-027`처럼 **계획 ID와 GitHub `#27`은 다를 수 있습니다**. Issue를 참조하는 PR에는 실제 GitHub 번호를 사용합니다.
+- PR 제목/본문에는 BT ID와 실제 Issue, 변경 범위, 검증 결과, 스키마·보안 영향, UI 변경 시 화면 증거를 적습니다.
+- `main`/`develop` 등 브랜치 규칙은 기존 저장소 설정을 우선합니다. 브랜치 관리가 미정이면 `feature/<area>-<BT-ID>`를 권장합니다.
+- PR을 생성/병합해도 **상태 라벨이 자동 변경된다고 가정하지 않습니다**. 담당자가 수동으로 수정합니다.
+- 스프린트 4 기능 동결 이후에는 명확한 버그 수정·회귀 테스트 위주로 작업합니다.
+
+## 10. Definition of Done
+
+- [ ] 해당 이슈의 실제 구현 범위·수용 기준·디자인을 따랐습니다.
+- [ ] 데이터 계약 및 코드 경로를 불필요하게 변경하지 않았습니다.
+- [ ] UI 상태(성공/로딩/빈 상태/오류)와 접근성을 확인했습니다.
+- [ ] Firebase/서버 권한, 엣지 케이스, 중복 요청·시간/매칭 충돌을 검증했습니다.
+- [ ] 관련 유닛/통합 테스트 및 빌드를 실행했고 결과를 명시했습니다.
+- [ ] 계정/시간표/채팅 개인정보 및 비밀값이 노출되지 않습니다.
+- [ ] 이슈/PR에 결과를 남기고 필요한 문서를 갱신했습니다.
+
+**작업 결정 순서:** 안전·보안 → 최신 명시 결정/Issue 수용 기준 → 피그마 화면 요구 → 실제 저장소 계약/기술 제약 → 최소 변경. 충돌 시 문제와 선택지를 명시하고, 기능을 독단으로 바꾸지 않습니다.
