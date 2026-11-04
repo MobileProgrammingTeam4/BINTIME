@@ -21,7 +21,7 @@ BIN TIME은 시간표를 바탕으로 공강을 계산하고, 사용자가 지�
 | 설계 기준 | [Figma 디자인](https://www.figma.com/design/jR1gI7EWb2WomXUuQvf67Z/2026%EB%85%842%ED%95%99%EA%B8%B0_%EB%AA%A8%EB%B0%94%EC%9D%BC2%EB%B6%84%EB%B0%98_%ED%8C%804?node-id=1-3) |
 | 협업 | GitHub Issues · Labels · Milestones · Assignees · Pull Requests |
 
-**현재 협업 운영 결정:** 61개의 GitHub Issues는 **등록 완료**되었습니다. GitHub Projects 보드 생성과 GitHub Actions 자동화는 **진행하지 않습니다**. 이슈의 상태·담당자·Sprint는 Issues에서 수동 관리합니다. PR 병합 시 상태 라벨이 자동으로 바뀐다고 가정하지 마세요.
+**현재 협업 운영 결정:** 61개의 GitHub Issues가 등록되어 있습니다. **GitHub Actions를 활용한 PR–Issue 상태 라벨 연동 및 조건부 Android CI를 도입합니다.** 조직 GitHub Projects는 별도 생성 권한·인증 설정을 마친 뒤 61개 이슈를 연결합니다. 자세한 설정과 미완료 조건은 [GitHub 자동화 운영 안내](./docs/GITHUB_AUTOMATION.md)를 참조하세요. 자동화가 main에 병합되고 실제 실행으로 검증되기 전까지 상태 변경 성공을 가정하지 않습니다.
 
 ## 2. 주요 사용자 흐름
 
@@ -219,14 +219,14 @@ npm run build
 - **Gemini는 Cloud Functions에서 호출**하고 키는 Firebase Secrets 등 서버 비밀 저장소로 관리합니다.
 - 운영 환경 배포·유료 기능 활성화·비용 설정 변경은 프로젝트 소유자 승인 없이 진행하지 않습니다.
 
-## 8. 협업 규칙 — Projects 및 Actions 없이
+## 8. 협업 규칙 — Issues · PR · Actions · 선택적 Projects
 
 - GitHub **Issues 61개를 기준**으로 일정·담당자·선행 의존성·완료 조건을 관리합니다.
 - 사용 가능한 **Milestones (`Sprint 1`~`Sprint 5`), Labels (`P0/P1/P2`, 영역, 상태), Assignees**를 수동으로 관리합니다. 실제 등록된 라벨 이름을 확인하고 사용합니다.
-- 상태는 팀이 합의한 `Todo → In Progress → In Review → Done`을 **이슈 라벨 또는 이슈 본문의 체크리스트**로 수동 반영합니다. **Projects 보드/Actions는 필수나 전제 조건이 아닙니다.**
+- 상태는 `Todo → In Progress → In Review → Done`을 사용합니다. 자동화가 main에 병합된 뒤 PR에 `Closes #실제번호`를 적으면 `status:*` 라벨이 변경됩니다. **조직 Projects 상태 동기화는 Project 생성과 별도 토큰 설정을 완료한 경우에만 활성화됩니다.**
 - 권장 브랜치: `main`(안정), `develop`(통합), `feature/<area>-<BT-ID>`, `fix/<area>-<BT-ID>`. 저장소의 실제 브랜치 정책을 먼저 확인합니다.
 - PR에는 관련 GitHub Issue 번호(`Closes #실제번호`), 대응 BT 계획 ID, 구현 범위, UI·데이터 변경, 테스트 결과와 필요한 스크린샷을 작성합니다. 리뷰 1명 이상을 권장합니다.
-- 기존 Issue 번호와 BT ID를 혼동하지 않습니다. 상태 라벨은 PR 생성·병합 시 **수동 갱신**합니다.
+- 기존 Issue 번호와 BT ID를 혼동하지 않습니다. 자동화 설정 전 또는 연결 이슈가 없는 PR의 상태 라벨은 수동 갱신합니다.
 
 ## 9. 완료 기준 (Definition of Done)
 

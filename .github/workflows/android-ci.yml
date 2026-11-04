@@ -1,0 +1,65 @@
+name: BIN TIME - CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  automation-tests:
+    name: Automation logic tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/*.test.cjs
+
+  detect-android:
+    runs-on: ubuntu-latest
+    outputs:
+      directory: ${{ steps.detect.outputs.directory }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: detect
+        shell: bash
+        run: |
+          if [[ -f gradlew && ( -f settings.gradle || -f settings.gradle.kts ) ]]; then
+            echo 'directory=.' >> "$GITHUB_OUTPUT"
+          elif [[ -f android/gradlew && ( -f android/settings.gradle || -f android/settings.gradle.kts ) ]]; then
+            echo 'directory=android' >> "$GITHUB_OUTPUT"
+          else
+            echo 'directory=none' >> "$GITHUB_OUTPUT"
+            echo '::notice::Android Gradle Wrapper not present. Android build is SKIPPED, not PASS.'
+          fi
+
+  android-build:
+    needs: detect-android
+    if: needs.detect-android.outputs.directory != 'none'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Assemble + unit tests + lint
+        shell: bash
+        env:
+          PROJECT_DIR: ${{ needs.detect-android.outputs.directory }}
+        run: |
+          cd "$PROJECT_DIR"
+          bash ./gradlew --no-daemon assembleDebug testDebugUnitTest lintDebug
+      - name: Upload debug APK (if built)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bintime-debug-apk
+          path: '**/build/outputs/apk/debug/*.apk'
+          if-no-files-found: warn
