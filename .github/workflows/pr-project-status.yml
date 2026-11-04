@@ -1,0 +1,28 @@
+name: BIN TIME - PR to Project status
+on:
+  pull_request_target:
+    types: [opened, reopened, edited, ready_for_review, converted_to_draft, closed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  sync-project:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Update configured project cards
+        uses: actions/github-script@v7
+        env:
+          BIN_TIME_PROJECT_TOKEN: ${{ secrets.BIN_TIME_PROJECT_TOKEN }}
+          BIN_TIME_PROJECT_OWNER: ${{ vars.BIN_TIME_PROJECT_OWNER }}
+          BIN_TIME_PROJECT_NUMBER: ${{ vars.BIN_TIME_PROJECT_NUMBER }}
+        with:
+          github-token: ${{ secrets.BIN_TIME_PROJECT_TOKEN || github.token }}
+          script: |
+            await require('./scripts/pr_project_status.cjs').run({ github, context, core });
