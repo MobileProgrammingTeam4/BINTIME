@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Figma: ChatBubble Direction=Outgoing (27:1892). 폭 처리 방식은 item_chat_message_incoming 과 같다. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="20dp">
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:gravity="bottom"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/chatMessageTime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.BinTime.Caption"
+            android:textColor="@color/text_tertiary"
+            tools:text="오후 2:05" />
+
+        <TextView
+            android:id="@+id/chatBubble"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/bg_chat_bubble_outgoing"
+            android:maxWidth="248dp"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="12dp"
+            android:textAppearance="@style/TextAppearance.BinTime.BodyM"
+            android:textColor="@color/bg_card"
+            tools:ignore="InefficientWeight"
+            tools:text="도서관 2층 어때요?" />
+    </LinearLayout>
+</FrameLayout>

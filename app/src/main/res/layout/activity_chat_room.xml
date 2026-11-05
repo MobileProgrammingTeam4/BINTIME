@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Figma: 04 채팅 > 1:1 채팅. 진행 중 41:10820 / 종료 102:3094, 120:2370 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/chatRoomRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_card"
+    android:orientation="vertical">
+
+    <!-- AppHeader Type=BackOptions. ⋯ 동작은 BT-010 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="20dp">
+
+        <ImageButton
+            android:id="@+id/chatBack"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/chat_back"
+            android:src="@drawable/ic_chevron_left" />
+
+        <TextView
+            android:id="@+id/chatRoomTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.BinTime.H1"
+            tools:text="김지민" />
+
+        <ImageButton
+            android:id="@+id/chatMore"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="12dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/chat_more"
+            android:enabled="false"
+            android:src="@drawable/ic_more" />
+    </LinearLayout>
+
+    <!-- 진행 중 매칭: 시간 · 남은 시간 · 추천 장소 -->
+    <LinearLayout
+        android:id="@+id/chatMatchInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="20dp"
+        android:background="@drawable/bg_timematch"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_clock" />
+
+            <TextView
+                android:id="@+id/chatMatchTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:textAppearance="@style/TextAppearance.BinTime.ButtonS"
+                android:textColor="@color/action_pressed"
+                tools:text="오늘 14:00 ~ 15:30" />
+
+            <TextView
+                android:id="@+id/chatMatchRemaining"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:gravity="end"
+                android:textAppearance="@style/TextAppearance.BinTime.CaptionBold"
+                android:textColor="@color/text_secondary"
+                tools:text="남은 시간 1:12:36" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/chatPlaceRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_sparkles" />
+
+            <TextView
+                android:id="@+id/chatPlace"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:textAppearance="@style/TextAppearance.BinTime.CaptionBold"
+                tools:text="추천 장소: 복지관 지하1층 카페 / 북악도서관" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- 종료된 매칭: 후기 이동은 BT-010 -->
+    <LinearLayout
+        android:id="@+id/chatEndedBanner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="20dp"
+        android:background="@drawable/bg_timematch"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_clock" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:text="@string/chat_ended_banner"
+            android:textAppearance="@style/TextAppearance.BinTime.ButtonS"
+            android:textColor="@color/action_pressed" />
+
+        <TextView
+            android:id="@+id/chatReviewLink"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:textAppearance="@style/TextAppearance.BinTime.CaptionBold"
+            android:textColor="@color/action_pressed"
+            tools:text="매칭 후기 남기기" />
+
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_chevron_right_small" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/chatMessageList"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingHorizontal="20dp"
+            android:paddingBottom="20dp" />
+
+        <com.team4.bintime.common.StateView
+            android:id="@+id/chatRoomState"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center" />
+    </FrameLayout>
+
+    <!-- 반짝이 버튼과 더미 칩은 배치만 한다. 동작은 BT-010 -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="4dp">
+
+            <ImageButton
+                android:id="@+id/chatAiReply"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/chat_ai_reply"
+                android:enabled="false"
+                android:src="@drawable/ic_chat_ai_button" />
+
+            <LinearLayout
+                android:id="@+id/chatReplyChips"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="11dp"
+                    android:background="@drawable/bg_chat_reply_chip"
+                    android:gravity="center"
+                    android:paddingHorizontal="12dp"
+                    android:text="@string/chat_mock_reply_1"
+                    android:textAppearance="@style/TextAppearance.BinTime.CaptionBold"
+                    android:textColor="@color/text_secondary" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="11dp"
+                    android:background="@drawable/bg_chat_reply_chip"
+                    android:gravity="center"
+                    android:paddingHorizontal="12dp"
+                    android:text="@string/chat_mock_reply_2"
+                    android:textAppearance="@style/TextAppearance.BinTime.CaptionBold"
+                    android:textColor="@color/text_secondary" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="11dp"
+                    android:background="@drawable/bg_chat_reply_chip"
+                    android:gravity="center"
+                    android:paddingHorizontal="12dp"
+                    android:text="@string/chat_mock_reply_3"
+                    android:textAppearance="@style/TextAppearance.BinTime.CaptionBold"
+                    android:textColor="@color/text_secondary" />
+            </LinearLayout>
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- 빈틈 매칭/MessageComposer (27:1896) -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="8dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_pill_page"
+            android:elevation="1dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="8dp">
+
+            <ImageButton
+                android:id="@+id/chatAttach"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="@drawable/bg_circle_card"
+                android:contentDescription="@string/chat_attach"
+                android:enabled="false"
+                android:src="@drawable/ic_plus" />
+
+            <EditText
+                android:id="@+id/chatInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:background="@null"
+                android:hint="@string/chat_message_hint"
+                android:importantForAutofill="no"
+                android:inputType="textMultiLine|textCapSentences"
+                android:maxLines="4"
+                android:minHeight="36dp"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="8dp"
+                android:textAppearance="@style/TextAppearance.BinTime.BodyM"
+                android:textColorHint="@color/text_tertiary" />
+
+            <ImageButton
+                android:id="@+id/chatSend"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_circle_primary"
+                android:contentDescription="@string/chat_send"
+                android:foreground="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_send" />
+        </LinearLayout>
+    </FrameLayout>
+</LinearLayout>
