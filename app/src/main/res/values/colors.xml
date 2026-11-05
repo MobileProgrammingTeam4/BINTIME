@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Figma 「빈틈 매칭」 디자인 토큰 (팀 공통) -->
+<resources>
+    <color name="action_primary">#F84648</color>
+    <color name="action_pressed">#E83D3D</color>
+    <color name="action_subtle">#FFF0F0</color>
+    <color name="action_soft">#FFDADA</color>
+    <color name="text_primary">#222222</color>
+    <color name="text_secondary">#666666</color>
+    <color name="text_tertiary">#999999</color>
+    <color name="bg_page">#F6F6F6</color>
+    <color name="bg_card">#FFFFFF</color>
+    <color name="border_default">#E8E8E8</color>
+</resources>
