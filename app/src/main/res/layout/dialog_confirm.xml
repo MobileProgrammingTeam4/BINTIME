@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Figma 공통 Modal (예: 해당 과목을 삭제할까요 / 수정을 취소할까요). ConfirmDialog 가 사용 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_dialog"
+    android:orientation="vertical"
+    android:paddingHorizontal="20dp"
+    android:paddingVertical="24dp">
+
+    <TextView
+        android:id="@+id/dialogTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:textAppearance="@style/TextAppearance.BinTime.H2"
+        tools:text="해당 과목을 삭제할까요" />
+
+    <TextView
+        android:id="@+id/dialogMessage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center"
+        android:textAppearance="@style/TextAppearance.BinTime.BodyS"
+        android:textColor="@color/text_secondary"
+        tools:text="선택한 과목을 삭제할게요" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/dialogNegative"
+            style="@style/Widget.BinTime.ButtonOutline"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1"
+            android:text="취소" />
+
+        <TextView
+            android:id="@+id/dialogPositive"
+            style="@style/Widget.BinTime.ButtonPrimary"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            tools:text="삭제" />
+    </LinearLayout>
+</LinearLayout>
