@@ -30,6 +30,17 @@ public class PlaceholderFragment extends Fragment {
         t.setGravity(Gravity.CENTER);
         t.setTextColor(ContextCompat.getColor(requireContext(), R.color.text_tertiary));
         t.setText(args.getString("title") + " 화면\n(" + args.getString("owner") + " 담당 · 통합 예정)");
+        if ("B".equals(args.getString("owner"))) {
+            android.widget.LinearLayout root = new android.widget.LinearLayout(requireContext());
+            root.setOrientation(android.widget.LinearLayout.VERTICAL);
+            root.setGravity(Gravity.CENTER);
+            root.addView(t);
+            android.widget.Button settings = new android.widget.Button(requireContext());
+            settings.setText(com.team4.bintime.R.string.notification_settings);
+            settings.setOnClickListener(v -> startActivity(new android.content.Intent(requireContext(), com.team4.bintime.notification.NotificationSettingsActivity.class)));
+            root.addView(settings);
+            return root;
+        }
         return t;
     }
 }

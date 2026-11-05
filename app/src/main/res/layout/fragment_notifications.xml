@@ -1,0 +1,15 @@
+<?xml version="1.0" ?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="56dp" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="20dp">
+        <ImageButton android:id="@+id/notificationBack" android:layout_width="40dp" android:layout_height="40dp" android:src="@drawable/ic_chevron_left" android:background="?attr/selectableItemBackgroundBorderless" android:contentDescription="@string/request_back"/>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:text="@string/notifications" android:textAppearance="@style/TextAppearance.BinTime.H1"/>
+    </LinearLayout>
+    <com.team4.bintime.common.MouseWheelScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp">
+            <TextView android:id="@+id/notificationDate" android:layout_width="match_parent" android:layout_height="wrap_content" android:textAppearance="@style/TextAppearance.BinTime.H3" android:layout_marginBottom="16dp"/>
+            <com.team4.bintime.common.StateView android:id="@+id/notificationEmpty" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+            <LinearLayout android:id="@+id/notificationRows" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical"/>
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/notification_footer" android:textAppearance="@style/TextAppearance.BinTime.Caption" android:textColor="@color/text_tertiary"/>
+        </LinearLayout>
+    </com.team4.bintime.common.MouseWheelScrollView>
+</LinearLayout>

@@ -15,13 +15,13 @@ import com.team4.bintime.model.MatchCandidate;
 import com.team4.bintime.model.MatchFilter;
 
 /** 매칭 카드와 프로필 상세가 같이 쓰는 화면 채우기·매칭 신청 처리. */
-final class MatchSummaryBinder {
+public final class MatchSummaryBinder {
 
     private MatchSummaryBinder() {
     }
 
     /** view_match_summary.xml 채우기. showPlace=true 면 AI 추천 장소 줄도 표시(상세 화면). */
-    static void bind(View summary, MatchCandidate c, boolean showPlace) {
+    public static void bind(View summary, MatchCandidate c, boolean showPlace) {
         // shortcut: 모든 후보에 기본 프로필 이미지, Firebase Storage 프로필 사진 연동 시 사진이 있으면 교체
         ((ImageView) summary.findViewById(R.id.avatar)).setImageResource(R.drawable.img_default_profile);
         text(summary, R.id.name, c.name);
