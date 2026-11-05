@@ -1,0 +1,7 @@
+# 줄바꿈 고정: CI(ubuntu)와 맥에서 gradlew 실행이 깨지지 않도록
+* text=auto
+gradlew text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+*.jar binary
+*.png binary
