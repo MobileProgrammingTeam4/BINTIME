@@ -201,7 +201,7 @@ public final class MockChatRepository implements ChatRepository {
                 "복지관 지하1층 카페 / 북악도서관", false,
                 incoming("안녕하세요!\n어디서 만날까요?", nowMillis - 30 * MINUTE),
                 outgoing("도서관 2층 어때요?", nowMillis - 30 * MINUTE),
-                incoming("좋아요! 그럼 2시에 봐요 :)", nowMillis - 27 * MINUTE),
+                incoming("좋아요! 그럼 거기서 봐요 :)", nowMillis - 27 * MINUTE),
                 incoming("오늘도 좋은 하루!", nowMillis - 5 * MINUTE));
         addRoom("match-junho", "mock-junho", "준호", false, ChatRoom.Status.ACTIVE, today,
                 Math.max(0, minute - 30), Math.min(1440, minute + 60), 3, null, false,
