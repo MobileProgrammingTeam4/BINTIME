@@ -67,7 +67,7 @@ public final class RequestTabsController {
         render();
     }
 
-    private void render() {
+    public void render() {
         int heading = tab == MockRequestRepository.Tab.SENT ? R.string.request_sent
                 : tab == MockRequestRepository.Tab.RECEIVED ? R.string.request_received : R.string.request_completed;
         text(root, R.id.requestHeading, fragment.getString(heading));
@@ -151,7 +151,7 @@ public final class RequestTabsController {
         return "request:" + item.id + ":" + status.name();
     }
 
-    static String timeLabel(MockRequestRepository.Item item) {
+    public static String timeLabel(MockRequestRepository.Item item) {
         LocalDate date = LocalDate.parse(item.meetingDate);
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
         String day = date.equals(today) ? "오늘" : date.equals(today.minusDays(1)) ? "어제"

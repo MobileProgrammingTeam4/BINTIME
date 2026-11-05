@@ -31,6 +31,8 @@ import com.team4.bintime.common.ActionMenu;
 import com.team4.bintime.request.MockRequestRepository;
 import com.team4.bintime.request.RequestTabsController;
 import com.team4.bintime.request.MatchAcceptedActivity;
+import com.team4.bintime.notification.MatchRequestDialog;
+import com.team4.bintime.notification.NotificationPreferences;
 
 import java.util.Collections;
 import java.util.List;
@@ -64,12 +66,12 @@ public class MatchingFragment extends Fragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        requestRepository = ((MainActivity) requireActivity()).requests();
         if (savedInstanceState != null) {
             filter = (MatchFilter) savedInstanceState.getSerializable(FilterActivity.EXTRA_FILTER);
             selectedTab = savedInstanceState.getInt("matchingTab", 0);
             matchingOn = savedInstanceState.getBoolean("matchingOn", true);
-            MockRequestRepository restored = (MockRequestRepository) savedInstanceState.getSerializable("mockRequests");
-            if (restored != null) requestRepository = restored;
+
         }
         acceptedLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
             if (result.getResultCode() != android.app.Activity.RESULT_OK) return;
@@ -77,6 +79,12 @@ public class MatchingFragment extends Fragment {
             if (tabs != null) selectTopTab(tabs[0]);
             if (result.getData() != null && result.getData().getBooleanExtra(MatchAcceptedActivity.EXTRA_OPEN_CHAT, false)) {
                 ((MainActivity) requireActivity()).selectTab(R.id.nav_chat);
+            }
+        });
+        getChildFragmentManager().setFragmentResultListener(MatchRequestDialog.RESULT, this, (key, data) -> {
+            if (requestRepository.respond(data.getString("id"), MockRequestRepository.Status.valueOf(data.getString("status")))) {
+                if (getView() != null) render();
+                if ("ACCEPTED".equals(data.getString("status"))) acceptedLauncher.launch(MatchAcceptedActivity.intent(requireContext(), requestRepository.find(data.getString("id"))));
             }
         });
         filterLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
@@ -94,14 +102,24 @@ public class MatchingFragment extends Fragment {
         outState.putSerializable(FilterActivity.EXTRA_FILTER, filter);
         outState.putInt("matchingTab", selectedTab);
         outState.putBoolean("matchingOn", matchingOn);
-        outState.putSerializable("mockRequests", requestRepository);
+
     }
 
     // 프로필 상세에서 매칭 신청 후 돌아오면 카드 버튼도 '신청 완료'로 갱신
     @Override
     public void onResume() {
         super.onResume();
-        if (getView() != null) render();
+        if (getView() != null) {
+            render();
+            if (requestTabs != null) requestTabs.render();
+            getView().post(() -> {
+                if (!isResumed() || isHidden() || getView() == null || getChildFragmentManager().isStateSaved()) return;
+                NotificationPreferences prefs = new NotificationPreferences(requireContext());
+                List<MockRequestRepository.Item> pending = requestRepository.list(MockRequestRepository.Tab.RECEIVED);
+                if (!pending.isEmpty() && prefs.canShowPopup() && ((MainActivity) requireActivity()).claimRequestPopup())
+                    MatchRequestDialog.showRequest(getChildFragmentManager(), pending.get(0).id);
+            });
+        }
     }
 
     @Override
@@ -131,7 +149,7 @@ public class MatchingFragment extends Fragment {
         for (TextView tab : tabs) tab.setOnClickListener(t -> selectTopTab((TextView) t));
         selectTopTab(tabs[Math.max(0, Math.min(selectedTab, tabs.length - 1))]);
 
-        v.findViewById(R.id.btnBell).setOnClickListener(b -> toast("알림 화면은 D 담당 화면과 연결 예정"));
+        v.findViewById(R.id.btnBell).setOnClickListener(b -> ((MainActivity) requireActivity()).openNotifications());
         v.findViewById(R.id.btnFilter).setOnClickListener(b -> openFilter());
         v.findViewById(R.id.btnSort).setOnClickListener(anchor -> {
             if (sortMenu != null && sortMenu.isShowing()) return;
@@ -165,6 +183,11 @@ public class MatchingFragment extends Fragment {
         matchContent.setVisibility(find ? View.VISIBLE : View.GONE);
         requestContent.setVisibility(find ? View.GONE : View.VISIBLE);
         if (!find) requestTabs.show(MockRequestRepository.Tab.values()[selectedTab - 1]);
+    }
+
+    @Override public void onHiddenChanged(boolean hidden) {
+        super.onHiddenChanged(hidden);
+        if (!hidden && getView() != null && requestTabs != null) requestTabs.render();
     }
 
     @Override

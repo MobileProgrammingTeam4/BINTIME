@@ -19,5 +19,6 @@
         <activity android:name=".matching.FilterActivity" />
         <activity android:name=".matching.ProfileDetailActivity" />
         <activity android:name=".request.MatchAcceptedActivity" android:exported="false" />
+        <activity android:name=".notification.NotificationSettingsActivity" android:exported="false" />
     </application>
 </manifest>

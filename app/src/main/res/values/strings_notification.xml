@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notifications">알림</string>
+    <string name="notification_empty">새로운 알림이 없어요</string>
+    <string name="notification_empty_message">매칭 요청과 대화 소식이 생기면 여기에 표시돼요.</string>
+    <string name="notification_settings">알림 설정</string>
+    <string name="notification_popup_settings">팝업 설정</string>
+    <string name="notification_settings_title">필요하지 않은 알림이 있나요?</string>
+    <string name="notification_settings_message">언제든지 켜고 끌 수 있어요</string>
+    <string name="notification_request_title">매칭 요청이 왔어요!</string>
+    <string name="notification_request_message">새로운 매칭 요청을 받았어요</string>
+    <string name="notification_question">매칭을 수락하시겠어요?</string>
+    <string name="notification_today">오늘 하루동안 매칭 요청 팝업 끄기</string>
+    <string name="notification_processed">이미 처리된 요청이에요</string>
+    <string name="notification_footer">매칭 요청과 대화 소식을 여기에서 확인할 수 있어요. (시연 데이터)</string>
+    <string name="notification_message_body">%1$s: “좋아요! 그럼 2시에 봐요 :)”</string>
+    <string name="notification_match_body">%1$s님과 %2$s에 함께할 공강이 생겼어요.</string>
+    <string name="notification_request_body">%1$s님이 %2$s 공강에 매칭을 요청했어요.</string>
+    <string name="notification_review_body">나도 매칭 후기를 작성하면 상대방이 작성해준 후기를 볼 수 있어요.</string>
+    <string name="notification_request_open">요청 확인하기</string>
+    <string name="notification_request_accepted">완료된 매칭 보기 · 수락 완료</string>
+    <string name="notification_chat">채팅하기</string>
+    <string name="notification_match_open">매칭 확인하기</string>
+    <string-array name="notification_titles"><item>새 메시지가 도착했어요</item><item>매칭이 성사되었어요</item><item>매칭 요청이 왔어요</item><item>매칭 후기가 도착했어요</item></string-array>
+    <string-array name="notification_settings_labels"><item>메시지 도착 알림</item><item>매칭 요청 알림</item><item>매칭 성사 알림</item><item>공강 시간 알림</item><item>매칭 후기 작성 알림</item><item>매칭 후기 도착 알림</item><item>매칭 요청 팝업 표시</item></string-array>
+</resources>

@@ -12,6 +12,8 @@ import androidx.fragment.app.FragmentTransaction;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.team4.bintime.matching.MatchingFragment;
+import com.team4.bintime.request.MockRequestRepository;
+import com.team4.bintime.notification.NotificationListFragment;
 
 /**
  * 공통 화면 이동 담당: 하단 탭 4개를 Fragment show/hide 로 전환한다 (탭 상태 유지).
@@ -22,23 +24,51 @@ public class MainActivity extends AppCompatActivity {
     private static final int[] TAB_IDS = {R.id.nav_matching, R.id.nav_chat, R.id.nav_timetable, R.id.nav_my};
 
     private BottomNavigationView bottomNav;
+    private MockRequestRepository requests = new MockRequestRepository();
+    private boolean popupShown;
+    public MockRequestRepository requests() { return requests; }
+    public boolean claimRequestPopup() {
+        if (popupShown) return false;
+        popupShown = true;
+        return true;
+    }
+    public void openNotifications() {
+        FragmentManager fm = getSupportFragmentManager();
+        if (fm.isStateSaved() || fm.findFragmentByTag("notifications") != null) return;
+        FragmentTransaction tx = fm.beginTransaction().setReorderingAllowed(true);
+        for (Fragment f : fm.getFragments()) if (f.isVisible()) tx.hide(f);
+        tx.add(R.id.container, new NotificationListFragment(), "notifications")
+                .addToBackStack("notifications").commit();
+    }
+    @Override protected void onSaveInstanceState(@NonNull Bundle out) {
+        out.putSerializable("sharedRequests", requests);
+        out.putBoolean("requestPopupShown", popupShown);
+        super.onSaveInstanceState(out);
+    }
 
     // 뒤로가기 규칙: 매칭 외 탭에서는 매칭 탭으로 돌아오고, 매칭 탭에서는 기본 동작(앱 종료)
     private final OnBackPressedCallback backToMatching = new OnBackPressedCallback(false) {
         @Override
         public void handleOnBackPressed() {
-            selectTab(R.id.nav_matching);
+            if (getSupportFragmentManager().getBackStackEntryCount() > 0) getSupportFragmentManager().popBackStack();
+            else selectTab(R.id.nav_matching);
         }
     };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        if (savedInstanceState != null) {
+            MockRequestRepository restored = (MockRequestRepository) savedInstanceState.getSerializable("sharedRequests");
+            if (restored != null) requests = restored;
+            popupShown = savedInstanceState.getBoolean("requestPopupShown");
+        }
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
         bottomNav = findViewById(R.id.bottomNav);
         bottomNav.setItemActiveIndicatorEnabled(false);
         bottomNav.setOnItemSelectedListener(item -> {
+            getSupportFragmentManager().popBackStackImmediate(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
             showTab(item.getItemId());
             backToMatching.setEnabled(item.getItemId() != R.id.nav_matching);
             return true;
