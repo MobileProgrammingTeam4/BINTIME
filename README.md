@@ -224,14 +224,58 @@ npm run build
 - **Gemini는 Cloud Functions에서 호출**하고 키는 Firebase Secrets 등 서버 비밀 저장소로 관리합니다.
 - 운영 환경 배포·유료 기능 활성화·비용 설정 변경은 프로젝트 소유자 승인 없이 진행하지 않습니다.
 
-## 8. 협업 규칙 — Issues · PR · Actions · 선택적 Projects
+## 8. 협업 규칙 — 커밋 · 브랜치 · PR · Issues
+
+### 8.1 커밋 컨벤션
+
+커밋 제목은 **`타입/변경 내용`** 형식으로 작성합니다. 타입은 아래 영문 소문자를 사용하고, 변경 내용은 한글로 작성해도 됩니다. `/` 뒤에 변경한 대상과 동작을 구체적으로 적습니다.
+
+| 타입 | 사용 기준 | 예시 |
+|---|---|---|
+| `feat` | 새로운 기능·화면 추가 | `feat/보낸 요청과 받은 요청 탭 구현` |
+| `fix` | 오류·잘못된 동작 수정 | `fix/마우스 스크롤이 끝까지 이동하는 문제 수정` |
+| `docs` | 문서 작성·수정 | `docs/커밋과 브랜치 및 PR 규칙 정리` |
+| `style` | 동작 변경 없는 코드 서식 정리 | `style/Java 들여쓰기 정리` |
+| `refactor` | 동작을 유지하는 코드 구조 개선 | `refactor/공통 시간 요약 컴포넌트 분리` |
+| `test` | 테스트 추가·수정 | `test/요청 수락과 취소 상태 검증 추가` |
+| `chore` | 개발 환경·도구·기타 설정 변경 | `chore/Android Studio 설정 파일 Git 제외` |
+| `ci` | CI·협업 자동화 변경 | `ci/Android 빌드 검사 워크플로 수정` |
+| `revert` | 이전 커밋 되돌리기 | `revert/정렬 메뉴 변경 되돌리기` |
+
+- 하나의 커밋에는 하나의 목적에 해당하는 변경을 담습니다. 관련 없는 수정은 분리합니다.
+- 화면 디자인 변경은 새 기능이면 `feat`, 잘못된 표시 수정이면 `fix`를 사용합니다. `style`은 코드 서식 정리에 사용합니다.
+- 설명이 더 필요하면 제목 다음 빈 줄을 두고 본문에 변경 이유·영향·검증 결과를 적습니다. 이슈 연결이 필요하면 본문에 `Refs #실제번호`를 작성합니다.
+- `.env`, `google-services.json`, `local.properties`, 서비스 계정·키스토어 등 로컬 설정과 비밀값은 커밋하지 않습니다.
+
+### 8.2 브랜치 규칙
+
+**기존 권장 브랜치 규칙을 사용합니다.** 작업 브랜치는 최신 `develop`에서 만들고, 기능·수정 작업을 마친 뒤 PR로 `develop`에 통합합니다. 통합된 변경은 별도 PR로 `main`에 반영합니다. 저장소에 설정된 보호 규칙과 승인된 팀 결정이 있으면 함께 준수합니다.
+
+| 브랜치 | 역할 / 이름 형식 | 예시 |
+|---|---|---|
+| `main` | 검증된 안정 버전 | `main` |
+| `develop` | 팀 작업 통합 및 통합 검증 | `develop` |
+| `feature/<area>-<BT-ID>` | 기능·화면 및 관련 구현 작업 | `feature/request-BT-007` |
+| `fix/<area>-<BT-ID>` | 오류 수정 작업 | `fix/matching-BT-006` |
+
+- `<area>`는 `common`, `auth`, `profile`, `timetable`, `matching`, `request`, `chat`, `notification`, `review` 등 실제 담당 영역을 사용합니다.
+- `<BT-ID>`는 `BT-007`처럼 세 자리 계획 ID를 사용합니다. 실제 GitHub 이슈 번호와 같다고 가정하지 않습니다.
+- 이슈가 없는 문서·설정 작업은 이슈 번호를 만들지 않고 `feature/docs-commit-rules`처럼 작업 설명을 사용합니다.
+- `main`·`develop` 반영은 PR을 통해 진행하고, 작업이 병합된 뒤 더 이상 필요 없는 작업 브랜치를 정리합니다.
+
+### 8.3 PR 규칙
+
+- PR은 [`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md)를 기준으로 작성합니다. 본문 항목과 검증 체크리스트는 해당 템플릿을 그대로 사용하며, README에서 별도의 작성 양식을 정의하지 않습니다.
+- 템플릿의 `#ISSUE_NUMBER`는 실제 GitHub 이슈 번호로 바꾸고, 각 항목은 실제 작업·검증 결과에 맞게 작성합니다. 해당하지 않거나 실행하지 않은 항목은 사유를 명시합니다.
+- 템플릿의 리뷰 요청 및 증거·후속 작업 항목을 확인하고, 작성 중이면 Draft로 관리합니다. 병합 대상 브랜치는 위 브랜치 규칙을 따릅니다.
+
+### 8.4 Issues · Actions · 선택적 Projects
 
 - GitHub **Issues 61개를 기준**으로 일정·담당자·선행 의존성·완료 조건을 관리합니다.
-- 사용 가능한 **Milestones (`Sprint 1`~`Sprint 5`), Labels (`P0/P1/P2`, 영역, 상태), Assignees**를 수동으로 관리합니다. 실제 등록된 라벨 이름을 확인하고 사용합니다.
-- 상태는 `Todo → In Progress → In Review → Done`을 사용합니다. 자동화가 main에 병합된 뒤 PR에 `Closes #실제번호`를 적으면 `status:*` 라벨이 변경됩니다. **조직 Projects 상태 동기화는 Project 생성과 별도 토큰 설정을 완료한 경우에만 활성화됩니다.**
-- 권장 브랜치: `main`(안정), `develop`(통합), `feature/<area>-<BT-ID>`, `fix/<area>-<BT-ID>`. 저장소의 실제 브랜치 정책을 먼저 확인합니다.
-- PR에는 관련 GitHub Issue 번호(`Closes #실제번호`), 대응 BT 계획 ID, 구현 범위, UI·데이터 변경, 테스트 결과와 필요한 스크린샷을 작성합니다. 리뷰 1명 이상을 권장합니다.
-- 기존 Issue 번호와 BT ID를 혼동하지 않습니다. 자동화 설정 전 또는 연결 이슈가 없는 PR의 상태 라벨은 수동 갱신합니다.
+- 사용 가능한 **Milestones (`Sprint 1`~`Sprint 5`), Labels (`P0/P1/P2`, 영역, 상태), Assignees**를 관리합니다. 실제 등록된 라벨 이름을 확인하고 사용합니다.
+- 상태는 `Todo → In Progress → In Review → Done`을 사용합니다. PR–Issue 자동화는 PR 본문의 `Closes #실제번호`를 기준으로 상태 라벨을 동기화하며, Done은 `main` 병합을 기준으로 합니다.
+- 자동화 워크플로가 `main`에 반영되고 실제 실행이 성공했는지 확인합니다. 자동화 설정 전 또는 연결 이슈가 없는 PR의 상태는 수동으로 관리합니다.
+- **조직 Projects 상태 동기화는 Project 생성과 별도 토큰 설정을 완료한 경우에만 활성화됩니다.** 설정과 제한사항은 [GitHub 자동화 운영 안내](./docs/GITHUB_AUTOMATION.md)를 따릅니다.
 
 ## 9. 완료 기준 (Definition of Done)
 
