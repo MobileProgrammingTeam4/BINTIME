@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="chat_title">채팅</string>
+    <string name="chat_tab_all">전체</string>
+    <string name="chat_tab_matched">매칭됨</string>
+    <string name="chat_tab_ended">매칭종료</string>
+    <string name="chat_today">오늘</string>
+    <string name="chat_yesterday">어제</string>
+    <string name="chat_retry">다시 시도</string>
+    <string name="chat_list_error">채팅 목록을 불러오지 못했어요.\n잠시 후 다시 시도해주세요.</string>
+    <string name="chat_empty_all_title">아직 채팅이 없어요</string>
+    <string name="chat_empty_all_message">매칭이 성사되면\n여기에서 대화할 수 있어요.</string>
+    <string name="chat_empty_matched_title">진행 중인 매칭이 없어요</string>
+    <string name="chat_empty_matched_message">매칭이 성사되면\n여기에서 대화할 수 있어요.</string>
+    <string name="chat_empty_ended_title">종료된 매칭이 없어요</string>
+    <string name="chat_empty_ended_message">매칭이 종료되면\n여기에서 확인할 수 있어요.</string>
+    <string name="chat_demo_state">데모 상태: %1$s</string>
+    <string name="chat_back">뒤로가기</string>
+    <string name="chat_more">채팅 옵션</string>
+    <string name="chat_attach">첨부</string>
+    <string name="chat_send">메시지 보내기</string>
+    <string name="chat_ai_reply">AI 답장 추천</string>
+    <string name="chat_message_hint">메시지를 입력하세요...</string>
+    <string name="chat_remaining">남은 시간 %1$s</string>
+    <string name="chat_recommended_place">추천 장소: %1$s</string>
+    <string name="chat_ended_banner">종료된 매칭이에요</string>
+    <string name="chat_review_write">매칭 후기 남기기</string>
+    <string name="chat_review_view">매칭 후기 보기</string>
+    <string name="chat_mock_reply_1">만나서 반가워요</string>
+    <string name="chat_mock_reply_2">복지관 카페 어떠세요?</string>
+    <string name="chat_mock_reply_3">자료구조 공부하시나요?</string>
+    <string name="chat_messages_empty_title">아직 메시지가 없어요</string>
+    <string name="chat_messages_empty_message">먼저 인사를 건네보세요.</string>
+    <string name="chat_messages_error">메시지를 불러오지 못했어요.\n잠시 후 다시 시도해주세요.</string>
+    <string name="chat_send_failed">메시지를 보내지 못했어요. 다시 시도해주세요.</string>
+    <string name="chat_room_missing">채팅방을 찾을 수 없어요.</string>
+</resources>

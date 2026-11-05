@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Figma: 04 채팅 > 채팅 목록 (41:10702) -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_card"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/chatListTitle"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="20dp"
+        android:text="@string/chat_title"
+        android:textAppearance="@style/TextAppearance.BinTime.H1" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="20dp">
+
+        <TextView
+            android:id="@+id/chatTabAll"
+            style="@style/Widget.BinTime.Tab"
+            android:text="@string/chat_tab_all" />
+
+        <TextView
+            android:id="@+id/chatTabMatched"
+            style="@style/Widget.BinTime.Tab"
+            android:layout_marginStart="8dp"
+            android:text="@string/chat_tab_matched" />
+
+        <TextView
+            android:id="@+id/chatTabEnded"
+            style="@style/Widget.BinTime.Tab"
+            android:layout_marginStart="8dp"
+            android:text="@string/chat_tab_ended" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/chatRoomList"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingHorizontal="20dp"
+            android:paddingTop="12dp" />
+
+        <com.team4.bintime.common.StateView
+            android:id="@+id/chatListState"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center" />
+    </FrameLayout>
+</LinearLayout>

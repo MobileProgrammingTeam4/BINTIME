@@ -11,6 +11,7 @@ import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.team4.bintime.chat.ChatListFragment;
 import com.team4.bintime.matching.MatchingFragment;
 import com.team4.bintime.request.MockRequestRepository;
 import com.team4.bintime.notification.NotificationListFragment;
@@ -106,7 +107,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private Fragment createTab(@IdRes int tabId) {
-        if (tabId == R.id.nav_chat) return PlaceholderFragment.newInstance("채팅", "E");
+        if (tabId == R.id.nav_chat) return new ChatListFragment();
         if (tabId == R.id.nav_timetable) return PlaceholderFragment.newInstance("시간표", "C");
         if (tabId == R.id.nav_my) return PlaceholderFragment.newInstance("마이페이지", "B");
         return new MatchingFragment();
