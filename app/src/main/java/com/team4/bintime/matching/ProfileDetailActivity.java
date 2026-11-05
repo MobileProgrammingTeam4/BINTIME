@@ -8,12 +8,14 @@ import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.PopupWindow;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
 import com.team4.bintime.R;
 import com.team4.bintime.common.ChipViews;
+import com.team4.bintime.common.ActionMenu;
 import com.team4.bintime.data.MockMatchRepository;
 import com.team4.bintime.model.MatchCandidate;
 
@@ -26,6 +28,7 @@ public class ProfileDetailActivity extends AppCompatActivity {
 
     private static final String EXTRA_UID = "uid";
     private static final String EXTRA_MY_TAGS = "myTags";
+    private PopupWindow moreMenu;
 
     public static Intent intent(Context context, String uid, Collection<String> myTags) {
         return new Intent(context, ProfileDetailActivity.class)
@@ -44,9 +47,11 @@ public class ProfileDetailActivity extends AppCompatActivity {
         setContentView(R.layout.activity_profile_detail);
 
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
-        // shortcut: 차단·신고 메뉴는 B 담당 기능 연결 전까지 안내만
-        findViewById(R.id.btnMore).setOnClickListener(v ->
-                Toast.makeText(this, "차단·신고 메뉴는 B 담당 기능과 연결 예정", Toast.LENGTH_SHORT).show());
+        findViewById(R.id.btnMore).setOnClickListener(v -> {
+            if (moreMenu != null && moreMenu.isShowing()) return;
+            moreMenu = ActionMenu.show(v, new String[]{getString(R.string.profile_report)}, 0,
+                    index -> Toast.makeText(this, R.string.profile_report_pending, Toast.LENGTH_SHORT).show());
+        });
 
         MatchSummaryBinder.bind(findViewById(R.id.summary), c, true);
         ((TextView) findViewById(R.id.purpose)).setText("매칭 목적 - " + c.purpose);
@@ -60,6 +65,12 @@ public class ProfileDetailActivity extends AppCompatActivity {
 
         bindReviews(c);
         MatchSummaryBinder.bindRequestButton(findViewById(R.id.btnRequest), c);
+    }
+
+    @Override protected void onStop() {
+        if (moreMenu != null) moreMenu.dismiss();
+        moreMenu = null;
+        super.onStop();
     }
 
     private void bindReviews(MatchCandidate c) {

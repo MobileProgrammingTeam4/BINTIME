@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Figma 41:10882 매칭 수락 후 확인 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:fitsSystemWindows="true" android:orientation="vertical">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="56dp"
+        android:gravity="center_vertical" android:orientation="horizontal" android:paddingHorizontal="20dp">
+        <ImageButton android:id="@+id/acceptedBack" android:layout_width="40dp" android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless" android:contentDescription="@string/request_back"
+            android:src="@drawable/ic_chevron_left" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginStart="12dp" android:text="@string/request_accepted_header"
+            android:textAppearance="@style/TextAppearance.BinTime.H1" />
+    </LinearLayout>
+    <androidx.core.widget.NestedScrollView android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:fillViewport="true">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:paddingHorizontal="20dp" android:paddingVertical="24dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:gravity="center_horizontal" android:paddingTop="64dp" android:paddingBottom="24dp">
+                <FrameLayout android:layout_width="56dp" android:layout_height="56dp" android:background="@drawable/bg_circle_subtle">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:layout_gravity="center"
+                        android:src="@drawable/ic_check" android:importantForAccessibility="no" />
+                </FrameLayout>
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp" android:gravity="center" android:text="@string/request_accepted_title"
+                    android:textAppearance="@style/TextAppearance.BinTime.H1" />
+                <TextView android:id="@+id/acceptedMessage" android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp" android:gravity="center" android:textColor="@color/text_secondary"
+                    android:textAppearance="@style/TextAppearance.BinTime.BodyM" />
+            </LinearLayout>
+            <include layout="@layout/view_time_overlap" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginTop="24dp" />
+            <HorizontalScrollView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="12dp" android:fillViewport="true" android:scrollbars="none">
+                <LinearLayout android:id="@+id/acceptedTags" android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" android:gravity="center" android:orientation="horizontal" />
+            </HorizontalScrollView>
+            <Space android:layout_width="match_parent" android:layout_height="0dp"
+                android:layout_weight="1" android:minHeight="24dp" />
+            <TextView android:id="@+id/acceptedChat" style="@style/Widget.BinTime.PillPrimary"
+                android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="24dp"
+                android:text="@string/request_chat" />
+            <TextView android:id="@+id/acceptedHome" style="@style/Widget.BinTime.PillOutline"
+                android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="12dp"
+                android:text="@string/request_home" />
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+</LinearLayout>

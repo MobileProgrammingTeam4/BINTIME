@@ -36,7 +36,7 @@
             android:src="@drawable/ic_bell" />
     </LinearLayout>
 
-    <!-- 탭 전환 (매칭 찾기만 A 담당, 나머지는 D 담당 화면 자리) -->
+    <!-- 매칭 찾기(A) 및 요청/완료(D) 탭 -->
     <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -77,10 +77,11 @@
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
+        android:layout_marginTop="12dp"
         android:layout_weight="1">
 
-        <androidx.core.widget.NestedScrollView
-            android:id="@+id/matchContent"
+        <com.team4.bintime.common.MouseWheelScrollView
+            android:id="@+id/matchingScroll"
             android:layout_width="match_parent"
             android:layout_height="match_parent">
 
@@ -89,7 +90,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:paddingHorizontal="20dp"
-                android:paddingVertical="12dp">
+                android:paddingBottom="12dp">
 
                 <!-- 매칭 스위치 / 현재 공강 상태 카드 -->
                 <LinearLayout
@@ -183,102 +184,104 @@
                     </LinearLayout>
                 </LinearLayout>
 
-                <!-- 적용된 필터 -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:text="적용된 필터"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
-
                 <LinearLayout
+                    android:id="@+id/matchContent"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <LinearLayout
-                        android:id="@+id/appliedFilters"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="horizontal" />
-
-                    <TextView
-                        android:id="@+id/btnFilter"
-                        style="@style/Widget.BinTime.PillOutline"
-                        android:layout_width="wrap_content"
-                        android:layout_height="32dp"
-                        android:text="필터 설정"
-                        android:textSize="12sp" />
-                </LinearLayout>
-
-                <!-- 섹션 헤더 -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
+                    android:orientation="vertical">
+                    <!-- 적용된 필터 -->
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="지금 만날 수 있는 사람"
-                        android:textColor="@color/text_primary"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/count"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        android:layout_weight="1"
-                        android:textColor="@color/action_primary"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
-                        tools:text="12" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:drawableEnd="@drawable/ic_chevron_down"
-                        android:drawablePadding="4dp"
-                        android:text="AI 추천순"
+                        android:layout_marginTop="16dp"
+                        android:text="적용된 필터"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp"
                         android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:id="@+id/appliedFilters"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="horizontal" />
+
+                        <TextView
+                            android:id="@+id/btnFilter"
+                            style="@style/Widget.BinTime.PillOutline"
+                            android:layout_width="wrap_content"
+                            android:layout_height="32dp"
+                            android:text="필터 설정"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <!-- 섹션 헤더 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="지금 만날 수 있는 사람"
+                            android:textColor="@color/text_primary"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/count"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:layout_weight="1"
+                            android:textColor="@color/action_primary"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            tools:text="12" />
+
+                        <TextView
+                            android:id="@+id/btnSort"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:drawableEnd="@drawable/ic_chevron_down"
+                            android:drawablePadding="4dp"
+                            android:background="?attr/selectableItemBackground"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:text="@string/matching_sort_ai"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/recycler"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:nestedScrollingEnabled="false"
+                        tools:listitem="@layout/item_matching_card" />
+
+                    <!-- 상황별 안내 (결과 없음 / 공강 없음 / 스위치 OFF) : 공통 StateView -->
+                    <com.team4.bintime.common.StateView
+                        android:id="@+id/stateView"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp" />
                 </LinearLayout>
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/recycler"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:nestedScrollingEnabled="false"
-                    tools:listitem="@layout/item_matching_card" />
-
-                <!-- 상황별 안내 (결과 없음 / 공강 없음 / 스위치 OFF) : 공통 StateView -->
-                <com.team4.bintime.common.StateView
-                    android:id="@+id/stateView"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp" />
+                <include layout="@layout/view_request_list" />
             </LinearLayout>
-        </androidx.core.widget.NestedScrollView>
+        </com.team4.bintime.common.MouseWheelScrollView>
 
-        <!-- 보낸/받은/완료 탭 자리 (D 담당) -->
-        <TextView
-            android:id="@+id/tabPlaceholder"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center"
-            android:textColor="@color/text_tertiary"
-            android:textSize="14sp"
-            android:visibility="gone" />
     </FrameLayout>
 </LinearLayout>

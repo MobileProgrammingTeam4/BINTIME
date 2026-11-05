@@ -32,13 +32,20 @@ public class ConfirmDialog extends DialogFragment {
     private static final String ARG_TITLE = "title";
     private static final String ARG_MESSAGE = "message";
     private static final String ARG_POSITIVE = "positive";
+    private static final String ARG_NEGATIVE = "negative";
 
     public static void show(FragmentManager fm, String requestKey, String title, String message, String positiveLabel) {
+        show(fm, requestKey, title, message, positiveLabel, "취소");
+    }
+
+    public static void show(FragmentManager fm, String requestKey, String title, String message,
+                            String positiveLabel, String negativeLabel) {
         Bundle args = new Bundle();
         args.putString(ARG_KEY, requestKey);
         args.putString(ARG_TITLE, title);
         args.putString(ARG_MESSAGE, message);
         args.putString(ARG_POSITIVE, positiveLabel);
+        args.putString(ARG_NEGATIVE, negativeLabel);
         ConfirmDialog dialog = new ConfirmDialog();
         dialog.setArguments(args);
         dialog.show(fm, requestKey);
@@ -54,7 +61,9 @@ public class ConfirmDialog extends DialogFragment {
         TextView positive = view.findViewById(R.id.dialogPositive);
         positive.setText(args.getString(ARG_POSITIVE));
 
-        view.findViewById(R.id.dialogNegative).setOnClickListener(v -> dismiss());
+        TextView negative = view.findViewById(R.id.dialogNegative);
+        negative.setText(args.getString(ARG_NEGATIVE, "취소"));
+        negative.setOnClickListener(v -> dismiss());
         positive.setOnClickListener(v -> {
             getParentFragmentManager().setFragmentResult(args.getString(ARG_KEY), new Bundle());
             dismiss();

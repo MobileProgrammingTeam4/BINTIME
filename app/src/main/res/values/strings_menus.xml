@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_report">신고하기</string>
+    <string name="profile_report_pending">신고 기능은 준비 중이에요.</string>
+    <string name="matching_sort_ai">AI 추천순</string>
+    <string name="matching_sort_time">빠른 시간순</string>
+    <string name="matching_sort_pending">정렬 기능은 준비 중이에요.</string>
+</resources>

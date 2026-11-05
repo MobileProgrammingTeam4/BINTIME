@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="request_profile">프로필 보기</string>
+    <string name="request_sent">보낸 매칭 요청</string>
+    <string name="request_received">받은 매칭 요청</string>
+    <string name="request_completed">완료된 매칭</string>
+    <string name="request_cancel">요청 취소</string>
+    <string name="request_reject">거절하기</string>
+    <string name="request_accept">수락하기</string>
+    <string name="request_review">매칭 후기 남기기</string>
+    <string name="request_close">닫기</string>
+    <string name="request_dismiss">취소</string>
+    <string name="request_cancel_confirm">요청취소</string>
+    <string name="request_waiting">수락 대기</string>
+    <string name="request_ended">완료됨</string>
+    <string name="request_active">매칭 진행 중</string>
+    <string name="request_mock_metadata">%1$s · 시연 데이터</string>
+    <string name="request_empty_title">%1$s이 없어요</string>
+    <string name="request_empty_message">새로운 요청이나 매칭이 생기면 여기에 표시돼요.</string>
+    <string name="request_sent_notice">• 겹치는 시간에 보낸 매칭 요청 중 하나가 수락되면 나머지 요청은 자동으로 취소처리 돼요\n• 매칭된 이후에는 약속을 취소할 수 없어요\n• 상대가 다른 매칭을 먼저 수락하거나 거절하면 요청 탭에 더이상 표시되지 않아요</string>
+    <string name="request_received_notice">• 겹치는 시간에 받은 매칭 요청 중 하나를 수락하면 나머지는 자동으로 거절처리 돼요\n• 매칭된 이후에는 약속을 취소할 수 없어요\n• 상대가 다른 상대와 매칭되면 이 탭에 더이상 표시되지 않아요</string>
+    <string name="request_completed_notice">• 매칭된 이후에는 약속을 취소할 수 없어요</string>
+    <string name="request_confirm_title">%1$s 요청을 %2$s할까요?</string>
+    <string name="request_confirm_message">%1$s\n%2$s\n이 화면에서는 시연 데이터만 변경됩니다.</string>
+    <string name="request_back">뒤로가기</string>
+    <string name="request_accepted_header">매칭 완료</string>
+    <string name="request_accepted_title">매칭이 성사되었어요!</string>
+    <string name="request_accepted_message">%1$s님과 함께할 공강이 생겼어요.</string>
+    <string name="request_accepted_duration">%1$s 공강 겹침</string>
+    <string name="request_chat">채팅하기</string>
+    <string name="request_home">홈으로 가기</string>
+    <string name="request_changed">요청 상태가 변경됐어요</string>
+    <string name="request_failed">이미 처리되었거나 사용할 수 없는 요청이에요.</string>
+    <string name="request_review_pending">후기 작성은 후기 기능 연동 후 사용할 수 있어요.</string>
+</resources>
