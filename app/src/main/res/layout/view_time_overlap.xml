@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="12dp"
+    android:background="@drawable/bg_timematch"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_clock" />
+
+        <TextView
+            android:id="@+id/time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:textColor="@color/action_pressed"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            tools:text="오늘 14:00 ~ 15:30" />
+
+        <TextView
+            android:id="@+id/duration"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            tools:text="1시간 30분 겹침" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginVertical="12dp"
+        android:background="@color/action_soft" />
+
+    <TextView
+        android:id="@+id/reasons"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:lineSpacingExtra="8dp"
+        android:textColor="@color/text_primary"
+        android:textSize="12sp"
+        tools:text="📍 직전 수업이 같은 '공학관'이에요 (도보 1분)\n📚 이번 학기 '자료구조' 수업을 함께 듣고 있어요" />
+
+    <TextView
+        android:id="@+id/aiPlace"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:drawableStart="@drawable/ic_sparkles"
+        android:drawablePadding="8dp"
+        android:gravity="center_vertical"
+        android:textAppearance="@style/TextAppearance.BinTime.CaptionBold"
+        android:visibility="gone"
+        tools:text="AI 추천 장소: 복지관 지하1층 카페 / 북악도서관"
+        tools:visibility="visible" />
+</LinearLayout>

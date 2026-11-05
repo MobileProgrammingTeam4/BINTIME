@@ -8,6 +8,7 @@ import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.PopupWindow;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -25,6 +26,11 @@ import com.team4.bintime.model.MatchCandidate;
 import com.team4.bintime.model.MatchFilter;
 import com.team4.bintime.common.ChipViews;
 import com.team4.bintime.common.StateView;
+import com.team4.bintime.common.ActionMenu;
+
+import com.team4.bintime.request.MockRequestRepository;
+import com.team4.bintime.request.RequestTabsController;
+import com.team4.bintime.request.MatchAcceptedActivity;
 
 import java.util.Collections;
 import java.util.List;
@@ -40,9 +46,15 @@ public class MatchingFragment extends Fragment {
 
     private final MatchingAdapter adapter = new MatchingAdapter();
     private ActivityResultLauncher<Intent> filterLauncher;
+    private ActivityResultLauncher<Intent> acceptedLauncher;
+    private PopupWindow sortMenu;
 
     private View statusCard, matchContent;
-    private TextView statusTitle, statusDesc, count, tabPlaceholder;
+    private TextView statusTitle, statusDesc, count;
+    private MockRequestRepository requestRepository = new MockRequestRepository();
+    private RequestTabsController requestTabs;
+    private View requestContent;
+    private int selectedTab;
     private StateView stateView;
     private TextView[] tabs;
     private MaterialSwitch switchMatching;
@@ -54,11 +66,23 @@ public class MatchingFragment extends Fragment {
         super.onCreate(savedInstanceState);
         if (savedInstanceState != null) {
             filter = (MatchFilter) savedInstanceState.getSerializable(FilterActivity.EXTRA_FILTER);
+            selectedTab = savedInstanceState.getInt("matchingTab", 0);
+            matchingOn = savedInstanceState.getBoolean("matchingOn", true);
+            MockRequestRepository restored = (MockRequestRepository) savedInstanceState.getSerializable("mockRequests");
+            if (restored != null) requestRepository = restored;
         }
+        acceptedLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+            if (result.getResultCode() != android.app.Activity.RESULT_OK) return;
+            selectedTab = 0;
+            if (tabs != null) selectTopTab(tabs[0]);
+            if (result.getData() != null && result.getData().getBooleanExtra(MatchAcceptedActivity.EXTRA_OPEN_CHAT, false)) {
+                ((MainActivity) requireActivity()).selectTab(R.id.nav_chat);
+            }
+        });
         filterLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
             if (result.getResultCode() == android.app.Activity.RESULT_OK && result.getData() != null) {
                 filter = (MatchFilter) result.getData().getSerializableExtra(FilterActivity.EXTRA_FILTER);
-                render();
+                if (getView() != null) render();
             }
         });
     }
@@ -68,6 +92,9 @@ public class MatchingFragment extends Fragment {
     public void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putSerializable(FilterActivity.EXTRA_FILTER, filter);
+        outState.putInt("matchingTab", selectedTab);
+        outState.putBoolean("matchingOn", matchingOn);
+        outState.putSerializable("mockRequests", requestRepository);
     }
 
     // 프로필 상세에서 매칭 신청 후 돌아오면 카드 버튼도 '신청 완료'로 갱신
@@ -93,7 +120,8 @@ public class MatchingFragment extends Fragment {
         recycler = v.findViewById(R.id.recycler);
         stateView = v.findViewById(R.id.stateView);
         matchContent = v.findViewById(R.id.matchContent);
-        tabPlaceholder = v.findViewById(R.id.tabPlaceholder);
+        requestContent = v.findViewById(R.id.requestContent);
+        requestTabs = new RequestTabsController(this, requestContent, requestRepository, acceptedLauncher::launch);
 
         recycler.setLayoutManager(new LinearLayoutManager(requireContext()));
         recycler.setAdapter(adapter);
@@ -101,10 +129,17 @@ public class MatchingFragment extends Fragment {
         tabs = new TextView[]{v.findViewById(R.id.tabFind), v.findViewById(R.id.tabSent),
                 v.findViewById(R.id.tabReceived), v.findViewById(R.id.tabDone)};
         for (TextView tab : tabs) tab.setOnClickListener(t -> selectTopTab((TextView) t));
-        selectTopTab(tabs[0]);
+        selectTopTab(tabs[Math.max(0, Math.min(selectedTab, tabs.length - 1))]);
 
         v.findViewById(R.id.btnBell).setOnClickListener(b -> toast("알림 화면은 D 담당 화면과 연결 예정"));
         v.findViewById(R.id.btnFilter).setOnClickListener(b -> openFilter());
+        v.findViewById(R.id.btnSort).setOnClickListener(anchor -> {
+            if (sortMenu != null && sortMenu.isShowing()) return;
+            sortMenu = ActionMenu.show(anchor, new String[]{getString(R.string.matching_sort_ai),
+                    getString(R.string.matching_sort_time)}, 0, index -> {
+                if (index == 1) toast(getString(R.string.matching_sort_pending));
+            });
+        });
         v.findViewById(R.id.btnChangeSlot).setOnClickListener(b -> goTimetable());
         switchMatching.setOnCheckedChangeListener((b, checked) -> {
             matchingOn = checked;
@@ -120,13 +155,33 @@ public class MatchingFragment extends Fragment {
         render();
     }
 
-    /** 상단 탭: 매칭 찾기만 이 화면, 나머지는 요청 화면(D 담당) 자리. */
+    /** 기존 매칭 찾기와 D 담당 요청 탭을 같은 공강 상태 카드 아래에서 전환한다. */
     private void selectTopTab(TextView selected) {
-        for (TextView tab : tabs) tab.setSelected(tab == selected);
-        boolean find = selected == tabs[0];
+        for (int i = 0; i < tabs.length; i++) {
+            tabs[i].setSelected(tabs[i] == selected);
+            if (tabs[i] == selected) selectedTab = i;
+        }
+        boolean find = selectedTab == 0;
         matchContent.setVisibility(find ? View.VISIBLE : View.GONE);
-        tabPlaceholder.setVisibility(find ? View.GONE : View.VISIBLE);
-        tabPlaceholder.setText(selected.getText() + " 화면\n(D 담당 · 통합 예정)");
+        requestContent.setVisibility(find ? View.GONE : View.VISIBLE);
+        if (!find) requestTabs.show(MockRequestRepository.Tab.values()[selectedTab - 1]);
+    }
+
+    @Override
+    public void onDestroyView() {
+        if (sortMenu != null) sortMenu.dismiss();
+        sortMenu = null;
+        super.onDestroyView();
+        recycler.setAdapter(null);
+        requestTabs = null;
+        requestContent = null;
+        statusCard = matchContent = null;
+        statusTitle = statusDesc = count = null;
+        stateView = null;
+        tabs = null;
+        switchMatching = null;
+        appliedFilters = null;
+        recycler = null;
     }
 
     private void render() {
