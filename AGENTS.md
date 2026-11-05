@@ -245,11 +245,11 @@ firebase emulators:start
 ## 9. GitHub Issues·PR·Actions 협업
 
 - 이미 생성된 **61개 Issues**의 Sprint·담당자·우선순위·의존성·체크리스트를 기준으로 작업합니다.
-- 상태 흐름은 **`Todo → In Progress → In Review → Done`**입니다. Actions가 main에 병합된 뒤 PR 본문에 `Closes #실제번호`를 추가하면 `status:*` 이슈 라벨을 동기화합니다. 조직 Project 필드 동기화는 별도 토큰 설정을 마친 뒤에만 동작합니다.
+- 상태 흐름은 **`Todo → In Progress → In Review → Done`**입니다. `develop` 대상 PR 본문의 `Closes #실제번호`를 기준으로 Draft는 In Progress, 리뷰 가능한 PR은 In Review, 병합 시 Done 및 이슈 완료 종료로 동기화합니다. 조직 Project 필드 동기화는 별도 토큰 설정을 마친 뒤에만 동작합니다.
 - `BT-027`처럼 **계획 ID와 GitHub `#27`은 다를 수 있습니다**. Issue를 참조하는 PR에는 실제 GitHub 번호를 사용합니다.
 - PR 제목/본문에는 BT ID와 실제 Issue, 변경 범위, 검증 결과, 스키마·보안 영향, UI 변경 시 화면 증거를 적습니다.
-- `main`/`develop` 등 브랜치 규칙은 기존 저장소 설정을 우선합니다. 브랜치 관리가 미정이면 `feature/<area>-<BT-ID>`를 권장합니다.
-- 워크플로가 main에 병합되고 실제 Actions 실행이 성공하기 전에는 **자동 상태 변경을 완료로 간주하지 않습니다**. PR 본문에 이슈 번호가 없으면 수동으로 관리합니다.
+- 최신 `develop`에서 `feature/<area>-<BT-ID>` 등의 작업 브랜치를 만들고 PR로 `develop`에 통합합니다. `main`은 모든 개발 완료 후 최종 배포에 사용합니다.
+- `pull_request_target`은 기본 브랜치의 워크플로를 실행합니다. 개발 로직을 develop에 병합하고, 별도 승인된 최소 진입점 워크플로를 main에 설치한 뒤 실제 Actions 실행이 성공하기 전에는 **자동 상태 변경을 완료로 간주하지 않습니다**. 활성화 절차는 `docs/GITHUB_AUTOMATION.md`를 따릅니다. 기본 브랜치 변경이나 main 병합을 임의로 실행하지 않습니다.
 - 스프린트 4 기능 동결 이후에는 명확한 버그 수정·회귀 테스트 위주로 작업합니다.
 
 ## 10. Definition of Done

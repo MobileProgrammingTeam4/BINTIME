@@ -14,10 +14,10 @@ test('deduplicates and ignores code and comments', () => {
 });
 
 test('status follows draft, review, close, merge', () => {
-  const pr = { merged: false, draft: false, base: { ref: 'main' } };
-  assert.equal(stageForPR(pr, 'opened', 'main'), 'In Review');
-  assert.equal(stageForPR({ ...pr, draft: true }, 'opened', 'main'), 'In Progress');
-  assert.equal(stageForPR(pr, 'closed', 'main'), 'In Progress');
-  assert.equal(stageForPR({ ...pr, merged: true }, 'closed', 'main'), 'Done');
-  assert.equal(stageForPR({ ...pr, merged: true, base: { ref: 'develop' } }, 'closed', 'main'), 'In Progress');
+  const pr = { merged: false, draft: false, state: 'open', base: { ref: 'develop' } };
+  assert.equal(stageForPR(pr), 'In Review');
+  assert.equal(stageForPR({ ...pr, draft: true }), 'In Progress');
+  assert.equal(stageForPR({ ...pr, state: 'closed' }), 'In Progress');
+  assert.equal(stageForPR({ ...pr, merged: true }), 'Done');
+  assert.equal(stageForPR({ ...pr, merged: true, base: { ref: 'main' } }), null);
 });

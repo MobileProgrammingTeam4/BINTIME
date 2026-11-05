@@ -1,6 +1,8 @@
 ## 연결된 GitHub Issue
 
-<!-- 아래의 #ISSUE_NUMBER를 실제 이슈 번호로 바꿔주세요. 그대로 두면 자동 상태 전환되지 않습니다. -->
+<!-- 기능 PR 대상은 develop입니다. 아래 번호를 실제 이슈 번호로 바꾸세요.
+완료한 이슈만 Closes #번호를 쓰고, 일부 작업은 Related #번호를 사용하세요.
+활성화된 Actions가 develop 병합 시 이슈를 종료합니다. main은 최종 배포용입니다. -->
 Closes #ISSUE_NUMBER
 
 ## 개발 정보
@@ -20,4 +22,4 @@ Closes #ISSUE_NUMBER
 - 데이터 스키마·보안 영향:
 - 미완료/위험:
 
-<!-- Draft: In Progress / 리뷰 가능: In Review / main 병합: Done -->
+<!-- develop PR: Draft → In Progress / 리뷰 가능 → In Review / 병합 → Done + 이슈 종료 -->

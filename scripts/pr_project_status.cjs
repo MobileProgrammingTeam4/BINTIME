@@ -1,8 +1,8 @@
 'use strict';
-const { linkedIssueNumbers, stageForPR } = require('./pr_issue_status.cjs');
+const { linkedIssueNumbers, stageForPR, currentPR } = require('./pr_issue_status.cjs');
 
 async function run({ github, context, core }) {
-  const pr = context.payload.pull_request;
+  const pr = await currentPR({ github, context, core });
   if (!pr) return;
   const repoFull = context.repo.owner + '/' + context.repo.repo;
   if (pr.head?.repo?.full_name?.toLowerCase() !== repoFull.toLowerCase()) {
@@ -15,7 +15,7 @@ async function run({ github, context, core }) {
   }
   const issues = linkedIssueNumbers(pr.body, repoFull);
   if (!issues.length) return core.notice('No linked issue number.');
-  const stage = stageForPR(pr, context.payload.action, context.payload.repository.default_branch);
+  const stage = stageForPR(pr);
   const typeResult = await github.graphql(
     'query($owner:String!){ repositoryOwner(login:$owner){ __typename } }', { owner }
   );
@@ -35,11 +35,12 @@ async function run({ github, context, core }) {
   const [repoOwner, repoName] = repoFull.split('/');
   for (const issue_number of issues) {
     const itemResult = await github.graphql(
-      'query($owner:String!,$repo:String!,$number:Int!){ repository(owner:$owner,name:$repo){ issue(number:$number){ id state projectItems(first:100){ nodes{ id project{ id } } pageInfo{ hasNextPage } } } } }',
+      'query($owner:String!,$repo:String!,$number:Int!){ repository(owner:$owner,name:$repo){ issue(number:$number){ id state stateReason projectItems(first:100){ nodes{ id project{ id } } pageInfo{ hasNextPage } } } } }',
       { owner: repoOwner, repo: repoName, number: issue_number }
     );
     const issue = itemResult.repository?.issue;
-    if (!issue || (issue.state === 'CLOSED' && stage !== 'Done')) continue;
+    if (!issue || (issue.state === 'CLOSED' &&
+      (stage !== 'Done' || issue.stateReason !== 'COMPLETED'))) continue;
     if (issue.projectItems.pageInfo.hasNextPage) throw Error('Project pagination needed for issue #' + issue_number);
     let projectItem = issue.projectItems.nodes.find(n => n?.project?.id === project.id);
     if (!projectItem) {
