@@ -26,7 +26,7 @@ BIN TIME은 시간표를 바탕으로 공강을 계산하고, 사용자가 지�
 
 SDK 버전은 현재 `app/build.gradle.kts` 설정 기준입니다. Android Studio에서 빌드하려면 SDK Manager에 Android SDK Platform API 37을 설치하고, 실행 기기 또는 에뮬레이터는 API 26 이상을 사용합니다.
 
-**현재 협업 운영 결정:** 61개의 GitHub Issues가 등록되어 있습니다. **GitHub Actions를 활용한 PR–Issue 상태 라벨 연동 및 조건부 Android CI를 도입합니다.** 조직 GitHub Projects는 별도 생성 권한·인증 설정을 마친 뒤 61개 이슈를 연결합니다. 자세한 설정과 미완료 조건은 [GitHub 자동화 운영 안내](./docs/GITHUB_AUTOMATION.md)를 참조하세요. 자동화가 main에 병합되고 실제 실행으로 검증되기 전까지 상태 변경 성공을 가정하지 않습니다.
+**현재 협업 운영 결정:** 61개의 GitHub Issues가 등록되어 있습니다. **develop 통합을 기준으로 PR–Issue 상태·종료 자동화와 Android CI를 운영하고, main은 최종 배포에 사용합니다.** 조직 GitHub Projects는 별도 권한·인증 설정을 마친 뒤 연결합니다. 자세한 설정과 미완료 조건은 [GitHub 자동화 운영 안내](./docs/GITHUB_AUTOMATION.md)를 참조하세요. 개발 로직과 기본 브랜치의 최소 진입점 설치 및 실제 실행 검증 전에는 상태 변경 성공을 가정하지 않습니다.
 
 ## 2. 주요 사용자 흐름
 
@@ -249,11 +249,11 @@ npm run build
 
 ### 8.2 브랜치 규칙
 
-**기존 권장 브랜치 규칙을 사용합니다.** 작업 브랜치는 최신 `develop`에서 만들고, 기능·수정 작업을 마친 뒤 PR로 `develop`에 통합합니다. 통합된 변경은 별도 PR로 `main`에 반영합니다. 저장소에 설정된 보호 규칙과 승인된 팀 결정이 있으면 함께 준수합니다.
+작업 브랜치는 최신 `develop`에서 만들고, 기능·수정 작업을 마친 뒤 PR로 `develop`에 통합합니다. `main`은 모든 개발과 통합 검증을 마친 뒤 최종 배포에 사용합니다. 저장소에 설정된 보호 규칙과 승인된 팀 결정이 있으면 함께 준수합니다.
 
 | 브랜치 | 역할 / 이름 형식 | 예시 |
 |---|---|---|
-| `main` | 검증된 안정 버전 | `main` |
+| `main` | 모든 개발 완료 후 최종 배포 | `main` |
 | `develop` | 팀 작업 통합 및 통합 검증 | `develop` |
 | `feature/<area>-<BT-ID>` | 기능·화면 및 관련 구현 작업 | `feature/request-BT-007` |
 | `fix/<area>-<BT-ID>` | 오류 수정 작업 | `fix/matching-BT-006` |
@@ -273,8 +273,8 @@ npm run build
 
 - GitHub **Issues 61개를 기준**으로 일정·담당자·선행 의존성·완료 조건을 관리합니다.
 - 사용 가능한 **Milestones (`Sprint 1`~`Sprint 5`), Labels (`P0/P1/P2`, 영역, 상태), Assignees**를 관리합니다. 실제 등록된 라벨 이름을 확인하고 사용합니다.
-- 상태는 `Todo → In Progress → In Review → Done`을 사용합니다. PR–Issue 자동화는 PR 본문의 `Closes #실제번호`를 기준으로 상태 라벨을 동기화하며, Done은 `main` 병합을 기준으로 합니다.
-- 자동화 워크플로가 `main`에 반영되고 실제 실행이 성공했는지 확인합니다. 자동화 설정 전 또는 연결 이슈가 없는 PR의 상태는 수동으로 관리합니다.
+- 상태는 `Todo → In Progress → In Review → Done`을 사용합니다. `develop` 대상 PR 본문의 `Closes #실제번호`를 기준으로 Draft는 In Progress, 리뷰 가능한 PR은 In Review, 병합 시 Done으로 전환하고 이슈를 완료 종료합니다. 일부 작업만 완료한 PR에는 `Related #번호`를 사용합니다.
+- 개발 로직은 `develop`에서 관리합니다. `pull_request_target`은 기본 브랜치에서 실행되므로 `main`에는 승인된 최소 워크플로 진입점 설치가 필요합니다. 활성화 순서와 실제 실행 검증은 [자동화 운영 안내](./docs/GITHUB_AUTOMATION.md)를 따릅니다. 설정 전 또는 연결 이슈가 없는 PR의 상태는 수동으로 관리합니다.
 - **조직 Projects 상태 동기화는 Project 생성과 별도 토큰 설정을 완료한 경우에만 활성화됩니다.** 설정과 제한사항은 [GitHub 자동화 운영 안내](./docs/GITHUB_AUTOMATION.md)를 따릅니다.
 
 ## 9. 완료 기준 (Definition of Done)

@@ -1,8 +1,10 @@
 name: BIN TIME - CI
 on:
   pull_request:
+    branches: [develop, main]
+    types: [opened, reopened, synchronize, ready_for_review, edited]
   push:
-    branches: [main]
+    branches: [develop, main]
   workflow_dispatch:
 
 permissions:
