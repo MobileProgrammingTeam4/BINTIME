@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 기본 프로필 이미지: 회색빛 파란 배경 + 흰 사람 실루엣. 사진이 없는 사용자에게 표시 (Avatar 가 원형으로 잘라 보여줌) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="56dp"
+    android:height="56dp"
+    android:viewportWidth="56"
+    android:viewportHeight="56">
+    <path
+        android:fillColor="#C8D2DD"
+        android:pathData="M0,0h56v56h-56z" />
+    <!-- 머리 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M28,11.5a9.5,9.5 0,1 1,0 19a9.5,9.5 0,1 1,0 -19z" />
+    <!-- 어깨 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M9,56C9,43.5 17.5,35 28,35C38.5,35 47,43.5 47,56Z" />
+</vector>
