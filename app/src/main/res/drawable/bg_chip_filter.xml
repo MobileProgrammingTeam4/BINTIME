@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Chip Type=Filter / TabItem : 선택 시 primary 배경 + 흰 글자 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/bg_pill_primary" android:state_selected="true" />
+    <item android:drawable="@drawable/bg_pill_page" />
+</selector>

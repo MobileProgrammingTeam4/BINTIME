@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 공통 상태 표시 (Figma 빈틈 매칭/Feedback 기반): 로딩 · 빈 상태 · 오류 · 완료. StateView 가 inflate 한다. -->
+<merge xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:orientation="vertical"
+    tools:parentTag="android.widget.LinearLayout">
+
+    <ProgressBar
+        android:id="@+id/stateProgress"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:indeterminateTint="@color/action_primary"
+        android:visibility="gone" />
+
+    <FrameLayout
+        android:id="@+id/stateIconBg"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:background="@drawable/bg_circle_page">
+
+        <ImageView
+            android:id="@+id/stateIcon"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_users_round" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/stateTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="center"
+        android:textAppearance="@style/TextAppearance.BinTime.H2"
+        tools:text="조건에 맞는 친구가 없어요" />
+
+    <TextView
+        android:id="@+id/stateMessage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center"
+        android:textAppearance="@style/TextAppearance.BinTime.BodyM"
+        android:textColor="@color/text_secondary"
+        tools:text="공강 시간이나 목적을 바꿔\n새로운 친구를 찾아보세요." />
+
+    <LinearLayout
+        android:id="@+id/stateButtons"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/stateSecondary"
+            style="@style/Widget.BinTime.ButtonOutline"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1"
+            tools:text="필터 초기화" />
+
+        <TextView
+            android:id="@+id/statePrimary"
+            style="@style/Widget.BinTime.ButtonPrimary"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            tools:text="필터 변경" />
+    </LinearLayout>
+</merge>
