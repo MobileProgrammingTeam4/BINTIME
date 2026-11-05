@@ -14,12 +14,17 @@ BIN TIME은 시간표를 바탕으로 공강을 계산하고, 사용자가 지�
 | 개발 기간 | 5주, 1주 단위 Sprint 5회 |
 | 개발 인원 | 5명(A~E), A가 Scrum Master 겸임 |
 | 플랫폼 | Android 앱 (Android Studio, Java, XML Views) |
+| 컴파일 SDK (`compileSdk`) | API 37 — 빌드에 사용하는 Android SDK |
+| 대상 SDK (`targetSdk`) | API 36 (Android 16) |
+| 최소 지원 버전 (`minSdk`) | API 26 (Android 8.0) 이상 |
 | 인증·업무 데이터 | Firebase Authentication, Cloud Firestore |
 | 채팅 | Firebase Realtime Database |
 | 파일·서버 | Firebase Storage, Cloud Functions(TypeScript) |
 | AI | Gemini API (계획 모델: Gemini 3.5 Flash-Lite, 실제 호출 모델 ID는 배포 환경에서 확인) |
 | 설계 기준 | [Figma 디자인](https://www.figma.com/design/jR1gI7EWb2WomXUuQvf67Z/2026%EB%85%842%ED%95%99%EA%B8%B0_%EB%AA%A8%EB%B0%94%EC%9D%BC2%EB%B6%84%EB%B0%98_%ED%8C%804?node-id=1-3) |
 | 협업 | GitHub Issues · Labels · Milestones · Assignees · Pull Requests |
+
+SDK 버전은 현재 `app/build.gradle.kts` 설정 기준입니다. Android Studio에서 빌드하려면 SDK Manager에 Android SDK Platform API 37을 설치하고, 실행 기기 또는 에뮬레이터는 API 26 이상을 사용합니다.
 
 **현재 협업 운영 결정:** 61개의 GitHub Issues가 등록되어 있습니다. **GitHub Actions를 활용한 PR–Issue 상태 라벨 연동 및 조건부 Android CI를 도입합니다.** 조직 GitHub Projects는 별도 생성 권한·인증 설정을 마친 뒤 61개 이슈를 연결합니다. 자세한 설정과 미완료 조건은 [GitHub 자동화 운영 안내](./docs/GITHUB_AUTOMATION.md)를 참조하세요. 자동화가 main에 병합되고 실제 실행으로 검증되기 전까지 상태 변경 성공을 가정하지 않습니다.
 

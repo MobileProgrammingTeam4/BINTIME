@@ -5,10 +5,7 @@ build/
 **/build/
 local.properties
 *.iml
-.idea/caches/
-.idea/libraries/
-.idea/workspace.xml
-.idea/tasks.xml
+.idea/
 captures/
 .externalNativeBuild/
 .cxx/
