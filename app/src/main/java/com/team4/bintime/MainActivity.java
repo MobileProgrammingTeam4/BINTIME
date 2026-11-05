@@ -11,6 +11,7 @@ import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.team4.bintime.matching.MatchingFragment;
 
 /**
  * 공통 화면 이동 담당: 하단 탭 4개를 Fragment show/hide 로 전환한다 (탭 상태 유지).
@@ -78,6 +79,6 @@ public class MainActivity extends AppCompatActivity {
         if (tabId == R.id.nav_chat) return PlaceholderFragment.newInstance("채팅", "E");
         if (tabId == R.id.nav_timetable) return PlaceholderFragment.newInstance("시간표", "C");
         if (tabId == R.id.nav_my) return PlaceholderFragment.newInstance("마이페이지", "B");
-        return PlaceholderFragment.newInstance("매칭", "A"); // BT-011 에서 매칭 화면으로 교체
+        return new MatchingFragment();
     }
 }

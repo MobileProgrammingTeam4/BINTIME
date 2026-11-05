@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Figma: 02 친구 탐색·매칭 신청 > 프로필 상세 페이지 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_card"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical">
+
+    <!-- AppHeader Type=BackOptions -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="20dp">
+
+        <ImageButton
+            android:id="@+id/btnBack"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="뒤로가기"
+            android:src="@drawable/ic_chevron_left" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:text="프로필 상세"
+            android:textAppearance="@style/TextAppearance.BinTime.H1" />
+
+        <ImageButton
+            android:id="@+id/btnMore"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="더보기"
+            android:src="@drawable/ic_more" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <include
+                android:id="@+id/summary"
+                layout="@layout/view_match_summary" />
+
+            <!-- 자기소개 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="자기소개"
+                    android:textAppearance="@style/TextAppearance.BinTime.H3" />
+
+                <TextView
+                    android:id="@+id/purpose"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_pill_subtle"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="4dp"
+                    android:textAppearance="@style/TextAppearance.BinTime.CaptionBold"
+                    android:textColor="@color/action_pressed"
+                    tools:text="매칭 목적 - 스터디" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/intro"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_box_page"
+                android:padding="16dp"
+                android:textAppearance="@style/TextAppearance.BinTime.BodyS"
+                tools:text="같이 공부할 친구 찾아요! 공강에 가볍게 커피 한 잔도 좋아해요 :)" />
+
+            <!-- 선호태그 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="선호태그"
+                android:textAppearance="@style/TextAppearance.BinTime.H3" />
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/tags"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                app:chipSpacingHorizontal="8dp"
+                app:chipSpacingVertical="8dp" />
+
+            <!-- 받은 매칭 후기 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="받은 매칭 후기"
+                    android:textAppearance="@style/TextAppearance.BinTime.H3" />
+
+                <TextView
+                    android:id="@+id/rematchRate"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_pill_subtle"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="4dp"
+                    android:textAppearance="@style/TextAppearance.BinTime.CaptionBold"
+                    android:textColor="@color/action_pressed"
+                    tools:text="재만남 희망률 96%" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/reviewList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_box_page"
+                android:orientation="vertical"
+                android:padding="16dp" />
+
+            <!-- 후기 없음 (Figma: 아직 후기를 수집하고 있어요) -->
+            <LinearLayout
+                android:id="@+id/reviewEmpty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_box_page"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:padding="24dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_sparkles" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="아직 후기를 수집하고 있어요"
+                    android:textAppearance="@style/TextAppearance.BinTime.H3" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="매칭을 통해 따뜻한 후기를 남겨보세요 :)"
+                    android:textAppearance="@style/TextAppearance.BinTime.BodyS"
+                    android:textColor="@color/text_secondary" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/reviewNote"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="가장 많이 받은 매칭 후기 위주로 표시돼요"
+                android:textAppearance="@style/TextAppearance.BinTime.BodyS"
+                android:textColor="@color/text_secondary" />
+        </LinearLayout>
+    </ScrollView>
+
+    <TextView
+        android:id="@+id/btnRequest"
+        style="@style/Widget.BinTime.PillPrimary"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="12dp"
+        android:text="매칭 신청" />
+</LinearLayout>
