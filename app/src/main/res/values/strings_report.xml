@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 신고 (Figma 116:3693). BT-010 목업, 실제 접수·차단은 BT-051·BT-046(B) -->
+<resources>
+    <string name="report_back">뒤로가기</string>
+    <string name="report_missing">신고할 사용자를 찾을 수 없어요.</string>
+    <string name="report_header">신고하기</string>
+    <string name="report_title">어떤 내용으로 신고할까요</string>
+    <string name="report_subtitle">신고할 내용을 선택해주세요</string>
+    <string name="report_reasons_title">신고 내용 선택 (복수 선택 가능)</string>
+    <string name="report_detail_title">직접 남기기 (선택)</string>
+    <string name="report_detail_hint">신고할 내용을 입력해주세요(선택)</string>
+    <string name="report_also_block">이 사용자를 함께 차단하기 (더 이상 매칭·채팅에 노출되지 않아요)</string>
+    <string name="report_submit">신고하기</string>
+    <string name="report_done_title">신고 내용을 확인했어요</string>
+    <string name="report_done_message">지금은 목업이라 실제로 접수되지 않아요.\n접수와 차단은 이후 업데이트에서 연결돼요.</string>
+    <string name="report_done_close">확인</string>
+
+    <string name="report_reason_no_show">⏰ 약속 장소에 나타나지 않았어요 (노쇼)</string>
+    <string name="report_reason_no_contact">📵 매칭 수락 후 연락이 두절되었어요</string>
+    <string name="report_reason_one_sided_cancel">🙅 일방적으로 직전에 약속을 취소했어요</string>
+    <string name="report_reason_abusive_language">😡 불쾌하거나 공격적인 언행을 사용해요</string>
+    <string name="report_reason_inappropriate_meeting">💔 매칭 목적과 다른 불건전한 만남을 요구해요</string>
+    <string name="report_reason_religion_mlm_promotion">📢 종교 권유, 다단계, 상업적 홍보를 해요</string>
+    <string name="report_reason_inappropriate_profile">🖼️ 부적절한 프로필 사진이나 자기소개가 있어요</string>
+    <string name="report_reason_impersonation">🕵️ 타인을 사칭하거나 학과·학년 정보가 허위예요</string>
+    <string name="report_reason_spam">🚫 스팸이나 도배성 요청을 반복해서 보내요</string>
+</resources>

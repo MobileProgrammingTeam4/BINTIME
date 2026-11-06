@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 후기·신고 화면 상단 상대 카드 (Figma 116:3395, 120:2437, 116:3693). chat.PartnerSummary 가 채운다 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_card"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:baselineAligned="false"
+        android:orientation="horizontal">
+
+        <FrameLayout
+            android:layout_width="40dp"
+            android:layout_height="40dp">
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/partnerPhoto"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:importantForAccessibility="no"
+                android:scaleType="centerCrop"
+                android:src="@drawable/img_default_profile"
+                app:shapeAppearanceOverlay="@style/ShapeAppearance.BinTime.Circle" />
+
+            <TextView
+                android:id="@+id/partnerInitials"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_circle_subtle"
+                android:gravity="center"
+                android:importantForAccessibility="no"
+                android:maxLines="1"
+                android:textAppearance="@style/TextAppearance.BinTime.CaptionBold"
+                android:textColor="@color/action_primary"
+                android:textSize="11sp"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/partnerName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textAppearance="@style/TextAppearance.BinTime.H3"
+                tools:text="김지민" />
+
+            <TextView
+                android:id="@+id/partnerInfo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textAppearance="@style/TextAppearance.BinTime.Caption"
+                android:textColor="@color/text_secondary"
+                tools:text="컴퓨터공학과 3학년 · 여성" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/partnerTimeBox"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_timematch"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="14dp">
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_clock" />
+
+        <TextView
+            android:id="@+id/partnerTime"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:textAppearance="@style/TextAppearance.BinTime.ButtonS"
+            android:textColor="@color/action_pressed"
+            tools:text="오늘 14:00 ~ 15:30" />
+
+        <TextView
+            android:id="@+id/partnerDuration"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:textAppearance="@style/TextAppearance.BinTime.CaptionBold"
+            android:textColor="@color/text_secondary"
+            tools:text="1시간 30분 겹침" />
+    </LinearLayout>
+</LinearLayout>

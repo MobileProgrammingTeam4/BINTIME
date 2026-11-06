@@ -8,7 +8,7 @@
     android:background="@color/bg_card"
     android:orientation="vertical">
 
-    <!-- AppHeader Type=BackOptions. ⋯ 동작은 BT-010 -->
+    <!-- AppHeader Type=BackOptions. ⋯ 는 채팅 옵션 메뉴(Figma 120:2575) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="56dp"
@@ -40,9 +40,8 @@
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:layout_marginStart="12dp"
-            android:background="@android:color/transparent"
+            android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/chat_more"
-            android:enabled="false"
             android:src="@drawable/ic_more" />
     </LinearLayout>
 
@@ -116,13 +115,16 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- 종료된 매칭: 후기 이동은 BT-010 -->
+    <!-- 종료된 매칭: 누르면 후기 작성(작성 전) 또는 후기 보기(작성 후) -->
     <LinearLayout
         android:id="@+id/chatEndedBanner"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="20dp"
         android:background="@drawable/bg_timematch"
+        android:clickable="true"
+        android:focusable="true"
+        android:foreground="?attr/selectableItemBackground"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:padding="16dp"
@@ -180,7 +182,7 @@
             android:layout_gravity="center" />
     </FrameLayout>
 
-    <!-- 반짝이 버튼과 더미 칩은 배치만 한다. 동작은 BT-010 -->
+    <!-- 반짝이 버튼을 누르면 ReplySuggestionRepository 결과로 칩 3개를 만든다. 칩은 입력창에만 넣는다 -->
     <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -198,9 +200,8 @@
                 android:id="@+id/chatAiReply"
                 android:layout_width="36dp"
                 android:layout_height="36dp"
-                android:background="@android:color/transparent"
+                android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/chat_ai_reply"
-                android:enabled="false"
                 android:src="@drawable/ic_chat_ai_button" />
 
             <LinearLayout
@@ -208,42 +209,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:visibility="gone"
-                tools:visibility="visible">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:layout_marginStart="11dp"
-                    android:background="@drawable/bg_chat_reply_chip"
-                    android:gravity="center"
-                    android:paddingHorizontal="12dp"
-                    android:text="@string/chat_mock_reply_1"
-                    android:textAppearance="@style/TextAppearance.BinTime.CaptionBold"
-                    android:textColor="@color/text_secondary" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:layout_marginStart="11dp"
-                    android:background="@drawable/bg_chat_reply_chip"
-                    android:gravity="center"
-                    android:paddingHorizontal="12dp"
-                    android:text="@string/chat_mock_reply_2"
-                    android:textAppearance="@style/TextAppearance.BinTime.CaptionBold"
-                    android:textColor="@color/text_secondary" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:layout_marginStart="11dp"
-                    android:background="@drawable/bg_chat_reply_chip"
-                    android:gravity="center"
-                    android:paddingHorizontal="12dp"
-                    android:text="@string/chat_mock_reply_3"
-                    android:textAppearance="@style/TextAppearance.BinTime.CaptionBold"
-                    android:textColor="@color/text_secondary" />
-            </LinearLayout>
+                android:visibility="gone" />
         </LinearLayout>
     </HorizontalScrollView>
 

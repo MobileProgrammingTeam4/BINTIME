@@ -26,12 +26,27 @@
     <string name="chat_ended_banner">종료된 매칭이에요</string>
     <string name="chat_review_write">매칭 후기 남기기</string>
     <string name="chat_review_view">매칭 후기 보기</string>
-    <string name="chat_mock_reply_1">만나서 반가워요</string>
-    <string name="chat_mock_reply_2">복지관 카페 어떠세요?</string>
-    <string name="chat_mock_reply_3">자료구조 공부하시나요?</string>
     <string name="chat_messages_empty_title">아직 메시지가 없어요</string>
     <string name="chat_messages_empty_message">먼저 인사를 건네보세요.</string>
     <string name="chat_messages_error">메시지를 불러오지 못했어요.\n잠시 후 다시 시도해주세요.</string>
     <string name="chat_send_failed">메시지를 보내지 못했어요. 다시 시도해주세요.</string>
     <string name="chat_room_missing">채팅방을 찾을 수 없어요.</string>
+    <string name="chat_overlap_duration">%1$s 겹침</string>
+    <!-- BT-010 AI 답장 · 채팅 옵션 (Figma 120:2575) -->
+    <string name="chat_ai_reply_failed">답장 추천을 불러오지 못했어요. 직접 입력해주세요.</string>
+    <string name="chat_option_end">매칭 종료하기</string>
+    <string name="chat_option_leave">채팅방 나가기</string>
+    <string name="chat_option_report">신고하기</string>
+    <string name="chat_end_title">매칭을 종료할까요</string>
+    <string name="chat_end_message">채팅방은 나가기 전까지 유지돼요</string>
+    <string name="chat_end_confirm">종료</string>
+    <string name="chat_end_failed">매칭을 종료하지 못했어요. 다시 시도해주세요.</string>
+    <string name="chat_leave_title">채팅방을 나갈까요</string>
+    <string name="chat_leave_message">상대에게 채팅방을 나간 내용이 표시돼요</string>
+    <string name="chat_leave_confirm">나가기</string>
+    <string name="chat_leave_failed">채팅방을 나가지 못했어요. 다시 시도해주세요.</string>
+    <string name="chat_leave_done">채팅방을 나갔어요.</string>
+    <string name="chat_leave_blocked_title">채팅방을 나갈 수 없어요</string>
+    <string name="chat_leave_blocked_message">현재 진행중인 매칭을 먼저 종료해주세요</string>
+    <string name="chat_close">닫기</string>
 </resources>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AI 답장 칩 (Figma 41:10820). 누르면 입력창에만 들어가고 전송하지 않는다 -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="36dp"
+    android:layout_marginStart="11dp"
+    android:background="@drawable/bg_chat_reply_chip"
+    android:foreground="?attr/selectableItemBackground"
+    android:gravity="center"
+    android:paddingHorizontal="12dp"
+    android:textAppearance="@style/TextAppearance.BinTime.CaptionBold"
+    android:textColor="@color/text_secondary"
+    tools:text="만나서 반가워요" />
