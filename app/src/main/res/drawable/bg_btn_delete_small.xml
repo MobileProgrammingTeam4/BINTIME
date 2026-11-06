@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 파일 위치: res/drawable/bg_btn_delete_small.xml -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#33F84648">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#FFF0F0" />
+            <corners android:radius="12dp" />
+        </shape>
+    </item>
+</ripple>

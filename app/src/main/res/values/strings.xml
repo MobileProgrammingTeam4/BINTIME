@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">BinTime</string>
+    <string name="analysis_desc">주 활동 건물은 공학관(4과목)이며, 매칭하기 가장 좋은 공강은 월 14:00(1.5시간), 목 11:00(점심 2시간)입니다.</string>
+    <string name="msg_edit_mode_on">%s 수정 모드로 전환되었습니다.</string>
+    <string name="msg_edit_mode_off">%s 수정 모드가 해제되었습니다.</string>
+    <string name="msg_course_deleted">%s 과목이 삭제되었습니다.</string>
+    <string name="title_start_time">시작 시간을 선택해 주세요</string>
+    <string name="title_end_time">종료 시간을 선택해 주세요</string>
+    <string name="msg_course_modified">%s 수업이 성공적으로 수정되었습니다!</string>
+    <string name="title_cancel_modify">수정을 취소할까요</string>
+    <string name="desc_cancel_modify">작성중인 정보는 저장되지 않아요</string>
+    <string name="btn_close">닫기</string>
+    <string name="btn_cancel_modify">수정 취소하기</string>
+</resources>

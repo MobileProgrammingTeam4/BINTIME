@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 파일 위치: res/layout/dialog_bottom_time_picker.xml -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_dialog_centered"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:paddingHorizontal="20dp"
+    android:paddingTop="24dp"
+    android:paddingBottom="24dp">
+
+    <!-- 타이틀 -->
+    <TextView
+        android:id="@+id/tvTimePickerTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="20dp"
+        android:text="시작 시간을 선택해 주세요"
+        android:textColor="#222222"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <!-- 휠 피커 영역 (오전/오후, 시 00~12, 분 00~55) -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <!-- 오전 / 오후 -->
+        <NumberPicker
+            android:id="@+id/npAmPm"
+            android:layout_width="80dp"
+            android:layout_height="150dp"
+            android:layout_marginEnd="12dp"
+            android:descendantFocusability="blocksDescendants" />
+
+        <!-- 시간 (00 ~ 12) -->
+        <NumberPicker
+            android:id="@+id/npHour"
+            android:layout_width="70dp"
+            android:layout_height="150dp"
+            android:layout_marginEnd="12dp"
+            android:descendantFocusability="blocksDescendants" />
+
+        <!-- 분 (00 ~ 55) -->
+        <NumberPicker
+            android:id="@+id/npMinute"
+            android:layout_width="70dp"
+            android:layout_height="150dp"
+            android:descendantFocusability="blocksDescendants" />
+    </LinearLayout>
+
+    <!-- 하단 버튼 영역 (취소 / 선택) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <!-- 취소 버튼 -->
+        <FrameLayout
+            android:id="@+id/btnCancelTime"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_btn_outline_red"
+            android:clickable="true"
+            android:focusable="true">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="취소"
+                android:textColor="#F84648"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </FrameLayout>
+
+        <!-- 선택 버튼 -->
+        <FrameLayout
+            android:id="@+id/btnConfirmTime"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_btn_red_fill_16"
+            android:clickable="true"
+            android:focusable="true">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="선택"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </FrameLayout>
+    </LinearLayout>
+
+</LinearLayout>
