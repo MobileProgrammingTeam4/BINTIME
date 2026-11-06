@@ -20,7 +20,7 @@ public class ChatTimeFormatterTest {
 
     private static ChatRoom room(String meetingDate, int start, int end) {
         return new ChatRoom("match", Arrays.asList("me", "other"), ChatRoom.Status.ACTIVE, meetingDate,
-                start, end, true, "other", "김지민", true, "", 0, 0, null, false);
+                start, end, true, "other", "김지민", null, true, "", 0, 0, null);
     }
 
     @Test

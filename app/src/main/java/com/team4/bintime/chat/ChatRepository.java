@@ -34,8 +34,26 @@ public interface ChatRepository {
     /** 오래된 메시지부터 전달한다. */
     Registration observeMessages(String matchId, Listener<List<ChatMessage>> listener);
 
+    interface ActionCallback {
+        void onSuccess();
+
+        void onError();
+    }
+
     /** ENDED 방에서도 전송할 수 있다. 공백만 있는 내용은 onError 로 거절한다. */
     void sendMessage(String matchId, String content, SendCallback callback);
 
     void markRead(String matchId);
+
+    /**
+     * 채팅 옵션의 수동 종료. ACTIVE → ENDED 로 바꾸고 확정 시간 스냅샷과 메시지는 유지한다.
+     * 이미 ENDED 면 그대로 성공한다(멱등). 실제 구현은 D 의 매칭 종료 서버 함수(BT-038)를 호출한다.
+     */
+    void endMatch(String matchId, ActionCallback callback);
+
+    /**
+     * 채팅방 나가기. ENDED 에서만 허용하고 ACTIVE 면 onError 로 거절한다.
+     * 내 목록에서만 숨기고 상대의 기록은 지우지 않는다. 실제 구현과 상대 안내는 BT-043 범위다.
+     */
+    void leaveRoom(String matchId, ActionCallback callback);
 }

@@ -24,5 +24,14 @@
             android:name=".chat.ChatRoomActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".review.ReviewWriteActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".review.ReviewDetailActivity" android:exported="false" />
+        <activity
+            android:name=".report.ReportActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
     </application>
 </manifest>

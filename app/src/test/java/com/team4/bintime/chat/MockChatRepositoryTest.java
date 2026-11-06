@@ -1,6 +1,8 @@
 package com.team4.bintime.chat;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -220,6 +222,87 @@ public class MockChatRepositoryTest {
         assertEquals(MockChatRepository.DemoState.NORMAL, repository.cycleDemoState());
         assertNotNull(freshRooms());
         assertEquals(4, freshRooms().size());
+    }
+
+    private static final class ActionResult implements ChatRepository.ActionCallback {
+        int successes, errors;
+
+        @Override
+        public void onSuccess() {
+            successes++;
+        }
+
+        @Override
+        public void onError() {
+            errors++;
+        }
+    }
+
+    @Test
+    public void endMatch_changesActiveToEnded_keepingSnapshotAndMessaging() {
+        ChatRoom before = room("match-jimin");
+        ActionResult result = new ActionResult();
+
+        repository.endMatch("match-jimin", result);
+
+        assertEquals(1, result.successes);
+        ChatRoom after = room("match-jimin");
+        assertEquals(ChatRoom.Status.ENDED, after.status);
+        assertEquals(before.meetingDate, after.meetingDate);
+        assertEquals(before.startMinute, after.startMinute);
+        assertEquals(before.endMinute, after.endMinute);
+        assertEquals(3, count(liveRooms.last, ChatRoom.Filter.ENDED));
+
+        SendResult send = new SendResult();
+        repository.sendMessage("match-jimin", "종료 후에도 보낼 수 있어요", send);
+        assertEquals(1, send.successes);
+    }
+
+    @Test
+    public void endMatch_isIdempotent_andRejectsUnknownRoom() {
+        ActionResult result = new ActionResult();
+        repository.endMatch("match-seoyeon", result);
+        repository.endMatch("unknown", result);
+        assertEquals(1, result.successes);
+        assertEquals(1, result.errors);
+        assertEquals(ChatRoom.Status.ENDED, room("match-seoyeon").status);
+    }
+
+    @Test
+    public void leaveRoom_rejectsActiveRoom() {
+        ActionResult result = new ActionResult();
+        repository.leaveRoom("match-jimin", result);
+        assertEquals(1, result.errors);
+        assertEquals(4, liveRooms.last.size());
+    }
+
+    @Test
+    public void leaveRoom_hidesEndedRoomOnlyFromMyList() {
+        Capture<ChatRoom> roomCapture = new Capture<>();
+        repository.observeRoom("match-seoyeon", roomCapture);
+        scheduler.runAll();
+        ActionResult result = new ActionResult();
+
+        repository.leaveRoom("match-seoyeon", result);
+
+        assertEquals(1, result.successes);
+        assertEquals(3, liveRooms.last.size());
+        for (ChatRoom room : liveRooms.last) assertNotEquals("match-seoyeon", room.matchId);
+        assertEquals(1, roomCapture.errors);
+        // 상대 기록은 지우지 않는다.
+        Capture<List<ChatMessage>> messages = new Capture<>();
+        repository.observeMessages("match-seoyeon", messages);
+        scheduler.runAll();
+        assertFalse(messages.last.isEmpty());
+    }
+
+    @Test
+    public void leaveRoom_afterManualEnd_isAllowed() {
+        ActionResult result = new ActionResult();
+        repository.endMatch("match-junho", result);
+        repository.leaveRoom("match-junho", result);
+        assertEquals(2, result.successes);
+        assertEquals(3, liveRooms.last.size());
     }
 
     @Test

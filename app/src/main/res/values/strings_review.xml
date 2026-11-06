@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 후기 (Figma 116:3395 매칭 후기 남기기 / 120:2437 매칭 후기 보기) -->
+<resources>
+    <string name="review_back">뒤로가기</string>
+    <string name="review_retry">다시 시도</string>
+    <string name="review_missing">후기를 남길 매칭을 찾을 수 없어요.</string>
+
+    <string name="review_write_header">매칭 후기 남기기</string>
+    <string name="review_write_title">오늘 매칭 어땠나요</string>
+    <string name="review_write_subtitle">소중한 후기는 다음 매칭에 도움이 돼요</string>
+    <string name="review_satisfaction_bad">😢 아쉬워요</string>
+    <string name="review_satisfaction_good">🙂 좋았어요</string>
+    <string name="review_satisfaction_great">😍 최고였어요!</string>
+    <string name="review_keywords_title">어떤 점이 좋았나요? (복수 선택 가능)</string>
+    <string name="review_comment_title">한 줄 후기 (선택)</string>
+    <string name="review_comment_hint">고마웠던 점이나 후기를 가볍게 남겨주세요 (선택)</string>
+    <string name="review_not_met">%1$s님과 만나지 못했나요?</string>
+    <string name="review_submit">후기 남기기</string>
+    <string name="review_submit_failed">후기를 남기지 못했어요. 다시 시도해주세요.</string>
+    <string name="review_done_title">후기를 남겼어요</string>
+    <string name="review_done_message">소중한 후기 고마워요!\n%1$s님이 남긴 후기는 받은 후기 보기에서 확인할 수 있어요.</string>
+    <string name="review_done_view">받은 후기 보기</string>
+    <string name="review_done_back">채팅으로 돌아가기</string>
+
+    <string name="review_detail_header">매칭 후기 보기</string>
+    <string name="review_detail_title">%1$s님이 작성해준 매칭 후기에요</string>
+    <string name="review_detail_keywords">%1$s님이 남겨준 후기에요</string>
+    <string name="review_detail_comment">한 줄 후기도 남겨주셨어요</string>
+    <string name="review_locked_title">내 후기를 먼저 남겨주세요</string>
+    <string name="review_locked_message">후기를 남기면 %1$s님이 남긴 후기를 볼 수 있어요.</string>
+    <string name="review_not_yet_title">아직 받은 후기가 없어요</string>
+    <string name="review_not_yet_message">%1$s님이 후기를 남기면\n여기에서 볼 수 있어요.</string>
+    <string name="review_load_error">후기를 불러오지 못했어요.\n잠시 후 다시 시도해주세요.</string>
+
+    <string name="review_keyword_on_time">⏰ 시간 약속을 잘 지켜요</string>
+    <string name="review_keyword_quick_reply">⚡ 답장이 빠르고 장소 정하기 수월했어요</string>
+    <string name="review_keyword_clean_parting">🏃 다음 수업 시간에 맞춰 깔끔하게 헤어졌어요</string>
+    <string name="review_keyword_kind_manner">😊 친절하고 매너가 좋아요</string>
+    <string name="review_keyword_focused_study">🔥 공부에 집중할 수 있었어요</string>
+    <string name="review_keyword_quiet_together">🤫 조용히 각자 할 일 하기 좋았어요</string>
+    <string name="review_keyword_major_talk">📚 전공이나 과제 이야기를 나누기 좋았어요</string>
+    <string name="review_keyword_good_conversation">💬 대화가 잘 통해요</string>
+    <string name="review_keyword_comfortable_mood">☕ 어색하지 않게 분위기를 잘 이끌어줘요</string>
+    <string name="review_keyword_campus_tips">🍽️ 맛집이나 캠퍼스 꿀팁을 잘 알아요</string>
+</resources>

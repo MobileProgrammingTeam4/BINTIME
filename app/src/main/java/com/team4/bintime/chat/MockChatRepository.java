@@ -12,12 +12,14 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
- * BT-009 UI 시연 전용. 메모리 데이터만 바꾸며 실제 인증·권한·RTDB 를 대신하지 않는다.
+ * BT-009·BT-010 UI 시연 전용. 메모리 데이터만 바꾸며 실제 인증·권한·RTDB·매칭 종료 서버 함수를 대신하지 않는다.
  * BT-021·BT-022 에서 같은 {@link ChatRepository} 의 RTDB 구현으로 교체한다.
  * 이름과 메시지는 Figma 시안 문구이고, 추천 장소는 AI 결과가 아니다.
  */
@@ -60,6 +62,8 @@ public final class MockChatRepository implements ChatRepository {
     private final Clock clock;
     private final Map<String, ChatRoom> rooms = new LinkedHashMap<>();
     private final Map<String, List<ChatMessage>> messages = new HashMap<>();
+    /** 내가 나간 방. 메시지는 지우지 않고 내 목록과 방 구독에서만 뺀다. */
+    private final Set<String> leftRooms = new HashSet<>();
     private final List<Subscription<List<ChatRoom>>> roomListSubscriptions = new ArrayList<>();
     private final List<Subscription<ChatRoom>> roomSubscriptions = new ArrayList<>();
     private final List<Subscription<List<ChatMessage>>> messageSubscriptions = new ArrayList<>();
@@ -128,6 +132,37 @@ public final class MockChatRepository implements ChatRepository {
         notifyRoomChanged(matchId);
     }
 
+    @Override
+    public void endMatch(String matchId, ActionCallback callback) {
+        ChatRoom room = rooms.get(matchId);
+        if (room == null || leftRooms.contains(matchId) || demoState == DemoState.ERROR) {
+            callback.onError();
+            return;
+        }
+        if (room.status == ChatRoom.Status.ACTIVE) {
+            rooms.put(matchId, room.withStatus(ChatRoom.Status.ENDED));
+            notifyRoomChanged(matchId);
+        }
+        callback.onSuccess();
+    }
+
+    @Override
+    public void leaveRoom(String matchId, ActionCallback callback) {
+        ChatRoom room = rooms.get(matchId);
+        if (room == null || room.status != ChatRoom.Status.ENDED || demoState == DemoState.ERROR) {
+            callback.onError();
+            return;
+        }
+        // 상대 기록은 남기고 내 목록에서만 숨긴다.
+        leftRooms.add(matchId);
+        notifyRoomChanged(matchId);
+        callback.onSuccess();
+    }
+
+    DemoState demoState() {
+        return demoState;
+    }
+
     /** 제목을 길게 눌러 정상 → 빈 상태 → 오류 화면을 시연한다. */
     public DemoState cycleDemoState() {
         DemoState[] states = DemoState.values();
@@ -172,14 +207,17 @@ public final class MockChatRepository implements ChatRepository {
             subscription.listener.onData(Collections.emptyList());
             return;
         }
-        List<ChatRoom> sorted = new ArrayList<>(rooms.values());
+        List<ChatRoom> sorted = new ArrayList<>();
+        for (ChatRoom room : rooms.values()) {
+            if (!leftRooms.contains(room.matchId)) sorted.add(room);
+        }
         sorted.sort(Comparator.comparingLong((ChatRoom room) -> room.lastMessageAt).reversed());
         subscription.listener.onData(sorted);
     }
 
     private void deliverRoom(Subscription<ChatRoom> subscription) {
         ChatRoom room = rooms.get(subscription.matchId);
-        if (room == null) subscription.listener.onError();
+        if (room == null || leftRooms.contains(subscription.matchId)) subscription.listener.onError();
         else subscription.listener.onData(room);
     }
 
@@ -196,27 +234,27 @@ public final class MockChatRepository implements ChatRepository {
         long nowMillis = clock.millis();
 
         // 실행 시각과 무관하게 남은 시간이 보이도록 ACTIVE 방은 현재 시각 기준으로 만든다.
-        addRoom("match-jimin", "u1", "김지민", true, ChatRoom.Status.ACTIVE, today,
+        addRoom("match-jimin", "u1", "김지민", "컴퓨터공학과 3학년 · 여성", true, ChatRoom.Status.ACTIVE, today,
                 Math.max(0, minute - 18), Math.min(1440, minute + 72), 12,
-                "복지관 지하1층 카페 / 북악도서관", false,
+                "복지관 지하1층 카페 / 북악도서관",
                 incoming("안녕하세요!\n어디서 만날까요?", nowMillis - 30 * MINUTE),
                 outgoing("도서관 2층 어때요?", nowMillis - 30 * MINUTE),
                 incoming("좋아요! 그럼 거기서 봐요 :)", nowMillis - 27 * MINUTE),
                 incoming("오늘도 좋은 하루!", nowMillis - 5 * MINUTE));
-        addRoom("match-junho", "mock-junho", "준호", false, ChatRoom.Status.ACTIVE, today,
-                Math.max(0, minute - 30), Math.min(1440, minute + 60), 3, null, false,
+        addRoom("match-junho", "mock-junho", "준호", "경영학부 2학년 · 남성", false, ChatRoom.Status.ACTIVE, today,
+                Math.max(0, minute - 30), Math.min(1440, minute + 60), 3, null,
                 outgoing("오늘 공강에 같이 공부할까요?", nowMillis - 50 * MINUTE),
                 incoming("네 좋아요!", nowMillis - 45 * MINUTE));
 
         // 종료 매칭은 지난 시간 스냅샷을 유지한다. 지난 시각은 자정 전후에도 어긋나지 않게 날짜를 함께 계산한다.
         long seoyeonAt = nowMillis - 120 * MINUTE;
-        addRoom("match-seoyeon", "mock-seoyeon", "서연", false, ChatRoom.Status.ENDED,
-                dateOf(seoyeonAt), 600, 690, 0, null, false,
+        addRoom("match-seoyeon", "mock-seoyeon", "서연", "시각디자인학과 4학년 · 여성", false, ChatRoom.Status.ENDED,
+                dateOf(seoyeonAt), 600, 690, 0, null,
                 outgoing("수업 끝나고 봐서 반가웠어요!", seoyeonAt - 10 * MINUTE),
                 incoming("이번 주에 시간 괜찮아요?", seoyeonAt));
         long jieunAt = nowMillis - 24 * 60 * MINUTE;
-        addRoom("match-jieun", "mock-jieun", "지은", true, ChatRoom.Status.ENDED,
-                dateOf(jieunAt), 840, 930, 0, null, true,
+        addRoom("match-jieun", "mock-jieun", "지은", "소프트웨어학부 2학년 · 여성", true, ChatRoom.Status.ENDED,
+                dateOf(jieunAt), 840, 930, 0, null,
                 outgoing("스터디 어떠세요?", jieunAt - 10 * MINUTE),
                 incoming("저도 스터디 좋아해요 :)", jieunAt));
     }
@@ -233,9 +271,9 @@ public final class MockChatRepository implements ChatRepository {
         return Instant.ofEpochMilli(millis).atZone(SEOUL).toLocalDate().toString();
     }
 
-    private void addRoom(String matchId, String otherUid, String otherName, boolean hasPhoto,
+    private void addRoom(String matchId, String otherUid, String otherName, String otherInfo, boolean hasPhoto,
                          ChatRoom.Status status, String meetingDate, int start, int end, int unread,
-                         String place, boolean reviewWritten, ChatMessage... seedMessages) {
+                         String place, ChatMessage... seedMessages) {
         List<ChatMessage> list = new ArrayList<>();
         for (ChatMessage m : seedMessages) {
             list.add(m.senderId == null ? new ChatMessage(m.messageId, otherUid, m.content, m.createdAt) : m);
@@ -243,7 +281,7 @@ public final class MockChatRepository implements ChatRepository {
         ChatMessage last = list.get(list.size() - 1);
         messages.put(matchId, list);
         rooms.put(matchId, new ChatRoom(matchId, Arrays.asList(MY_UID, otherUid), status,
-                meetingDate, start, end, true, otherUid, otherName, hasPhoto,
-                last.content, last.createdAt, unread, place, reviewWritten));
+                meetingDate, start, end, true, otherUid, otherName, otherInfo, hasPhoto,
+                last.content, last.createdAt, unread, place));
     }
 }

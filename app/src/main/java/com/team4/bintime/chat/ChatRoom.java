@@ -3,8 +3,9 @@ package com.team4.bintime.chat;
 import java.util.List;
 
 /**
- * BT-009 임시 모델. 매칭 필드는 AGENTS.md 5장의 matches 계약을 따르고, BT-012 확정 후 위치·이름을 맞춘다.
- * meetingDate, startMinute, endMinute 는 확정 시간 스냅샷이라 메시지가 오가도 바뀌지 않는다.
+ * BT-009·BT-010 임시 모델. 매칭 필드는 AGENTS.md 5장의 matches 계약을 따르고, BT-012 확정 후 위치·이름을 맞춘다.
+ * meetingDate, startMinute, endMinute 는 확정 시간 스냅샷이라 메시지가 오가거나 매칭이 종료돼도 바뀌지 않는다.
+ * 후기 작성 여부는 이 모델이 아니라 review.ReviewRepository 가 기준이다.
  */
 public final class ChatRoom {
     public enum Status { ACTIVE, ENDED }
@@ -27,18 +28,19 @@ public final class ChatRoom {
     public final int startMinute, endMinute;
     public final boolean chatReady;
     public final String otherUid, otherName;
+    /** 학과·학년·성별 요약. 예: 컴퓨터공학과 3학년 · 여성. 실제 값은 publicProfiles 에서 받는다. */
+    public final String otherInfo;
     public final boolean otherHasPhoto;
     public final String lastMessage;
     public final long lastMessageAt;
     public final int unreadCount;
     /** 추천 장소가 없으면 null. BT-009 에서는 AI 결과가 아니라 Mock 문구다. */
     public final String recommendedPlace;
-    public final boolean reviewWritten;
 
     ChatRoom(String matchId, List<String> participantUids, Status status, String meetingDate,
              int startMinute, int endMinute, boolean chatReady, String otherUid, String otherName,
-             boolean otherHasPhoto, String lastMessage, long lastMessageAt, int unreadCount,
-             String recommendedPlace, boolean reviewWritten) {
+             String otherInfo, boolean otherHasPhoto, String lastMessage, long lastMessageAt,
+             int unreadCount, String recommendedPlace) {
         this.matchId = matchId;
         this.participantUids = participantUids;
         this.status = status;
@@ -48,21 +50,28 @@ public final class ChatRoom {
         this.chatReady = chatReady;
         this.otherUid = otherUid;
         this.otherName = otherName;
+        this.otherInfo = otherInfo;
         this.otherHasPhoto = otherHasPhoto;
         this.lastMessage = lastMessage;
         this.lastMessageAt = lastMessageAt;
         this.unreadCount = unreadCount;
         this.recommendedPlace = recommendedPlace;
-        this.reviewWritten = reviewWritten;
     }
 
     ChatRoom withLastMessage(String message, long at, int unread) {
         return new ChatRoom(matchId, participantUids, status, meetingDate, startMinute, endMinute,
-                chatReady, otherUid, otherName, otherHasPhoto, message, at, unread,
-                recommendedPlace, reviewWritten);
+                chatReady, otherUid, otherName, otherInfo, otherHasPhoto, message, at, unread,
+                recommendedPlace);
     }
 
     ChatRoom withUnread(int unread) {
         return withLastMessage(lastMessage, lastMessageAt, unread);
+    }
+
+    /** 상태만 바꾼다. 확정 시간 스냅샷은 그대로 둔다. */
+    ChatRoom withStatus(Status newStatus) {
+        return new ChatRoom(matchId, participantUids, newStatus, meetingDate, startMinute, endMinute,
+                chatReady, otherUid, otherName, otherInfo, otherHasPhoto, lastMessage, lastMessageAt,
+                unreadCount, recommendedPlace);
     }
 }
