@@ -13,8 +13,9 @@ import androidx.fragment.app.FragmentTransaction;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.team4.bintime.chat.ChatListFragment;
 import com.team4.bintime.matching.MatchingFragment;
-import com.team4.bintime.request.MockRequestRepository;
 import com.team4.bintime.notification.NotificationListFragment;
+import com.team4.bintime.profile.MyPageFragment;
+import com.team4.bintime.request.MockRequestRepository;
 
 /**
  * 공통 화면 이동 담당: 하단 탭 4개를 Fragment show/hide 로 전환한다 (탭 상태 유지).
@@ -109,7 +110,7 @@ public class MainActivity extends AppCompatActivity {
     private Fragment createTab(@IdRes int tabId) {
         if (tabId == R.id.nav_chat) return new ChatListFragment();
         if (tabId == R.id.nav_timetable) return PlaceholderFragment.newInstance("시간표", "C");
-        if (tabId == R.id.nav_my) return PlaceholderFragment.newInstance("마이페이지", "B");
+        if (tabId == R.id.nav_my) return new MyPageFragment();
         return new MatchingFragment();
     }
 }
