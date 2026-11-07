@@ -16,6 +16,11 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".auth.OnboardingActivity" android:exported="false" />
+        <activity
+            android:name=".auth.EmailAuthActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
         <activity android:name=".matching.FilterActivity" />
         <activity android:name=".matching.ProfileDetailActivity" />
         <activity android:name=".request.MatchAcceptedActivity" android:exported="false" />

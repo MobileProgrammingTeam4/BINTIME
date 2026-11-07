@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BIN TIME</string>
+
+    <!-- 온보딩 -->
+    <string name="onboarding_title">같은 시간,\n다른 곳에 있는 너와</string>
+    <string name="onboarding_subtitle">지금, 공강이 겹치는 사람과\n가까워질 수 있어요.</string>
+    <string name="onboarding_start_button">시작하기</string>
+
+    <!-- 학생 인증 공통 -->
+    <string name="auth_header_title">학생 인증</string>
+
+    <!-- 학생 인증 - 이메일 입력 -->
+    <string name="auth_email_input_title">학교 이메일로 인증해주세요</string>
+    <string name="auth_email_input_subtitle">BIN TIME 앱은 대학교 이메일 인증으로 이용할 수 있어요</string>
+    <string name="auth_email_label">이메일 주소</string>
+    <string name="auth_email_hint">yu.bin@kookmin.ac.kr</string>
+    <string name="auth_send_link_button">인증링크 발송</string>
+    <string name="auth_error_invalid_domain">대학교 이메일(@...ac.kr, @...edu)을 입력해 주세요</string>
+
+    <!-- 학생 인증 - 이메일 확인 안내 (발송 완료) -->
+    <string name="auth_check_email_title">이메일을 확인해 주세요</string>
+    <string name="auth_check_email_subtitle">받은 이메일의 인증 링크를 눌러 로그인을 완료해 주세요</string>
+    <string name="auth_reenter_email">이메일 다시 입력하기</string>
+    <string name="auth_resend_link_button">인증 링크 다시 보내기</string>
+    <string name="auth_resend_success">인증 링크를 다시 보냈어요</string>
+    <string name="auth_simulate_link_click">인증 링크 클릭 완료 (목업 시연용)</string>
+
+    <!-- 학생 인증 예외 - 링크 만료 -->
+    <string name="auth_expired_title">링크가 만료되었어요</string>
+    <string name="auth_expired_subtitle">인증 링크의 유효 시간이 지났어요\n이메일을 다시 입력하거나 새 링크를 받아주세요</string>
+
+    <!-- 학생 인증 예외 - 잘못된 링크 -->
+    <string name="auth_invalid_link_title">잘못된 링크에요</string>
+    <string name="auth_invalid_link_subtitle">링크가 잘못되었거나 이미 사용되었어요\n다시 시도해 주세요</string>
+
+    <!-- 학생 인증 예외 - 타 기기에서 클릭 -->
+    <string name="auth_different_device_title">이메일을 다시 입력해 주세요</string>
+    <string name="auth_different_device_subtitle">인증 링크를 받은 이메일 주소를 입력하면\n로그인/회원가입을 계속할 수 있어요</string>
+    <string name="auth_other_email_link">다른 이메일 주소로 인증할래요</string>
+    <string name="auth_complete_button">인증 완료하기</string>
+</resources>
