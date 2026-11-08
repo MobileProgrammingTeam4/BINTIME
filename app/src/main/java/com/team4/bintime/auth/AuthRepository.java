@@ -6,18 +6,36 @@ package com.team4.bintime.auth;
  */
 public interface AuthRepository {
 
+    /** 인증 실패 사유. 화면은 이 값으로 만료/잘못된 링크/이메일 재입력 상태를 구분한다. */
+    enum Failure {
+        INVALID_EMAIL,   // 허용되지 않은 이메일 형식·도메인
+        LINK_NOT_SENT,   // 인증 링크를 발송한 적이 없음
+        INVALID_LINK,    // 발송한 링크와 다르거나 형식이 잘못된 링크
+        LINK_EXPIRED,    // 유효 시간이 지난 링크
+        LINK_ALREADY_USED, // 이미 인증에 사용된 링크
+        EMAIL_MISMATCH   // 링크를 요청한 이메일과 입력한 이메일이 다름
+    }
+
     interface Callback<T> {
         void onSuccess(T result);
         void onError(String message);
+
+        /** 실패 사유가 필요한 화면은 이 메서드를 재정의한다. 기본 동작은 onError 위임. */
+        default void onFailure(Failure failure, String message) {
+            onError(message);
+        }
     }
 
     /** 학교 이메일로 Firebase Auth 로그인 링크를 전송합니다. */
     void sendSignInLink(String email, Callback<Void> callback);
 
-    /** 인증 링크 재발송 */
+    /** 인증 링크 재발송. 이전에 발송한 링크는 더 이상 사용할 수 없습니다. */
     void resendSignInLink(String email, Callback<Void> callback);
 
-    /** 수신된 링크(또는 딥링크 URL)를 검증하고 로그인을 완료합니다. */
+    /**
+     * 수신된 링크(또는 딥링크 URL)를 검증하고 로그인을 완료합니다.
+     * 링크 발송 여부, 링크 일치·만료·재사용, 요청 이메일과의 일치 여부를 모두 통과해야 성공합니다.
+     */
     void verifySignInLink(String email, String link, Callback<String /* uid */> callback);
 
     /** 현재 사용자의 로그인 여부 확인 */

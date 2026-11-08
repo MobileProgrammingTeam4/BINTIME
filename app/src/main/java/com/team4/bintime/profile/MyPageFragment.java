@@ -19,6 +19,7 @@ import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.team4.bintime.MainActivity;
 import com.team4.bintime.R;
+import com.team4.bintime.auth.MockAuthRepository;
 import com.team4.bintime.auth.OnboardingActivity;
 import com.team4.bintime.notification.NotificationSettingsActivity;
 
@@ -28,7 +29,8 @@ import com.team4.bintime.notification.NotificationSettingsActivity;
  */
 public class MyPageFragment extends Fragment {
 
-    private MockProfileRepository profileRepo = new MockProfileRepository();
+    // 프로필 설정 화면과 같은 저장소를 사용해 수정 결과가 onResume() 에서 바로 반영되게 한다.
+    private final MockProfileRepository profileRepo = MockProfileRepository.shared();
     private UserProfile currentProfile;
 
     private ImageView imgMyPhoto;
@@ -139,9 +141,10 @@ public class MyPageFragment extends Fragment {
                 .setTitle("로그아웃")
                 .setMessage("정말 로그아웃 하시겠습니까?")
                 .setPositiveButton("로그아웃", (dialog, which) -> {
+                    MockAuthRepository.shared().signOut();
                     Toast.makeText(requireContext(), "로그아웃 되었습니다.", Toast.LENGTH_SHORT).show();
                     Intent intent = new Intent(requireContext(), OnboardingActivity.class);
-                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                     startActivity(intent);
                     if (getActivity() != null) getActivity().finish();
                 })

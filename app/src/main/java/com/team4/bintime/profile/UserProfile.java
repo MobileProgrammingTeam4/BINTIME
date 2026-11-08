@@ -36,6 +36,36 @@ public class UserProfile implements Serializable {
         this.interestTags.add("산책");
     }
 
+    /** 프로필 최초 생성용 빈 프로필. 기본 시연 값(김지민 등)을 채우지 않는다. */
+    public static UserProfile empty() {
+        UserProfile p = new UserProfile();
+        p.uid = null;
+        p.email = null;
+        p.nickname = "";
+        p.department = "";
+        p.grade = "";
+        p.gender = "";
+        p.bio = "";
+        p.photoResId = 0;
+        p.interestTags = new ArrayList<>();
+        return p;
+    }
+
+    /** 저장소 내부 값과 화면 편집 값을 분리하기 위한 깊은 복사. */
+    public UserProfile copy() {
+        UserProfile p = new UserProfile();
+        p.uid = uid;
+        p.email = email;
+        p.nickname = nickname;
+        p.department = department;
+        p.grade = grade;
+        p.gender = gender;
+        p.bio = bio;
+        p.photoResId = photoResId;
+        p.interestTags = interestTags != null ? new ArrayList<>(interestTags) : new ArrayList<>();
+        return p;
+    }
+
     public static UserProfile createDefault() {
         UserProfile p = new UserProfile();
         p.setGrade("3학년");

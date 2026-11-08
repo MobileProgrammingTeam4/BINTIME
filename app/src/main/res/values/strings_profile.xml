@@ -22,6 +22,11 @@
     <string name="profile_ai_tags_section">✨ AI 추천</string>
     <string name="profile_default_tags_section">기본 활동 태그</string>
 
+    <!-- 필수 입력값 검증 안내 -->
+    <string name="profile_error_nickname_required">닉네임을 입력해 주세요</string>
+    <string name="profile_error_department_required">학과를 입력해 주세요</string>
+    <string name="profile_error_check_required">필수 정보를 확인해 주세요</string>
+
     <string name="profile_start_button">시작하기</string>
     <string name="profile_save_button">변경하기</string>
 

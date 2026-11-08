@@ -132,6 +132,15 @@
                 android:textColor="@color/text_tertiary"
                 android:textSize="12sp" />
 
+            <TextView
+                android:id="@+id/tvNicknameError"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/profile_error_nickname_required"
+                android:textColor="@color/action_primary"
+                android:textSize="12sp"
+                android:visibility="gone" />
+
             <!-- 학과 입력 -->
             <TextView
                 android:layout_width="wrap_content"
@@ -154,6 +163,16 @@
                 android:textSize="15sp"
                 android:paddingHorizontal="16dp"
                 android:singleLine="true" />
+
+            <TextView
+                android:id="@+id/tvDepartmentError"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/profile_error_department_required"
+                android:textColor="@color/action_primary"
+                android:textSize="12sp"
+                android:visibility="gone" />
 
             <!-- 성별 & 학년 (가로 2열 그리드) -->
             <LinearLayout
