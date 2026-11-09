@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
+    <path
+        android:pathData="M0 12C0 5.37258 5.37258 0 12 0H36C42.6274 0 48 5.37258 48 12V36C48 42.6274 42.6274 48 36 48H12C5.37258 48 0 42.6274 0 36V12Z"
+        android:fillColor="@color/bg_card" />
+    <path
+        android:pathData="M38 28.6662L33.1996 23.8658C32.6161 23.2825 31.825 22.9549 31 22.9549C30.175 22.9549 29.3839 23.2825 28.8004 23.8658L14.6667 37.9995M38 28.6662V13.1111C38 11.3929 36.6071 10 34.8889 10H13.1111C11.3929 10 10 11.3929 10 13.1111V34.8889C10 36.6071 11.3929 38 13.1111 38H34.8889C36.6071 38 38 36.6071 38 34.8889V28.6662ZM22.4444 19.3333C22.4444 21.0516 21.0516 22.4444 19.3333 22.4444C17.6151 22.4444 16.2222 21.0516 16.2222 19.3333C16.2222 17.6151 17.6151 16.2222 19.3333 16.2222C21.0516 16.2222 22.4444 17.6151 22.4444 19.3333Z"
+        android:fillColor="#00000000"
+        android:strokeColor="#666666"
+        android:strokeWidth="1"
+        android:strokeLineCap="round" />
+</vector>

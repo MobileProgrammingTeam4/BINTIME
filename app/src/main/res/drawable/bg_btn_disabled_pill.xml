@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 파일 위치: res/drawable/bg_btn_disabled_pill.xml -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/bg_page" />
+    <corners android:radius="999dp" />
+</shape>

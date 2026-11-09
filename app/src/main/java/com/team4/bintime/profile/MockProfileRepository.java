@@ -30,6 +30,10 @@ public class MockProfileRepository implements ProfileRepository {
 
     private UserProfile currentProfile;
 
+    public boolean hasCompletedProfile(String uid) {
+        return uid != null && uid.equals(currentProfile.getUid());
+    }
+
     public MockProfileRepository() {
         currentProfile = new UserProfile();
         currentProfile.setNickname("김지민");
