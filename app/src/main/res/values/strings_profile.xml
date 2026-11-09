@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 프로필 설정 공통 -->
+    <string name="profile_header_title">프로필 설정</string>
+    <string name="profile_add_photo">프로필 사진 추가</string>
+    <string name="profile_change_photo">프로필 사진 변경</string>
+    <string name="profile_nickname_label">닉네임</string>
+    <string name="profile_nickname_hint">김지민</string>
+    <string name="profile_department_label">학과</string>
+    <string name="profile_department_hint">소프트웨어학과</string>
+    <string name="profile_gender_label">성별</string>
+    <string name="profile_grade_label">학년</string>
+    <string name="profile_gender_notice">성별은 한번 선택한 이후에는 변경할 수 없어요</string>
+
+    <string name="profile_bio_label">자기소개</string>
+    <string name="profile_bio_hint">같이 공부할 친구 찾아요!\n(스터디, 산책, 카페 다 좋아해요 😊)</string>
+    <string name="profile_ai_write_button">✨ AI로 작성하기</string>
+    <string name="profile_ai_feedback">✨ 시간표의 \'자료구조\', 월요일 오후 공강\'을 분석해 작성했어요</string>
+
+    <string name="profile_tags_title">선호하는 활동 태그</string>
+    <string name="profile_tags_subtitle">관심 있는 활동을 모두 선택하세요</string>
+    <string name="profile_ai_tags_section">✨ AI 추천</string>
+    <string name="profile_default_tags_section">기본 활동 태그</string>
+
+    <!-- 필수 입력값 검증 안내 -->
+    <string name="profile_error_nickname_required">닉네임을 입력해 주세요</string>
+    <string name="profile_error_department_required">학과를 입력해 주세요</string>
+    <string name="profile_error_check_required">필수 정보를 확인해 주세요</string>
+
+    <string name="profile_start_button">시작하기</string>
+    <string name="profile_save_button">변경하기</string>
+
+    <!-- 수정 취소 다이얼로그 모달 -->
+    <string name="profile_cancel_dialog_title">수정을 취소할까요</string>
+    <string name="profile_cancel_dialog_desc">작성중인 정보는 저장되지 않아요</string>
+    <string name="profile_cancel_dialog_close">닫기</string>
+    <string name="profile_cancel_dialog_confirm">수정 취소하기</string>
+
+    <!-- 마이 화면 -->
+    <string name="my_header_title">마이</string>
+    <string name="my_section_personal">개인 설정</string>
+    <string name="my_menu_edit_profile">프로필 수정</string>
+    <string name="my_menu_blocked_users">차단한 사용자 관리</string>
+    <string name="my_menu_timetable">시간표 관리</string>
+
+    <string name="my_section_account">계정 설정</string>
+    <string name="my_menu_notification">알림 설정</string>
+    <string name="my_menu_terms">이용약관 및 개인정보 처리방침</string>
+    <string name="my_menu_logout">로그아웃</string>
+    <string name="my_menu_delete_account">회원 탈퇴</string>
+</resources>

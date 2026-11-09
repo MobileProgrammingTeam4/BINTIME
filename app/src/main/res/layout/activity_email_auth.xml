@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_card">
+
+    <!-- 상단 툴바 / 앱바 -->
+    <LinearLayout
+        android:id="@+id/layoutAppBar"
+        android:layout_width="0dp"
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <ImageButton
+            android:id="@+id/btnBack"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_chevron_left"
+            android:contentDescription="뒤로가기"
+            app:tint="@color/text_primary" />
+
+        <TextView
+            android:id="@+id/tvHeaderTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="@string/auth_header_title"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <ScrollView
+        android:id="@+id/scrollViewContent"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:fillViewport="true"
+        app:layout_constraintTop_toBottomOf="@id/layoutAppBar"
+        app:layout_constraintBottom_toTopOf="@id/layoutBottomAction"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="24dp"
+            android:paddingTop="20dp"
+            android:paddingBottom="24dp">
+
+            <!-- 1. 메인 안내 타이틀 & 서브타이틀 -->
+            <TextView
+                android:id="@+id/tvMainTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/auth_email_input_title"
+                android:textColor="@color/text_primary"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:lineSpacingExtra="4dp" />
+
+            <TextView
+                android:id="@+id/tvSubTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/auth_email_input_subtitle"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp"
+                android:lineSpacingExtra="3dp" />
+
+            <!-- 이메일 입력 섹션 (단계 1 & 타 기기 단계) -->
+            <LinearLayout
+                android:id="@+id/layoutEmailInputSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="36dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvEmailLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/auth_email_label"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <EditText
+                    android:id="@+id/etEmail"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/bg_input_field"
+                    android:hint="@string/auth_email_hint"
+                    android:textColorHint="@color/text_tertiary"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:paddingHorizontal="16dp"
+                    android:inputType="textEmailAddress"
+                    android:maxLines="1" />
+
+                <TextView
+                    android:id="@+id/tvEmailHelper"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/auth_error_invalid_domain"
+                    android:textColor="@color/action_primary"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <!-- 발송 완료 / 링크 대기 섹션 (단계 2) -->
+            <LinearLayout
+                android:id="@+id/layoutSentInfoSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="32dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <!-- 전송된 이메일 표시 카드 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_pill_subtle"
+                    android:padding="16dp"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tvSentEmailDisplay"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/action_primary"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- 시연/테스트용: 가상 인증 링크 수신 및 클릭 버튼 -->
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btnSimulateLinkClick"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="20dp"
+                    android:background="@drawable/bg_btn_outline"
+                    android:text="@string/auth_simulate_link_click"
+                    android:textColor="@color/action_primary"
+                    android:textSize="14sp" />
+
+                <!-- 개발/테스트용: 예외 상태 모의 전환 칩 (만료/잘못된링크/타기기) -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:orientation="horizontal"
+                    android:gravity="center">
+
+                    <TextView
+                        android:id="@+id/btnSimulateExpired"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:padding="8dp"
+                        android:text="[만료 테스트]"
+                        android:textColor="@color/text_tertiary"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/btnSimulateInvalid"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:padding="8dp"
+                        android:text="[잘못된링크 테스트]"
+                        android:textColor="@color/text_tertiary"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/btnSimulateOtherDevice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:padding="8dp"
+                        android:text="[타기기 테스트]"
+                        android:textColor="@color/text_tertiary"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+            </LinearLayout>
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- 하단 액션 영역 -->
+    <LinearLayout
+        android:id="@+id/layoutBottomAction"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingHorizontal="24dp"
+        android:paddingBottom="28dp"
+        android:paddingTop="12dp"
+        android:background="@color/bg_card"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- 보조 액션 (이메일 다시 입력하기 / 다른 이메일 주소로 인증할래요) -->
+        <TextView
+            android:id="@+id/tvSecondaryAction"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="8dp"
+            android:layout_marginBottom="8dp"
+            android:text="@string/auth_reenter_email"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp"
+            android:visibility="gone" />
+
+        <!-- 메인 액션 버튼 (인증링크 발송 / 인증 링크 다시 보내기 / 인증 완료하기) -->
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btnPrimaryAction"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:background="@drawable/bg_btn_disabled"
+            android:enabled="false"
+            android:text="@string/auth_send_link_button"
+            android:textColor="@color/text_tertiary"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

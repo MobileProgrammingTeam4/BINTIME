@@ -7,8 +7,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.BinTime">
 
+        <!-- 최초 실행: 온보딩 → 학교 이메일 인증 → 프로필 생성 → 메인. 로그인 상태 자동 분기는 BT-014 -->
         <activity
-            android:name=".MainActivity"
+            android:name=".auth.OnboardingActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -16,6 +17,15 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".MainActivity" android:exported="false" />
+        <activity
+            android:name=".auth.EmailAuthActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".profile.ProfileSetupActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
         <activity android:name=".matching.FilterActivity" />
         <activity android:name=".matching.ProfileDetailActivity" />
         <activity android:name=".request.MatchAcceptedActivity" android:exported="false" />
