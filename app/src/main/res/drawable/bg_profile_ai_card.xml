@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Figma AI 추천 자기소개 카드: action/subtle 배경, radius/lg 16dp -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/action_subtle" />
+    <corners android:radius="16dp" />
+</shape>

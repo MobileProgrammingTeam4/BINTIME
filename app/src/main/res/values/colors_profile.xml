@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- BT-003·BT-004 화면 전용 색. Figma 변수 color/text/disabled. 팀 공통 토큰은 colors.xml -->
+<resources>
+    <color name="form_text_disabled">#C8C8C8</color>
+</resources>

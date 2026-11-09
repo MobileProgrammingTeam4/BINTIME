@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 사진 없는 프로필 (Figma 빈틈 매칭/Avatar Type=Placeholder): 흰 원 + 가운데 user-round 28dp.
+     80dp 기준. 원형 자르기와 1dp 테두리는 ShapeableImageView 가 담당 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="80dp"
+    android:height="80dp"
+    android:viewportWidth="80"
+    android:viewportHeight="80">
+    <path android:fillColor="@color/bg_card" android:pathData="M0,0h80v80h-80z" />
+    <group android:translateX="26" android:translateY="26">
+        <path
+            android:pathData="M14 15.1667C17.2213 15.1667 19.8327 12.555 19.8327 9.33333C19.8327 6.11167 17.2213 3.5 14 3.5C10.7787 3.5 8.16725 6.11167 8.16725 9.33333C8.16725 12.555 10.7787 15.1667 14 15.1667ZM14 15.1667C16.4751 15.1667 18.8488 16.15 20.599 17.9003C22.3492 19.6507 23.3324 22.0246 23.3324 24.5M14 15.1667C11.5249 15.1667 9.15116 16.15 7.401 17.9003C5.65083 19.6507 4.6676 22.0246 4.6676 24.5"
+            android:strokeWidth="1.8"
+            android:strokeColor="@color/text_tertiary"
+            android:strokeLineCap="round" />
+    </group>
+</vector>

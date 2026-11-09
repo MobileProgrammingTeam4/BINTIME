@@ -24,7 +24,10 @@
     <string name="auth_reenter_email">이메일 다시 입력하기</string>
     <string name="auth_resend_link_button">인증 링크 다시 보내기</string>
     <string name="auth_resend_success">인증 링크를 다시 보냈어요</string>
-    <string name="auth_simulate_link_click">인증 링크 클릭 완료 (목업 시연용)</string>
+    <string name="auth_simulate_link_click">[목업 시연] 메일의 인증 링크 열기</string>
+    <string name="auth_simulate_expired">[만료 링크]</string>
+    <string name="auth_simulate_invalid">[잘못된 링크]</string>
+    <string name="auth_simulate_other_device">[다른 기기]</string>
 
     <!-- 학생 인증 예외 - 링크 만료 -->
     <string name="auth_expired_title">링크가 만료되었어요</string>

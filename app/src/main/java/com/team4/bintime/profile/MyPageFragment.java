@@ -1,6 +1,5 @@
 package com.team4.bintime.profile;
 
-import android.app.AlertDialog;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -12,14 +11,14 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
-import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.team4.bintime.R;
 import com.team4.bintime.auth.MockAuthRepository;
 import com.team4.bintime.auth.OnboardingActivity;
+import com.team4.bintime.common.ChipViews;
+import com.team4.bintime.common.ConfirmDialog;
 import com.team4.bintime.notification.NotificationSettingsActivity;
 import com.team4.bintime.timetable.TimetableReviewActivity;
 
@@ -28,6 +27,9 @@ import com.team4.bintime.timetable.TimetableReviewActivity;
  * (BT-004 / Issue #4)
  */
 public class MyPageFragment extends Fragment {
+
+    private static final String KEY_LOGOUT = "myLogout";
+    private static final String KEY_DELETE_ACCOUNT = "myDeleteAccount";
 
     // 프로필 설정 화면과 같은 저장소를 사용해 수정 결과가 onResume() 에서 바로 반영되게 한다.
     private final MockProfileRepository profileRepo = MockProfileRepository.shared();
@@ -38,6 +40,15 @@ public class MyPageFragment extends Fragment {
     private TextView tvMyInfo;
     private TextView tvMyBio;
     private ChipGroup chipGroupMyTags;
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        getChildFragmentManager().setFragmentResultListener(KEY_LOGOUT, this, (key, result) -> logout());
+        // 실제 계정 삭제는 후속 이슈 범위라, 완료된 것처럼 안내하지 않는다.
+        getChildFragmentManager().setFragmentResultListener(KEY_DELETE_ACCOUNT, this, (key, result) ->
+                Toast.makeText(requireContext(), R.string.my_delete_not_ready, Toast.LENGTH_SHORT).show());
+    }
 
     @Nullable
     @Override
@@ -76,21 +87,14 @@ public class MyPageFragment extends Fragment {
                 tvMyInfo.setText(profile.getFormattedSummary());
                 tvMyBio.setText(profile.getBio());
 
-                if (profile.getPhotoResId() != 0) {
-                    imgMyPhoto.setImageResource(profile.getPhotoResId());
-                }
+                imgMyPhoto.setImageResource(profile.getPhotoResId() != 0
+                        ? profile.getPhotoResId() : R.drawable.img_profile_placeholder);
 
                 chipGroupMyTags.removeAllViews();
                 if (profile.getInterestTags() != null) {
                     for (String tag : profile.getInterestTags()) {
-                        Chip chip = new Chip(requireContext());
-                        chip.setText("#" + tag);
-                        chip.setChipBackgroundColorResource(R.color.action_subtle);
-                        chip.setTextColor(ContextCompat.getColor(requireContext(), R.color.action_primary));
-                        chip.setChipStrokeColorResource(R.color.action_soft);
-                        chip.setChipStrokeWidth(1.0f);
-                        chip.setClickable(false);
-                        chipGroupMyTags.addView(chip);
+                        // 공통 Figma Chip(Type=Interest, Selected)
+                        chipGroupMyTags.addView(ChipViews.interest(requireContext(), "#" + tag, true));
                     }
                 }
             }
@@ -133,29 +137,26 @@ public class MyPageFragment extends Fragment {
         root.findViewById(R.id.menuDeleteAccount).setOnClickListener(v -> showDeleteAccountDialog());
     }
 
+    /** 공통 ConfirmDialog(Figma Modal) 사용. 결과 리스너는 onCreate 에서 등록해 회전 후에도 받는다. */
     private void showLogoutDialog() {
-        new AlertDialog.Builder(requireContext())
-                .setTitle("로그아웃")
-                .setMessage("정말 로그아웃 하시겠습니까?")
-                .setPositiveButton("로그아웃", (dialog, which) -> {
-                    MockAuthRepository.shared().signOut();
-                    Toast.makeText(requireContext(), "로그아웃 되었습니다.", Toast.LENGTH_SHORT).show();
-                    Intent intent = new Intent(requireContext(), OnboardingActivity.class);
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                    startActivity(intent);
-                    if (getActivity() != null) getActivity().finish();
-                })
-                .setNegativeButton("취소", null)
-                .show();
+        if (getChildFragmentManager().findFragmentByTag(KEY_LOGOUT) != null) return;
+        ConfirmDialog.show(getChildFragmentManager(), KEY_LOGOUT,
+                getString(R.string.my_logout_title), getString(R.string.my_logout_message),
+                getString(R.string.my_menu_logout));
     }
 
     private void showDeleteAccountDialog() {
-        new AlertDialog.Builder(requireContext())
-                .setTitle("회원 탈퇴")
-                .setMessage("회원 탈퇴 시 시간표와 매칭 기록이 모두 삭제됩니다. 계속하시겠습니까?")
-                .setPositiveButton("탈퇴하기", (dialog, which) ->
-                        Toast.makeText(requireContext(), "회원 탈퇴가 완료되었습니다.", Toast.LENGTH_SHORT).show())
-                .setNegativeButton("취소", null)
-                .show();
+        if (getChildFragmentManager().findFragmentByTag(KEY_DELETE_ACCOUNT) != null) return;
+        ConfirmDialog.show(getChildFragmentManager(), KEY_DELETE_ACCOUNT,
+                getString(R.string.my_delete_title), getString(R.string.my_delete_message),
+                getString(R.string.my_delete_confirm));
+    }
+
+    private void logout() {
+        MockAuthRepository.shared().signOut();
+        Toast.makeText(requireContext(), R.string.my_logout_done, Toast.LENGTH_SHORT).show();
+        Intent intent = new Intent(requireContext(), OnboardingActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
     }
 }

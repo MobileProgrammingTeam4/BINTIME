@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 학과 '선택' 버튼 (Figma 116:2685): action/subtle, radius 12 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/action_subtle" />
+    <corners android:radius="12dp" />
+</shape>

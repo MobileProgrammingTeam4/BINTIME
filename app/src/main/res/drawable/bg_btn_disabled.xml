@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 비활성 알약 버튼 (Figma 인증링크 발송 비활성) -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#F2F2F2" />
-    <corners android:radius="16dp" />
+    <solid android:color="@color/bg_page" />
+    <corners android:radius="999dp" />
 </shape>

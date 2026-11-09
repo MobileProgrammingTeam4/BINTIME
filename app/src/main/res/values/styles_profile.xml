@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- BT-003·BT-004 화면 공통 스타일. 수치는 Figma MCP get_design_context 값 -->
+<resources>
+
+    <!-- 빈틈 매칭/InputField Field: h48, radius16, px16, Body M 14 -->
+    <style name="Widget.BinTime.ProfileInput" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">48dp</item>
+        <item name="android:background">@drawable/bg_input_field</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:inputType">text</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textColorHint">@color/text_tertiary</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <!-- Caption 12 / lineHeight 16 / text tertiary (글자 수, 안내 문구) -->
+    <style name="Widget.BinTime.ProfileCaption" parent="">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">@color/text_tertiary</item>
+        <item name="android:textSize">12sp</item>
+        <item name="lineHeight">16dp</item>
+    </style>
+
+    <!-- 필수값 오류 안내 (Figma 에 오류 상태 시안이 없어 Caption + action/primary 로 표시) -->
+    <style name="Widget.BinTime.ProfileError" parent="Widget.BinTime.ProfileCaption">
+        <item name="android:layout_marginTop">4dp</item>
+        <item name="android:textColor">@color/action_primary</item>
+        <item name="android:visibility">gone</item>
+    </style>
+
+    <!-- 마이 SettingsRow (Figma 27:1897): h64 px16 gap12, 아이콘 20, Body M 14, chevron-right 20 -->
+    <style name="Widget.BinTime.MyMenuRow" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">64dp</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:background">?attr/selectableItemBackground</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <style name="Widget.BinTime.MyMenuIcon" parent="">
+        <item name="android:layout_width">20dp</item>
+        <item name="android:layout_height">20dp</item>
+        <item name="android:importantForAccessibility">no</item>
+    </style>
+
+    <style name="Widget.BinTime.MyMenuText" parent="">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_marginStart">12dp</item>
+        <item name="android:layout_marginEnd">12dp</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="Widget.BinTime.MyMenuChevron" parent="">
+        <item name="android:layout_width">20dp</item>
+        <item name="android:layout_height">20dp</item>
+        <item name="android:src">@drawable/ic_my_chevron_right</item>
+        <item name="android:importantForAccessibility">no</item>
+    </style>
+
+    <style name="Widget.BinTime.MyMenuDivider" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">1dp</item>
+        <item name="android:background">@color/border_default</item>
+    </style>
+
+    <!-- SectionHeader (Figma 27:1867): H3 14 Bold -->
+    <style name="Widget.BinTime.MySectionTitle" parent="">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+</resources>

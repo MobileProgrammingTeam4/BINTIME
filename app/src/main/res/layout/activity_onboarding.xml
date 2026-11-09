@@ -1,74 +1,77 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 온보딩 (Figma 41:9992). 수치는 Figma MCP get_design_context 값 그대로.
+     Figma 상태바(44)·홈 인디케이터(28) 영역은 실제 기기 시스템 바 여백(SystemBarInsets)으로 대체한다 -->
 <androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/onboardingRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg_card"
-    android:paddingHorizontal="24dp">
+    android:fitsSystemWindows="true">
 
-    <!-- 중앙 콘텐츠 컨테이너 -->
+    <!-- 환영 콘텐츠: pt80 pb32 px32, 간격 32 -->
     <LinearLayout
         android:id="@+id/layoutCenterContent"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
         android:gravity="center_horizontal"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/btnStart"
-        app:layout_constraintStart_toStartOf="parent"
+        android:orientation="vertical"
+        android:paddingHorizontal="32dp"
+        android:paddingTop="80dp"
+        android:paddingBottom="32dp"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintVertical_bias="0.45">
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
 
-        <!-- 양 캐릭터 마스코트 -->
         <ImageView
             android:id="@+id/imgMascot"
-            android:layout_width="200dp"
-            android:layout_height="200dp"
-            android:scaleType="fitCenter"
-            android:src="@drawable/img_onboarding_mascot"
-            android:contentDescription="@string/app_name" />
+            android:layout_width="300dp"
+            android:layout_height="245dp"
+            android:contentDescription="@string/app_name"
+            android:scaleType="centerCrop"
+            android:src="@drawable/img_onboarding_mascot" />
 
-        <!-- 환영 핵심 메시지 -->
+        <!-- Display 28 Bold -->
         <TextView
             android:id="@+id/tvOnboardingTitle"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="32dp"
-            android:text="@string/onboarding_title"
-            android:textColor="@color/text_primary"
-            android:textSize="26sp"
-            android:textStyle="bold"
             android:gravity="center"
-            android:lineSpacingExtra="4dp" />
+            android:text="@string/onboarding_title"
+            android:textAppearance="@style/TextAppearance.BinTime.Display" />
 
-        <!-- 서비스 설명 -->
+        <!-- Body L 16 Medium, 간격 16 -->
         <TextView
             android:id="@+id/tvOnboardingSubtitle"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/onboarding_subtitle"
-            android:textColor="@color/text_secondary"
-            android:textSize="15sp"
+            android:layout_marginTop="16dp"
             android:gravity="center"
-            android:lineSpacingExtra="3dp" />
-
+            android:text="@string/onboarding_subtitle"
+            android:textAppearance="@style/TextAppearance.BinTime.BodyL"
+            android:textColor="@color/text_secondary" />
     </LinearLayout>
 
-    <!-- 하단 액션: 시작하기 버튼 -->
-    <androidx.appcompat.widget.AppCompatButton
-        android:id="@+id/btnStart"
+    <!-- 주요 액션: pt16 pb12 px20, Button Primary h52 -->
+    <FrameLayout
+        android:id="@+id/layoutBottomAction"
         android:layout_width="0dp"
-        android:layout_height="54dp"
-        android:layout_marginBottom="28dp"
-        android:background="@drawable/bg_btn_primary"
-        android:text="@string/onboarding_start_button"
-        android:textColor="@color/bg_card"
-        android:textSize="16sp"
-        android:textStyle="bold"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="16dp"
+        android:paddingBottom="12dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <TextView
+            android:id="@+id/btnStart"
+            style="@style/Widget.BinTime.PillPrimary"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:text="@string/onboarding_start_button" />
+    </FrameLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
