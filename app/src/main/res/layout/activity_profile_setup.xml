@@ -134,18 +134,29 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:labelFor="@id/etDepartment"
                 android:text="@string/profile_department_label"
                 android:textColor="@color/text_primary"
                 android:textSize="12sp"
                 app:lineHeight="16dp" />
 
-            <EditText
-                android:id="@+id/etDepartment"
-                style="@style/Widget.BinTime.ProfileInput"
+            <!-- 학과: 직접 입력하지 않고 학과 검색 화면(Figma 116:2685)에서 선택 -->
+            <TextView
+                android:id="@+id/tvDepartment"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
                 android:layout_marginTop="8dp"
-                android:autofillHints="organizationUnit"
-                android:hint="@string/profile_department_hint" />
+                android:background="@drawable/bg_input_field"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
+                android:freezesText="true"
+                android:gravity="center_vertical"
+                android:hint="@string/profile_department_placeholder"
+                android:maxLines="1"
+                android:paddingHorizontal="16dp"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_tertiary"
+                android:textSize="14sp" />
 
             <TextView
                 android:id="@+id/tvDepartmentError"

@@ -26,6 +26,10 @@
             android:name=".profile.ProfileSetupActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".profile.DepartmentSearchActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
         <activity android:name=".matching.FilterActivity" />
         <activity android:name=".matching.ProfileDetailActivity" />
         <activity android:name=".request.MatchAcceptedActivity" android:exported="false" />

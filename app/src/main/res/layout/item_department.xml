@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 학과 목록 항목 (Figma 116:2685): py16, 학과명 H3 14 / 간격 4 / 소속 Body S 13 #666, 선택 버튼 56x36 radius 12 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingVertical="16dp">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="8dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/departmentName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="@style/TextAppearance.BinTime.H3" />
+
+        <TextView
+            android:id="@+id/departmentCollege"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textAppearance="@style/TextAppearance.BinTime.BodyS"
+            android:textColor="@color/text_secondary" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/departmentSelect"
+        android:layout_width="56dp"
+        android:layout_height="36dp"
+        android:background="@drawable/bg_department_select"
+        android:foreground="?attr/selectableItemBackground"
+        android:gravity="center"
+        android:text="@string/department_select"
+        android:textAppearance="@style/TextAppearance.BinTime.ButtonL"
+        android:textColor="@color/action_primary" />
+</LinearLayout>

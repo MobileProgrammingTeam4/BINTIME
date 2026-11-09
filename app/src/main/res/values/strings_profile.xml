@@ -7,7 +7,6 @@
     <string name="profile_nickname_label">닉네임</string>
     <string name="profile_nickname_hint">김지민</string>
     <string name="profile_department_label">학과</string>
-    <string name="profile_department_hint">소프트웨어학과</string>
     <string name="profile_gender_label">성별</string>
     <string name="profile_grade_label">학년</string>
     <string name="profile_gender_notice">성별은 한번 선택한 이후에는 변경할 수 없어요</string>
@@ -49,6 +48,14 @@
     <string name="my_menu_terms">이용약관 및 개인정보 처리방침</string>
     <string name="my_menu_logout">로그아웃</string>
     <string name="my_menu_delete_account">회원 탈퇴</string>
+
+    <!-- 학과 검색 (Figma 116:2685) -->
+    <string name="department_search_title">학과 검색</string>
+    <string name="department_search_hint">학과를 검색하세요</string>
+    <string name="department_select">선택</string>
+    <string name="department_empty_title">검색 결과가 없어요</string>
+    <string name="department_empty_message">다른 검색어로 다시 찾아보세요</string>
+    <string name="profile_department_placeholder">학과를 선택해 주세요</string>
 
     <!-- 마이 확인 다이얼로그 (공통 ConfirmDialog). Figma 시안이 없어 기존 문구 유지 -->
     <string name="my_logout_title">로그아웃 할까요</string>

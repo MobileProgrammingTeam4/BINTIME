@@ -13,6 +13,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
@@ -56,7 +58,8 @@ public class ProfileSetupActivity extends AppCompatActivity {
     private EditText etNickname;
     private TextView tvNicknameCount;
     private TextView tvNicknameError;
-    private EditText etDepartment;
+    private TextView tvDepartment;
+    private ActivityResultLauncher<Intent> departmentLauncher;
     private TextView tvDepartmentError;
     private Spinner spinnerGender;
     private Spinner spinnerGrade;
@@ -72,6 +75,13 @@ public class ProfileSetupActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_profile_setup);
+        departmentLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+            if (result.getResultCode() != RESULT_OK || result.getData() == null) return;
+            String department = result.getData().getStringExtra(DepartmentSearchActivity.EXTRA_DEPARTMENT);
+            if (department == null) return;
+            tvDepartment.setText(department);
+            tvDepartmentError.setVisibility(View.GONE);
+        });
         // 확인 다이얼로그 결과는 화면 회전 뒤에도 받도록 매번 등록한다.
         getSupportFragmentManager().setFragmentResultListener(KEY_CANCEL_EDIT, this, (key, result) -> finish());
 
@@ -129,7 +139,7 @@ public class ProfileSetupActivity extends AppCompatActivity {
         etNickname = findViewById(R.id.etNickname);
         tvNicknameCount = findViewById(R.id.tvNicknameCount);
         tvNicknameError = findViewById(R.id.tvNicknameError);
-        etDepartment = findViewById(R.id.etDepartment);
+        tvDepartment = findViewById(R.id.tvDepartment);
         tvDepartmentError = findViewById(R.id.tvDepartmentError);
         spinnerGender = findViewById(R.id.spinnerGender);
         spinnerGrade = findViewById(R.id.spinnerGrade);
@@ -185,7 +195,7 @@ public class ProfileSetupActivity extends AppCompatActivity {
             public void onSuccess(UserProfile user) {
                 profile = user;
                 etNickname.setText(profile.getNickname());
-                etDepartment.setText(profile.getDepartment());
+                tvDepartment.setText(profile.getDepartment());
                 etBio.setText(profile.getBio());
 
                 if ("남성".equals(profile.getGender())) spinnerGender.setSelection(1);
@@ -261,13 +271,9 @@ public class ProfileSetupActivity extends AppCompatActivity {
             @Override public void afterTextChanged(Editable s) {}
         });
 
-        etDepartment.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int count, int after) {
-                tvDepartmentError.setVisibility(View.GONE);
-            }
-            @Override public void afterTextChanged(Editable s) {}
-        });
+        // 학과 칸 → 학과 검색 화면. 뒤로가기(선택 취소)면 기존 학과를 그대로 둔다.
+        tvDepartment.setOnClickListener(v ->
+                departmentLauncher.launch(new Intent(this, DepartmentSearchActivity.class)));
 
         etBio.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -311,7 +317,7 @@ public class ProfileSetupActivity extends AppCompatActivity {
 
     private void saveProfileAndFinish() {
         String nickname = etNickname.getText().toString().trim();
-        String department = etDepartment.getText().toString().trim();
+        String department = tvDepartment.getText().toString().trim();
 
         // 필수값(닉네임·학과)이 비어 있으면 저장·화면 이동을 하지 않고 안내만 표시한다.
         ProfileValidator.Error nicknameError = ProfileValidator.validateNickname(nickname);
@@ -319,7 +325,7 @@ public class ProfileSetupActivity extends AppCompatActivity {
         showFieldError(tvNicknameError, nicknameError);
         showFieldError(tvDepartmentError, departmentError);
         if (nicknameError != null || departmentError != null) {
-            (nicknameError != null ? etNickname : etDepartment).requestFocus();
+            if (nicknameError != null) etNickname.requestFocus();
             Toast.makeText(this, R.string.profile_error_check_required, Toast.LENGTH_SHORT).show();
             return;
         }
