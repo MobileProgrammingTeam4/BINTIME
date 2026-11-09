@@ -42,10 +42,13 @@ public class TimetableSelectModeActivity extends AppCompatActivity {
         setContentView(R.layout.activity_timetable_select_mode);
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
         findViewById(R.id.btnManualInput).setOnClickListener(v -> {
-            TimetableDraft draft = MockTimetableRepository.load();
-            if (draft == null) {
-                draft = new TimetableDraft(Collections.singletonList(
-                        new Course("컴퓨터 구조론", "공학관 302호", "월", "10:00", "11:30")));
+            TimetableDraft draft = new TimetableDraft(Collections.emptyList());
+            if (getIntent().hasExtra(EXTRA_SIGNUP_EMAIL)) {
+                draft = MockTimetableRepository.load();
+                if (draft == null) {
+                    draft = new TimetableDraft(Collections.singletonList(
+                            new Course("컴퓨터 구조론", "공학관 302호", "월", "10:00", "11:30")));
+                }
             }
             registration.launch(TimetableDraft.open(this, CourseDirectInputActivity.class, draft));
         });

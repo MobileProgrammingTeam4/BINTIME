@@ -96,7 +96,7 @@ public class TimetableUploadActivity extends AppCompatActivity {
         updateAnalyzeButton();
         if (readable) {
             review.launch(TimetableDraft.open(this,
-                    TimetableAnalysisResultActivity.class, TimetableDraft.mockRecognition()));
+                    TimetableReviewActivity.class, TimetableDraft.mockRecognition()));
         } else {
             ConfirmDialog.show(getSupportFragmentManager(), RETRY_RECOGNITION,
                     "시간표 이미지를 인식하지 못했어요",

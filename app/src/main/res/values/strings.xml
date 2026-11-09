@@ -10,4 +10,7 @@
     <string name="desc_cancel_modify">작성중인 정보는 저장되지 않아요</string>
     <string name="btn_close">닫기</string>
     <string name="btn_cancel_modify">수정 취소하기</string>
+    <string name="timetable_edit_title">시간표 수정</string>
+    <string name="timetable_register_new">새로운 시간표 등록</string>
+    <string name="timetable_register_current">이 시간표로 등록</string>
 </resources>

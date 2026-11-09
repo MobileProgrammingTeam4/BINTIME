@@ -1,81 +1,62 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="12dp"
     android:background="@drawable/bg_course_item_card"
     android:gravity="center_vertical"
+    android:minHeight="69dp"
     android:orientation="horizontal"
     android:padding="16dp">
 
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginEnd="8dp"
         android:layout_weight="1"
         android:orientation="vertical">
 
         <TextView
             android:id="@+id/tvCourseTitle"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="컴퓨터 구조론"
-            android:textColor="#222222"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            android:includeFontPadding="false"
+            android:textAppearance="@style/TextAppearance.BinTime.H3"
+            tools:text="컴퓨터 구조론" />
 
         <TextView
             android:id="@+id/tvCourseInfo"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="월 10:00 ~ 11:30 · 공학관 302호"
-            android:textColor="#666666"
-            android:textSize="13sp" />
+            android:includeFontPadding="false"
+            android:textAppearance="@style/TextAppearance.BinTime.BodyS"
+            android:textColor="@color/text_secondary"
+            tools:text="월 10:00 ~ 11:30 · 공학관 302호" />
     </LinearLayout>
 
-    <LinearLayout
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
+    <TextView
+        android:id="@+id/btnEditLecture"
+        android:layout_width="56dp"
+        android:layout_height="36dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:text="수정"
+        android:textAppearance="@style/TextAppearance.BinTime.ButtonL"
+        android:textColor="@color/text_secondary" />
 
-        <FrameLayout
-            android:id="@+id/btnEditLecture"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
-            android:background="@drawable/bg_btn_gray_small"
-            android:clickable="true"
-            android:focusable="true"
-            android:paddingHorizontal="12dp"
-            android:paddingVertical="8dp">
-
-            <TextView
-                android:id="@+id/tvEditText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="수정"
-                android:textColor="#666666"
-                android:textSize="13sp"
-                android:textStyle="bold" />
-        </FrameLayout>
-
-        <FrameLayout
-            android:id="@+id/btnDeleteLecture"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/bg_btn_delete_small"
-            android:clickable="true"
-            android:focusable="true"
-            android:paddingHorizontal="12dp"
-            android:paddingVertical="8dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="삭제"
-                android:textColor="#F84648"
-                android:textSize="13sp"
-                android:textStyle="bold" />
-        </FrameLayout>
-    </LinearLayout>
+    <TextView
+        android:id="@+id/btnDeleteLecture"
+        android:layout_width="56dp"
+        android:layout_height="36dp"
+        android:background="@drawable/bg_btn_delete_small"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:text="삭제"
+        android:textAppearance="@style/TextAppearance.BinTime.ButtonL"
+        android:textColor="@color/action_primary" />
 </LinearLayout>

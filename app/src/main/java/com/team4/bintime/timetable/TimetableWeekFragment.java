@@ -1,5 +1,6 @@
 package com.team4.bintime.timetable;
 
+import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.Gravity;
@@ -22,7 +23,9 @@ import java.util.Collections;
 
 public class TimetableWeekFragment extends Fragment {
     private final ActivityResultLauncher<Intent> manage = registerForActivityResult(
-            new ActivityResultContracts.StartActivityForResult(), result -> render());
+            new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (result.getResultCode() == Activity.RESULT_OK) render();
+            });
 
     public TimetableWeekFragment() {
         super(R.layout.fragment_timetable_week);
@@ -31,7 +34,7 @@ public class TimetableWeekFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, Bundle state) {
         view.findViewById(R.id.manage_timetable).setOnClickListener(v ->
-                manage.launch(new Intent(requireContext(), TimetableSelectModeActivity.class)));
+                manage.launch(TimetableReviewActivity.forEditing(requireContext())));
         view.findViewById(R.id.btnChangeSlot).setVisibility(View.GONE);
         TextView footer = view.findViewById(R.id.matching_status_footer);
         footer.setGravity(Gravity.CENTER);
