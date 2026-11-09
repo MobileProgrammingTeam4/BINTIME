@@ -118,16 +118,24 @@
                 android:hint="@string/profile_nickname_hint"
                 android:maxLength="10" />
 
-            <TextView
-                android:id="@+id/tvNicknameCount"
-                style="@style/Widget.BinTime.ProfileCaption"
-                android:layout_marginTop="8dp"
-                android:text="0/10" />
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp">
 
-            <TextView
-                android:id="@+id/tvNicknameError"
-                style="@style/Widget.BinTime.ProfileError"
-                android:text="@string/profile_error_nickname_required" />
+                <TextView
+                    android:id="@+id/tvNicknameError"
+                    style="@style/Widget.BinTime.ProfileError"
+                    android:layout_gravity="start|center_vertical"
+                    android:layout_marginTop="0dp"
+                    android:text="@string/profile_error_nickname_required" />
+
+                <TextView
+                    android:id="@+id/tvNicknameCount"
+                    style="@style/Widget.BinTime.ProfileCaption"
+                    android:layout_gravity="end|center_vertical"
+                    android:text="0/10" />
+            </FrameLayout>
 
             <!-- 학과 -->
             <TextView
