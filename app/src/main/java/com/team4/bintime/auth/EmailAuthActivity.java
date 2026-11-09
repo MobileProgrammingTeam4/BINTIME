@@ -1,7 +1,6 @@
 package com.team4.bintime.auth;
 
 import android.content.Intent;
-import android.content.res.ColorStateList;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -14,7 +13,6 @@ import android.widget.Toast;
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.AppCompatButton;
 import androidx.core.content.ContextCompat;
 
 import com.team4.bintime.R;
@@ -49,12 +47,12 @@ public class EmailAuthActivity extends AppCompatActivity {
     private EditText etEmail;
     private TextView tvEmailHelper;
 
+    /** 목업 시연 버튼 영역. Figma 에 없는 영역이며 링크 발송 후에만 보인다. */
     private LinearLayout layoutSentInfoSection;
-    private TextView tvSentEmailDisplay;
-    private AppCompatButton btnSimulateLinkClick;
+    private TextView btnSimulateLinkClick;
 
     private TextView tvSecondaryAction;
-    private AppCompatButton btnPrimaryAction;
+    private TextView btnPrimaryAction;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -96,7 +94,6 @@ public class EmailAuthActivity extends AppCompatActivity {
         tvEmailHelper = findViewById(R.id.tvEmailHelper);
 
         layoutSentInfoSection = findViewById(R.id.layoutSentInfoSection);
-        tvSentEmailDisplay = findViewById(R.id.tvSentEmailDisplay);
         btnSimulateLinkClick = findViewById(R.id.btnSimulateLinkClick);
 
         tvSecondaryAction = findViewById(R.id.tvSecondaryAction);
@@ -190,11 +187,11 @@ public class EmailAuthActivity extends AppCompatActivity {
     private void setPrimaryButtonEnabled(boolean enabled) {
         btnPrimaryAction.setEnabled(enabled);
         if (enabled) {
-            btnPrimaryAction.setBackgroundResource(R.drawable.bg_btn_primary);
+            btnPrimaryAction.setBackgroundResource(R.drawable.bg_pill_primary);
             btnPrimaryAction.setTextColor(ContextCompat.getColor(this, R.color.bg_card));
         } else {
             btnPrimaryAction.setBackgroundResource(R.drawable.bg_btn_disabled);
-            btnPrimaryAction.setTextColor(ContextCompat.getColor(this, R.color.text_tertiary));
+            btnPrimaryAction.setTextColor(ContextCompat.getColor(this, R.color.form_text_disabled));
         }
     }
 
@@ -334,14 +331,13 @@ public class EmailAuthActivity extends AppCompatActivity {
                 tvSubTitle.setText(R.string.auth_check_email_subtitle);
                 layoutEmailInputSection.setVisibility(View.GONE);
                 layoutSentInfoSection.setVisibility(View.VISIBLE);
-                tvSentEmailDisplay.setText(authState.getEmail());
 
                 tvSecondaryAction.setVisibility(View.VISIBLE);
                 tvSecondaryAction.setText(R.string.auth_reenter_email);
 
                 btnPrimaryAction.setText(R.string.auth_resend_link_button);
                 btnPrimaryAction.setEnabled(true);
-                btnPrimaryAction.setBackgroundResource(R.drawable.bg_btn_outline);
+                btnPrimaryAction.setBackgroundResource(R.drawable.bg_pill_outline);
                 btnPrimaryAction.setTextColor(ContextCompat.getColor(this, R.color.action_primary));
                 break;
 
@@ -356,7 +352,7 @@ public class EmailAuthActivity extends AppCompatActivity {
 
                 btnPrimaryAction.setText(R.string.auth_resend_link_button);
                 btnPrimaryAction.setEnabled(true);
-                btnPrimaryAction.setBackgroundResource(R.drawable.bg_btn_outline);
+                btnPrimaryAction.setBackgroundResource(R.drawable.bg_pill_outline);
                 btnPrimaryAction.setTextColor(ContextCompat.getColor(this, R.color.action_primary));
                 break;
 
@@ -371,7 +367,7 @@ public class EmailAuthActivity extends AppCompatActivity {
 
                 btnPrimaryAction.setText(R.string.auth_resend_link_button);
                 btnPrimaryAction.setEnabled(true);
-                btnPrimaryAction.setBackgroundResource(R.drawable.bg_btn_outline);
+                btnPrimaryAction.setBackgroundResource(R.drawable.bg_pill_outline);
                 btnPrimaryAction.setTextColor(ContextCompat.getColor(this, R.color.action_primary));
                 break;
 

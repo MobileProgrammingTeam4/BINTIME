@@ -1,17 +1,12 @@
 package com.team4.bintime.profile;
 
-import android.app.Dialog;
 import android.content.Intent;
-import android.graphics.Color;
-import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
-import android.view.Window;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
-import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -20,14 +15,14 @@ import android.widget.Toast;
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.AppCompatButton;
 import androidx.core.content.ContextCompat;
 
-import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.team4.bintime.MainActivity;
 import com.team4.bintime.R;
 import com.team4.bintime.auth.MockAuthRepository;
+import com.team4.bintime.common.ChipViews;
+import com.team4.bintime.common.ConfirmDialog;
 
 import java.util.ArrayList;
 
@@ -48,6 +43,8 @@ public class ProfileSetupActivity extends AppCompatActivity {
     private static final String STATE_MODE = "profileMode";
     private static final String STATE_PROFILE = "userProfile";
     private static final String STATE_SELECTED_TAGS = "selectedTags";
+    private static final String STATE_AI_FEEDBACK = "aiFeedbackVisible";
+    private static final String KEY_CANCEL_EDIT = "profileCancelEdit";
 
     private int mode = MODE_CREATE;
     private final MockProfileRepository profileRepo = MockProfileRepository.shared();
@@ -69,12 +66,14 @@ public class ProfileSetupActivity extends AppCompatActivity {
     private TextView tvAiFeedback;
     private ChipGroup chipGroupAiTags;
     private ChipGroup chipGroupDefaultTags;
-    private AppCompatButton btnSubmit;
+    private TextView btnSubmit;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_profile_setup);
+        // 확인 다이얼로그 결과는 화면 회전 뒤에도 받도록 매번 등록한다.
+        getSupportFragmentManager().setFragmentResultListener(KEY_CANCEL_EDIT, this, (key, result) -> finish());
 
         mode = getIntent().getIntExtra(EXTRA_MODE, MODE_CREATE);
         boolean restored = false;
@@ -96,6 +95,7 @@ public class ProfileSetupActivity extends AppCompatActivity {
         // 입력값과 스피너 선택은 View 상태 복원으로 유지되므로, 회전 시에는 저장소 값으로 덮어쓰지 않는다.
         if (restored) {
             bindPhoto();
+            tvAiFeedback.setVisibility(savedInstanceState.getBoolean(STATE_AI_FEEDBACK) ? View.VISIBLE : View.GONE);
         } else if (mode == MODE_EDIT) {
             loadProfileData();
         } else {
@@ -118,6 +118,7 @@ public class ProfileSetupActivity extends AppCompatActivity {
         outState.putInt(STATE_MODE, mode);
         outState.putSerializable(STATE_PROFILE, profile);
         outState.putStringArrayList(STATE_SELECTED_TAGS, selectedTags);
+        outState.putBoolean(STATE_AI_FEEDBACK, tvAiFeedback.getVisibility() == View.VISIBLE);
     }
 
     private void initViews() {
@@ -143,31 +144,39 @@ public class ProfileSetupActivity extends AppCompatActivity {
         if (mode == MODE_EDIT) {
             tvPhotoLabel.setText(R.string.profile_change_photo);
             btnSubmit.setText(R.string.profile_save_button);
-            // 성별은 1회 선택 후 수정 불가 불변 정책
+            // 성별은 1회 선택 후 수정 불가 (Figma 102:2684: 회색 칸, 화살표 없음, 라벨·값 연회색)
             spinnerGender.setEnabled(false);
-            spinnerGender.setAlpha(0.6f);
+            findViewById(R.id.layoutGenderField).setBackgroundResource(R.drawable.bg_input_disabled);
+            findViewById(R.id.imgGenderChevron).setVisibility(View.GONE);
+            ((TextView) findViewById(R.id.tvGenderLabel))
+                    .setTextColor(ContextCompat.getColor(this, R.color.form_text_disabled));
         } else {
             tvPhotoLabel.setText(R.string.profile_add_photo);
             btnSubmit.setText(R.string.profile_start_button);
             spinnerGender.setEnabled(true);
-            spinnerGender.setAlpha(1.0f);
         }
     }
 
     private void setupSpinners() {
-        ArrayAdapter<String> genderAdapter = new ArrayAdapter<>(
-                this,
-                android.R.layout.simple_spinner_dropdown_item,
-                new String[]{"여성", "남성"}
-        );
-        spinnerGender.setAdapter(genderAdapter);
+        spinnerGender.setAdapter(createSpinnerAdapter(new String[]{"여성", "남성"}, spinnerGender));
+        spinnerGrade.setAdapter(createSpinnerAdapter(
+                new String[]{"1학년", "2학년", "3학년", "4학년"}, spinnerGrade));
+    }
 
-        ArrayAdapter<String> gradeAdapter = new ArrayAdapter<>(
-                this,
-                android.R.layout.simple_spinner_dropdown_item,
-                new String[]{"1학년", "2학년", "3학년", "4학년"}
-        );
-        spinnerGrade.setAdapter(gradeAdapter);
+    /** 선택값은 Figma 입력칸 모양(item_profile_spinner), 펼친 목록은 기본 항목. 비활성 칸은 연회색 글씨. */
+    private ArrayAdapter<String> createSpinnerAdapter(String[] items, Spinner owner) {
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, R.layout.item_profile_spinner, items) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull android.view.ViewGroup parent) {
+                TextView view = (TextView) super.getView(position, convertView, parent);
+                view.setTextColor(ContextCompat.getColor(getContext(),
+                        owner.isEnabled() ? R.color.text_primary : R.color.form_text_disabled));
+                return view;
+            }
+        };
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        return adapter;
     }
 
     private void loadProfileData() {
@@ -231,36 +240,14 @@ public class ProfileSetupActivity extends AppCompatActivity {
         }
     }
 
-    private Chip createTagChip(String tag) {
-        Chip chip = new Chip(this);
-        chip.setText("#" + tag);
-        chip.setCheckable(true);
-        chip.setChecked(selectedTags.contains(tag));
-        updateChipStyle(chip, chip.isChecked());
-
-        chip.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            if (isChecked) {
-                if (!selectedTags.contains(tag)) selectedTags.add(tag);
-            } else {
-                selectedTags.remove(tag);
-            }
-            updateChipStyle(chip, isChecked);
+    /** 공통 Figma Chip(Type=Interest). 선택 상태는 View.setSelected 로 표현한다. */
+    private TextView createTagChip(String tag) {
+        TextView chip = ChipViews.interest(this, "#" + tag, selectedTags.contains(tag));
+        chip.setOnClickListener(v -> {
+            if (!selectedTags.remove(tag)) selectedTags.add(tag);
+            v.setSelected(selectedTags.contains(tag));
         });
         return chip;
-    }
-
-    private void updateChipStyle(Chip chip, boolean checked) {
-        if (checked) {
-            chip.setChipBackgroundColorResource(R.color.action_subtle);
-            chip.setTextColor(ContextCompat.getColor(this, R.color.action_primary));
-            chip.setChipStrokeColorResource(R.color.action_primary);
-            chip.setChipStrokeWidth(1.5f);
-        } else {
-            chip.setChipBackgroundColorResource(R.color.bg_page);
-            chip.setTextColor(ContextCompat.getColor(this, R.color.text_secondary));
-            chip.setChipStrokeColorResource(R.color.border_default);
-            chip.setChipStrokeWidth(1.0f);
-        }
     }
 
     private void bindEvents() {
@@ -393,20 +380,13 @@ public class ProfileSetupActivity extends AppCompatActivity {
         }
     }
 
+    /** 수정 취소 확인 (Figma 122:1959). 공통 ConfirmDialog 를 써서 화면 회전 후에도 유지된다. */
     private void showCancelConfirmDialog() {
-        Dialog dialog = new Dialog(this);
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        dialog.setContentView(R.layout.dialog_profile_cancel);
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-        }
-
-        dialog.findViewById(R.id.btnCancelClose).setOnClickListener(v -> dialog.dismiss());
-        dialog.findViewById(R.id.btnCancelConfirm).setOnClickListener(v -> {
-            dialog.dismiss();
-            finish();
-        });
-
-        dialog.show();
+        if (getSupportFragmentManager().findFragmentByTag(KEY_CANCEL_EDIT) != null) return;
+        ConfirmDialog.show(getSupportFragmentManager(), KEY_CANCEL_EDIT,
+                getString(R.string.profile_cancel_dialog_title),
+                getString(R.string.profile_cancel_dialog_desc),
+                getString(R.string.profile_cancel_dialog_confirm),
+                getString(R.string.profile_cancel_dialog_close));
     }
 }
