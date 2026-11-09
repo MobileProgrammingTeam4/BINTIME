@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="72dp"
+    android:layout_height="72dp"
+    android:layout_marginEnd="10dp">
+
+    <!-- 썸네일 이미지 -->
+    <ImageView
+        android:id="@+id/ivThumbnail"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_upload_card_selected"
+        android:scaleType="centerCrop"
+        android:contentDescription="선택된 이미지 미리보기" />
+
+    <!-- 선택 상태 뱃지 (순번 1, 2, 3...) -->
+    <TextView
+        android:id="@+id/tvOrderBadge"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_gravity="top|start"
+        android:layout_margin="4dp"
+        android:background="@drawable/bg_btn_red_fill_16"
+        android:gravity="center"
+        android:text="1"
+        android:textColor="#FFFFFF"
+        android:textSize="10sp"
+        android:textStyle="bold" />
+
+    <!-- 개별 삭제(X) 버튼 -->
+    <FrameLayout
+        android:id="@+id/btnRemoveImage"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="2dp"
+        android:background="@drawable/bg_btn_delete_small"
+        android:clickable="true"
+        android:focusable="true">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="✕"
+            android:textColor="#666666"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+    </FrameLayout>
+
+</FrameLayout>
