@@ -1,5 +1,6 @@
 package com.team4.bintime;
 
+import android.content.Intent;
 import android.os.Bundle;
 
 import androidx.activity.OnBackPressedCallback;
@@ -16,6 +17,7 @@ import com.team4.bintime.matching.MatchingFragment;
 import com.team4.bintime.notification.NotificationListFragment;
 import com.team4.bintime.profile.MyPageFragment;
 import com.team4.bintime.request.MockRequestRepository;
+import com.team4.bintime.timetable.TimetableSelectModeActivity;
 
 /**
  * 공통 화면 이동 담당: 하단 탭 4개를 Fragment show/hide 로 전환한다 (탭 상태 유지).
@@ -71,6 +73,9 @@ public class MainActivity extends AppCompatActivity {
         bottomNav.setItemActiveIndicatorEnabled(false);
         bottomNav.setOnItemSelectedListener(item -> {
             getSupportFragmentManager().popBackStackImmediate(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
+            if (item.getItemId() == R.id.nav_timetable) {
+                startActivity(new Intent(this, TimetableSelectModeActivity.class));
+            }
             showTab(item.getItemId());
             backToMatching.setEnabled(item.getItemId() != R.id.nav_matching);
             return true;

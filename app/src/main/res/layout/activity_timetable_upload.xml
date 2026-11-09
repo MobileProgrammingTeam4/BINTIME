@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 파일 위치: res/layout/activity_timetable_upload.xml -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:background="#FFFFFF"
+    android:orientation="vertical">
+
+    <!-- 상단 툴바 (뒤로가기 + 타이틀) -->
+    <LinearLayout
+        android:id="@+id/layout_toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="56dp"
+        android:background="#FFFFFF"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingVertical="8dp">
+
+        <ImageView
+            android:id="@+id/btnBack"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="20dp"
+            android:layout_marginEnd="12dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="뒤로가기"
+            android:padding="8dp"
+            android:src="@drawable/ic_arrow_back_custom" />
+
+        <TextView
+            android:id="@+id/tvToolbarTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="시간표 이미지 업로드"
+            android:textColor="#222222"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- 스크롤 가능한 본문 내용 -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="20dp"
+            android:paddingTop="20dp"
+            android:paddingBottom="24dp">
+
+            <!-- 타이틀 및 보조 설명 -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="시간표 이미지를 올려 주세요"
+                android:textColor="#222222"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="24dp"
+                android:lineSpacingExtra="4dp"
+                android:text="강의명과 요일, 시간, 강의실이 잘 보이는\n캡처 이미지를 첨부해 주세요"
+                android:textColor="#666666"
+                android:textSize="14sp" />
+
+            <!-- 이미지 선택 영역 카드 -->
+            <LinearLayout
+                android:id="@+id/layoutUploadBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_upload_card"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:padding="24dp">
+
+                <!-- 갤러리/선택 이미지 미리보기 -->
+                <ImageView
+                    android:id="@+id/ivSelectedImage"
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
+                    android:layout_marginBottom="12dp"
+                    android:contentDescription="시간표 이미지"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_gallery_placeholder" />
+
+                <!-- 안내 텍스트 1 -->
+                <TextView
+                    android:id="@+id/tvSelectHintTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="4dp"
+                    android:text="시간표 이미지 선택"
+                    android:textColor="#222222"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <!-- 안내 텍스트 2 -->
+                <TextView
+                    android:id="@+id/tvSelectHintSub"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="20dp"
+                    android:text="JPG · PNG · 이미지 1장"
+                    android:textColor="#999999"
+                    android:textSize="12sp" />
+
+                <!-- 버튼: 사진 보관함에서 선택 -->
+                <FrameLayout
+                    android:id="@+id/btnSelectFromGallery"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:background="@drawable/bg_btn_outline_red"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <TextView
+                        android:id="@+id/tvGalleryBtnText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:text="사진 보관함에서 선택"
+                        android:textColor="#F84648"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                </FrameLayout>
+            </LinearLayout>
+
+            <!-- 유의사항 팁 박스 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:background="@drawable/bg_notice_box"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:lineSpacingExtra="3dp"
+                    android:text="• 시간표 전체와 시간 축이 보이도록 올려 주세요"
+                    android:textColor="#666666"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:lineSpacingExtra="3dp"
+                    android:text="• 흐릿하거나 잘린 이미지는 피해주세요"
+                    android:textColor="#666666"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:lineSpacingExtra="3dp"
+                    android:text="• 분석 후에는 인식 결과를 확인하고 직접 수정할 수 있어요."
+                    android:textColor="#666666"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- 하단 고정 영역: 분석하기 버튼 -->
+    <LinearLayout
+        android:id="@+id/layoutBottomBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#FFFFFF"
+        android:orientation="vertical">
+
+        <FrameLayout
+            android:id="@+id/btnAnalyze"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginHorizontal="20dp"
+            android:layout_marginVertical="14dp"
+            android:background="@drawable/bg_btn_primary_pill"
+            android:clickable="true"
+            android:focusable="true">
+
+            <TextView
+                android:id="@+id/tvAnalyzeBtnText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="분석하기"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+        </FrameLayout>
+    </LinearLayout>
+
+</LinearLayout>

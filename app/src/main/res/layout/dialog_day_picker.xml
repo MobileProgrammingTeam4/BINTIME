@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 파일 위치: res/layout/dialog_day_picker.xml -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_dialog_centered"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:paddingHorizontal="24dp"
+    android:paddingTop="24dp"
+    android:paddingBottom="24dp">
+
+    <!-- 타이틀 -->
+    <TextView
+        android:id="@+id/tvDayPickerTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="20dp"
+        android:text="요일을 선택해 주세요"
+        android:textColor="#222222"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <!-- 요일 리스트 컨테이너 -->
+    <LinearLayout
+        android:id="@+id/layoutDayOptions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- 월요일 -->
+        <LinearLayout
+            android:id="@+id/itemMon"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp">
+
+            <TextView
+                android:id="@+id/tvMon"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="월요일"
+                android:textColor="#222222"
+                android:textSize="15sp" />
+
+            <ImageView
+                android:id="@+id/ivMonCheck"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:contentDescription="선택됨"
+                android:src="@drawable/ic_check_red" />
+        </LinearLayout>
+
+        <!-- 화요일 -->
+        <LinearLayout
+            android:id="@+id/itemTue"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp">
+
+            <TextView
+                android:id="@+id/tvTue"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="화요일"
+                android:textColor="#222222"
+                android:textSize="15sp" />
+
+            <ImageView
+                android:id="@+id/ivTueCheck"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:contentDescription="선택됨"
+                android:src="@drawable/ic_check_red"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- 수요일 -->
+        <LinearLayout
+            android:id="@+id/itemWed"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp">
+
+            <TextView
+                android:id="@+id/tvWed"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="수요일"
+                android:textColor="#222222"
+                android:textSize="15sp" />
+
+            <ImageView
+                android:id="@+id/ivWedCheck"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:contentDescription="선택됨"
+                android:src="@drawable/ic_check_red"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- 목요일 -->
+        <LinearLayout
+            android:id="@+id/itemThu"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp">
+
+            <TextView
+                android:id="@+id/tvThu"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="목요일"
+                android:textColor="#222222"
+                android:textSize="15sp" />
+
+            <ImageView
+                android:id="@+id/ivThuCheck"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:contentDescription="선택됨"
+                android:src="@drawable/ic_check_red"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- 금요일 -->
+        <LinearLayout
+            android:id="@+id/itemFri"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp">
+
+            <TextView
+                android:id="@+id/tvFri"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="금요일"
+                android:textColor="#222222"
+                android:textSize="15sp" />
+
+            <ImageView
+                android:id="@+id/ivFriCheck"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:contentDescription="선택됨"
+                android:src="@drawable/ic_check_red"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- 토요일 -->
+        <LinearLayout
+            android:id="@+id/itemSat"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp">
+
+            <TextView
+                android:id="@+id/tvSat"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="토요일"
+                android:textColor="#222222"
+                android:textSize="15sp" />
+
+            <ImageView
+                android:id="@+id/ivSatCheck"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:contentDescription="선택됨"
+                android:src="@drawable/ic_check_red"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- 일요일 -->
+        <LinearLayout
+            android:id="@+id/itemSun"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp">
+
+            <TextView
+                android:id="@+id/tvSun"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="일요일"
+                android:textColor="#222222"
+                android:textSize="15sp" />
+
+            <ImageView
+                android:id="@+id/ivSunCheck"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:contentDescription="선택됨"
+                android:src="@drawable/ic_check_red"
+                android:visibility="gone" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+</LinearLayout>

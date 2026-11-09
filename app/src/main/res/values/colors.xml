@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Figma 「빈틈 매칭」 디자인 토큰 (팀 공통) -->
 <resources>
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- Figma 「빈틈 매칭」 디자인 토큰 (팀 공통) -->
     <color name="action_primary">#F84648</color>
     <color name="action_pressed">#E83D3D</color>
     <color name="action_subtle">#FFF0F0</color>

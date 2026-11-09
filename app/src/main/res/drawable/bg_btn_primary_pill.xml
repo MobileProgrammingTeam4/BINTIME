@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 파일 위치: res/drawable/bg_btn_primary_pill.xml -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#33FFFFFF">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#F84648" />
+            <corners android:radius="26dp" />
+        </shape>
+    </item>
+</ripple>
