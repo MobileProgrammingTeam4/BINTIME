@@ -12,7 +12,8 @@ import java.util.UUID;
 /**
  * 공통 도메인 수업 모델 (Single Source of Truth).
  * <p>
- * 화면 간 수업 데이터는 이 클래스(Parcelable)로만 주고받습니다.
+ * 현재 develop의 시간표 화면은 아직 {@link com.team4.bintime.timetable.Course}(Serializable, 문자열 시간)를
+ * 사용하므로, 두 모델 사이는 {@link #fromLegacy} / {@link #toLegacy}로 변환합니다.
  * BT-012 요구사항:
  * <ul>
  *   <li>고유 ID (courseId) — Firestore 문서 키</li>
@@ -157,6 +158,57 @@ public class Course implements Parcelable {
                 TimeSlot.minutesToTimeString(slot.getStartMinute()),
                 TimeSlot.minutesToTimeString(slot.getEndMinute()),
                 classroom != null ? classroom : "강의실 미정");
+    }
+
+    // ── 레거시 변환 (develop timetable.Course) ─────────
+
+    /**
+     * develop의 {@code timetable.Course}(Serializable, "HH:mm" 문자열 시간)를 변환합니다.
+     * <ul>
+     *   <li>레거시 모델에는 ID가 없으므로 <b>호출할 때마다 새 courseId</b>가 생성됩니다.
+     *       같은 레거시 수업을 두 번 변환하면 서로 다른 Course가 됩니다.</li>
+     *   <li>요일("월"/"월요일"/주말 포함) 또는 시간 파싱에 실패하거나 종료 &lt;= 시작이면
+     *       시간 슬롯 없이 반환합니다({@link #createSingle} 규칙).</li>
+     *   <li>professor·colorCode는 레거시에 없으므로 null입니다.</li>
+     * </ul>
+     *
+     * @return 변환 결과, {@code legacy}가 null이면 null
+     */
+    public static Course fromLegacy(com.team4.bintime.timetable.Course legacy) {
+        if (legacy == null) return null;
+        return createSingle(
+                legacy.getName(),
+                legacy.getClassroom(),
+                legacy.getDay(),
+                legacy.getStartTime(),
+                legacy.getEndTime()
+        );
+    }
+
+    /**
+     * develop의 {@code timetable.Course}로 변환합니다 (하위 호환).
+     * <ul>
+     *   <li><b>시간 슬롯이 여러 개면 첫 번째 슬롯만 변환</b>되고 나머지는 버려집니다.</li>
+     *   <li><b>시간 슬롯이 없으면 day·startTime·endTime이 null</b>인 객체를 반환합니다
+     *       (임의의 기본 시간을 채우지 않음). 레거시 쪽에서 null 시간은 {@code getShortDay()} → "월",
+     *       {@code parseMinute()} → 0으로 해석되므로 호출측이 {@link #getTimeSlots()}를 먼저 확인해야 합니다.</li>
+     *   <li>courseId·professor·colorCode는 레거시에 없으므로 변환되지 않습니다.</li>
+     *   <li>요일은 약칭("월"~"일"), 시간은 24시간제 "HH:mm"입니다.</li>
+     * </ul>
+     *
+     * @return 레거시 Course (반환값 자체는 null이 아님, 시간 필드는 null일 수 있음)
+     */
+    public com.team4.bintime.timetable.Course toLegacy() {
+        if (timeSlots == null || timeSlots.isEmpty()) {
+            return new com.team4.bintime.timetable.Course(name, classroom, null, null, null);
+        }
+        TimeSlot slot = timeSlots.get(0);
+        return new com.team4.bintime.timetable.Course(
+                name, classroom,
+                slot.getDayLabel(),
+                TimeSlot.minutesToTimeString(slot.getStartMinute()),
+                TimeSlot.minutesToTimeString(slot.getEndMinute())
+        );
     }
 
     // ── Parcelable ──────────────────────────────────────
