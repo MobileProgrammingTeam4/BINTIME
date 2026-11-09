@@ -1,49 +1,55 @@
 package com.team4.bintime.timetable;
 
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.widget.ImageView;
-import android.widget.LinearLayout;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.team4.bintime.R;
+import com.team4.bintime.profile.ProfileSetupActivity;
 
-/**
- * 시간표 등록 방식 선택 화면 (수동 입력 / 이미지 업로드)
- */
+import java.util.Collections;
+
 public class TimetableSelectModeActivity extends AppCompatActivity {
+    private static final String EXTRA_SIGNUP_EMAIL = "timetable_signup_email";
 
-    private ImageView btnBack;
-    private LinearLayout btnManualInput;
-    private LinearLayout btnImageUpload;
+    private final ActivityResultLauncher<Intent> registration = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(), result -> {
+                TimetableDraft draft = TimetableDraft.read(result.getData());
+                if (result.getResultCode() != RESULT_OK || draft == null) return;
+                MockTimetableRepository.save(draft);
+                String email = getIntent().getStringExtra(EXTRA_SIGNUP_EMAIL);
+                if (email != null) {
+                    Intent profile = new Intent(this, ProfileSetupActivity.class);
+                    profile.putExtra(ProfileSetupActivity.EXTRA_USER_EMAIL, email);
+                    startActivity(profile);
+                } else {
+                    setResult(RESULT_OK);
+                }
+                finish();
+            });
+
+    public static Intent forSignup(Context context, String email) {
+        return new Intent(context, TimetableSelectModeActivity.class).putExtra(EXTRA_SIGNUP_EMAIL, email);
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_timetable_select_mode);
-
-        initViews();
-        setupListeners();
-    }
-
-    private void initViews() {
-        btnBack = findViewById(R.id.btnBack);
-        btnManualInput = findViewById(R.id.btnManualInput);
-        btnImageUpload = findViewById(R.id.btnImageUpload);
-    }
-
-    private void setupListeners() {
-        btnBack.setOnClickListener(v -> finish());
-
-        btnManualInput.setOnClickListener(v -> {
-            Intent intent = new Intent(TimetableSelectModeActivity.this, CourseDirectInputActivity.class);
-            startActivity(intent);
+        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
+        findViewById(R.id.btnManualInput).setOnClickListener(v -> {
+            TimetableDraft draft = MockTimetableRepository.load();
+            if (draft == null) {
+                draft = new TimetableDraft(Collections.singletonList(
+                        new Course("컴퓨터 구조론", "공학관 302호", "월", "10:00", "11:30")));
+            }
+            registration.launch(TimetableDraft.open(this, CourseDirectInputActivity.class, draft));
         });
-
-        btnImageUpload.setOnClickListener(v -> {
-            Intent intent = new Intent(TimetableSelectModeActivity.this, TimetableUploadActivity.class);
-            startActivity(intent);
-        });
+        findViewById(R.id.btnImageUpload).setOnClickListener(v ->
+                registration.launch(new Intent(this, TimetableUploadActivity.class)));
     }
 }

@@ -2,8 +2,15 @@ package com.team4.bintime.timetable;
 
 import org.junit.Test;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.Collections;
+
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * [BT-005 / BT-006] 시간표 및 수업 시각·요일 변환, 슬롯 계산 단위 테스트
@@ -76,5 +83,54 @@ public class CourseTest {
         assertEquals(4, new Course("", "", "금요일", "", "").getDayIndex());
         assertEquals(-1, new Course("", "", "토", "", "").getDayIndex());
         assertEquals(-1, new Course("", "", "일요일", "", "").getDayIndex());
+    }
+
+    @Test
+    public void testFreeSelectionRespectsAdjacentSlotsAndCourseBoundaries() {
+        Course first = new Course("수학", "101호", "월", "10:00", "10:30");
+        Course next = new Course("물리", "102호", "월", "11:30", "12:00");
+        TimetableDraft draft = new TimetableDraft(Arrays.asList(first, next));
+        draft.suggestGaps();
+        assertFalse(draft.isFreeSelected(0, 20));
+        assertTrue(draft.isFreeSelected(0, 21));
+        assertTrue(draft.isFreeSelected(0, 22));
+        assertFalse(draft.isFreeSelected(0, 23));
+        assertTrue(draft.hasHourOfFreeTime());
+
+        draft.toggleFree(0, 21);
+        draft.toggleFree(0, 20);
+        draft.suggestGaps();
+        assertFalse(draft.isFreeSelected(0, 20));
+        assertFalse(draft.isFreeSelected(0, 21));
+        assertTrue(draft.isFreeSelected(0, 22));
+        assertFalse(draft.hasHourOfFreeTime());
+    }
+
+    @Test
+    public void testCourseEditsRespectWeekdaysAndAllowAdjacentClasses() {
+        Course original = new Course("수학", "101호", "월", "10:00", "11:00");
+        TimetableDraft draft = new TimetableDraft(Collections.singletonList(original));
+        assertTrue(draft.overlaps(new Course("물리", "102호", "월", "10:30", "11:30"), -1));
+        assertFalse(draft.overlaps(new Course("물리", "102호", "월", "11:00", "11:30"), -1));
+        assertFalse(draft.overlaps(new Course("물리", "102호", "화", "10:30", "11:30"), -1));
+        assertFalse(draft.overlaps(original, 0));
+    }
+
+    @Test
+    public void testMatchingCardUsesCurrentOrNextHourOfSelectedFreeTime() {
+        TimetableDraft draft = new TimetableDraft(Collections.emptyList());
+        draft.toggleFree(0, 28);
+        draft.toggleFree(0, 29);
+        draft.toggleFree(1, 20);
+        draft.toggleFree(1, 21);
+        LocalDate monday = LocalDate.of(2026, 11, 9);
+        TimetableDraft.FreeWindow current = draft.nextFreeWindow(LocalDateTime.of(2026, 11, 9, 14, 30));
+        assertEquals(monday, current.date);
+        assertEquals(28, current.start);
+        assertEquals(30, current.end);
+        TimetableDraft.FreeWindow next = draft.nextFreeWindow(LocalDateTime.of(2026, 11, 9, 15, 0));
+        assertEquals(monday.plusDays(1), next.date);
+        assertEquals(20, next.start);
+        assertEquals(22, next.end);
     }
 }

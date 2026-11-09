@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_card"
+    android:orientation="vertical">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="20dp"
+        android:text="시간표"
+        android:textAppearance="@style/TextAppearance.BinTime.H1" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="20dp"
+            android:paddingBottom="20dp">
+
+            <include layout="@layout/view_matching_status" />
+
+            <com.team4.bintime.timetable.TimetableWeekView
+                android:id="@+id/timetable_week"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="• 공강시간은 30분 단위로 선택할 수 있어요&#10;• 실제 공강시간 매칭은 1시간 이상의 공강일 때 가능해요"
+                android:textAppearance="@style/TextAppearance.BinTime.BodyS"
+                android:textColor="@color/text_secondary" />
+
+            <TextView
+                android:id="@+id/manage_timetable"
+                style="@style/Widget.BinTime.ButtonOutline"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="12dp"
+                android:text="수업 추가 · 시간표 관리" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>
