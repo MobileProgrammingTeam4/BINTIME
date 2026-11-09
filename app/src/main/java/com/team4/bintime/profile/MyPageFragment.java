@@ -14,13 +14,13 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.google.android.material.chip.ChipGroup;
-import com.team4.bintime.MainActivity;
 import com.team4.bintime.R;
 import com.team4.bintime.auth.MockAuthRepository;
 import com.team4.bintime.auth.OnboardingActivity;
 import com.team4.bintime.common.ChipViews;
 import com.team4.bintime.common.ConfirmDialog;
 import com.team4.bintime.notification.NotificationSettingsActivity;
+import com.team4.bintime.timetable.TimetableReviewActivity;
 
 /**
  * 마이페이지 탭 화면 (Figma 41:24577).
@@ -116,12 +116,9 @@ public class MyPageFragment extends Fragment {
         root.findViewById(R.id.menuBlockedUsers).setOnClickListener(v ->
                 Toast.makeText(requireContext(), "차단한 사용자 관리 (후속 이슈 연동 예정)", Toast.LENGTH_SHORT).show());
 
-        // 3. 시간표 관리 -> MainActivity의 시간표 탭으로 이동
-        root.findViewById(R.id.menuTimetable).setOnClickListener(v -> {
-            if (getActivity() instanceof MainActivity) {
-                ((MainActivity) getActivity()).selectTab(R.id.nav_timetable);
-            }
-        });
+        // 3. 시간표 관리
+        root.findViewById(R.id.menuTimetable).setOnClickListener(v ->
+                startActivity(TimetableReviewActivity.forEditing(requireContext())));
 
         // 4. 알림 설정 -> NotificationSettingsActivity 이동
         root.findViewById(R.id.menuNotification).setOnClickListener(v -> {

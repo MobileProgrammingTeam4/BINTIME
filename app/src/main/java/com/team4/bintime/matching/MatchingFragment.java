@@ -44,7 +44,6 @@ import java.util.List;
 public class MatchingFragment extends Fragment {
 
     private MatchFilter filter = MatchFilter.defaults();
-    private boolean matchingOn = true;
 
     private final MatchingAdapter adapter = new MatchingAdapter();
     private ActivityResultLauncher<Intent> filterLauncher;
@@ -70,7 +69,6 @@ public class MatchingFragment extends Fragment {
         if (savedInstanceState != null) {
             filter = (MatchFilter) savedInstanceState.getSerializable(FilterActivity.EXTRA_FILTER);
             selectedTab = savedInstanceState.getInt("matchingTab", 0);
-            matchingOn = savedInstanceState.getBoolean("matchingOn", true);
 
         }
         acceptedLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
@@ -101,7 +99,6 @@ public class MatchingFragment extends Fragment {
         super.onSaveInstanceState(outState);
         outState.putSerializable(FilterActivity.EXTRA_FILTER, filter);
         outState.putInt("matchingTab", selectedTab);
-        outState.putBoolean("matchingOn", matchingOn);
 
     }
 
@@ -160,7 +157,7 @@ public class MatchingFragment extends Fragment {
         });
         v.findViewById(R.id.btnChangeSlot).setOnClickListener(b -> goTimetable());
         switchMatching.setOnCheckedChangeListener((b, checked) -> {
-            matchingOn = checked;
+            ((MainActivity) requireActivity()).setMatchingOn(checked);
             render();
         });
         // 데모용: 타이틀 길게 누르면 '공강 없음' 상태 토글 (시간표 연동 전 시연용)
@@ -187,7 +184,10 @@ public class MatchingFragment extends Fragment {
 
     @Override public void onHiddenChanged(boolean hidden) {
         super.onHiddenChanged(hidden);
-        if (!hidden && getView() != null && requestTabs != null) requestTabs.render();
+        if (!hidden && getView() != null) {
+            render();
+            if (requestTabs != null) requestTabs.render();
+        }
     }
 
     @Override
@@ -209,6 +209,7 @@ public class MatchingFragment extends Fragment {
 
     private void render() {
         // 상태 카드
+        boolean matchingOn = ((MainActivity) requireActivity()).isMatchingOn();
         boolean hasSlot = MockMatchRepository.hasFreeSlot;
         if (switchMatching.isChecked() != matchingOn) switchMatching.setChecked(matchingOn);
         statusCard.setBackgroundResource(matchingOn ? R.drawable.bg_status_on : R.drawable.bg_status_off);

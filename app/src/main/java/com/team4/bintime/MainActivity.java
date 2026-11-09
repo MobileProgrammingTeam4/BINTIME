@@ -16,6 +16,7 @@ import com.team4.bintime.matching.MatchingFragment;
 import com.team4.bintime.notification.NotificationListFragment;
 import com.team4.bintime.profile.MyPageFragment;
 import com.team4.bintime.request.MockRequestRepository;
+import com.team4.bintime.timetable.TimetableWeekFragment;
 
 /**
  * 공통 화면 이동 담당: 하단 탭 4개를 Fragment show/hide 로 전환한다 (탭 상태 유지).
@@ -28,6 +29,9 @@ public class MainActivity extends AppCompatActivity {
     private BottomNavigationView bottomNav;
     private MockRequestRepository requests = new MockRequestRepository();
     private boolean popupShown;
+    private boolean matchingOn = true;
+    public boolean isMatchingOn() { return matchingOn; }
+    public void setMatchingOn(boolean enabled) { matchingOn = enabled; }
     public MockRequestRepository requests() { return requests; }
     public boolean claimRequestPopup() {
         if (popupShown) return false;
@@ -45,6 +49,7 @@ public class MainActivity extends AppCompatActivity {
     @Override protected void onSaveInstanceState(@NonNull Bundle out) {
         out.putSerializable("sharedRequests", requests);
         out.putBoolean("requestPopupShown", popupShown);
+        out.putBoolean("matchingOn", matchingOn);
         super.onSaveInstanceState(out);
     }
 
@@ -63,6 +68,7 @@ public class MainActivity extends AppCompatActivity {
             MockRequestRepository restored = (MockRequestRepository) savedInstanceState.getSerializable("sharedRequests");
             if (restored != null) requests = restored;
             popupShown = savedInstanceState.getBoolean("requestPopupShown");
+            matchingOn = savedInstanceState.getBoolean("matchingOn", true);
         }
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
@@ -109,7 +115,7 @@ public class MainActivity extends AppCompatActivity {
 
     private Fragment createTab(@IdRes int tabId) {
         if (tabId == R.id.nav_chat) return new ChatListFragment();
-        if (tabId == R.id.nav_timetable) return PlaceholderFragment.newInstance("시간표", "C");
+        if (tabId == R.id.nav_timetable) return new TimetableWeekFragment();
         if (tabId == R.id.nav_my) return new MyPageFragment();
         return new MatchingFragment();
     }

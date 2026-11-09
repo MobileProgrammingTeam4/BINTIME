@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:background="@color/bg_card"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="20dp">
+
+        <ImageView
+            android:id="@+id/btnBack"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginEnd="12dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="뒤로가기"
+            android:padding="8dp"
+            android:src="@drawable/ic_chevron_left" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="시간표 등록"
+            android:textAppearance="@style/TextAppearance.BinTime.H1" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="공강 시간을 선택해주세요"
+                android:textAppearance="@style/TextAppearance.BinTime.H1" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="수업을 확인하고 시간표의 빈 공간을 눌러&#10;공강시간을 등록해 주세요"
+                android:textAppearance="@style/TextAppearance.BinTime.BodyM"
+                android:textColor="@color/text_secondary" />
+
+            <com.team4.bintime.timetable.TimetableWeekView
+                android:id="@+id/timetable_week"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp" />
+
+            <TextView
+                android:id="@+id/timetable_hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/bg_analysis_notice_box"
+                android:drawableStart="@drawable/ic_sparkles"
+                android:drawablePadding="6dp"
+                android:gravity="center_vertical"
+                android:padding="12dp"
+                android:text="빈 공강 시간을 찾아 자동으로 공강시간을 설정했어요&#10;수정이 필요하다면 시간표의 빈 공강을 눌러보세요"
+                android:textAppearance="@style/TextAppearance.BinTime.BodyS"
+                android:textColor="@color/action_primary" />
+        </LinearLayout>
+    </ScrollView>
+
+    <TextView
+        android:id="@+id/btnCompleteRegistration"
+        style="@style/Widget.BinTime.PillPrimary"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="16dp"
+        android:text="다음" />
+</LinearLayout>

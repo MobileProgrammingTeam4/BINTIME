@@ -16,7 +16,9 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
 import com.team4.bintime.R;
-import com.team4.bintime.profile.ProfileSetupActivity;
+import com.team4.bintime.MainActivity;
+import com.team4.bintime.profile.MockProfileRepository;
+import com.team4.bintime.timetable.TimetableSelectModeActivity;
 
 /**
  * 학교 이메일 링크 인증 화면 (Figma 100:1411, 235:1961, 268:1969, 268:2004, 268:2039).
@@ -249,7 +251,7 @@ public class EmailAuthActivity extends AppCompatActivity {
 
     /**
      * 사용자가 수신된 이메일 링크를 클릭하여 앱으로 복귀했을 때의 콜백 처리.
-     * 저장소 검증을 통과해야만 프로필 생성 화면으로 이동한다.
+     * 저장소 검증을 통과해야만 첫 가입의 시간표 등록 또는 기존 계정의 메인 화면으로 이동한다.
      */
     private void onVerificationLinkOpened(String email, String link) {
         authRepository.verifySignInLink(email, link, new AuthRepository.Callback<String>() {
@@ -259,7 +261,7 @@ public class EmailAuthActivity extends AppCompatActivity {
                 authState.setStatus(EmailVerificationState.Status.VERIFIED);
                 otherDeviceLink = null;
                 Toast.makeText(EmailAuthActivity.this, "학생 인증이 완료되었습니다!", Toast.LENGTH_SHORT).show();
-                navigateToProfileSetup(email);
+                navigateAfterVerification(uid, email);
             }
 
             @Override
@@ -303,10 +305,10 @@ public class EmailAuthActivity extends AppCompatActivity {
         tvEmailHelper.setVisibility(View.VISIBLE);
     }
 
-    private void navigateToProfileSetup(String email) {
-        Intent intent = new Intent(EmailAuthActivity.this, ProfileSetupActivity.class);
-        intent.putExtra(ProfileSetupActivity.EXTRA_MODE, ProfileSetupActivity.MODE_CREATE);
-        intent.putExtra(ProfileSetupActivity.EXTRA_USER_EMAIL, email);
+    private void navigateAfterVerification(String uid, String email) {
+        Intent intent = MockProfileRepository.shared().hasCompletedProfile(uid)
+                ? new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                : TimetableSelectModeActivity.forSignup(this, email);
         startActivity(intent);
         finish();
     }
