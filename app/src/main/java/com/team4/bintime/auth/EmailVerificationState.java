@@ -26,6 +26,9 @@ public class EmailVerificationState implements Serializable {
             Pattern.CASE_INSENSITIVE
     );
 
+    /** 인증 링크 재발송 최소 간격. */
+    public static final long RESEND_COOLDOWN_MILLIS = 60_000L;
+
     private Status status;
     private String email;
     private long sentTimestamp;
@@ -64,6 +67,21 @@ public class EmailVerificationState implements Serializable {
 
     public void setSentTimestamp(long sentTimestamp) {
         this.sentTimestamp = sentTimestamp;
+    }
+
+    /**
+     * 재발송까지 남은 시간(ms). 발송 기록이 없거나 쿨다운이 지났으면 0.
+     * 서버(Firebase) 발송 제한과 별도로 UI 에서 연속 재발송을 막는다. (BT-013)
+     */
+    public long remainingResendCooldownMillis(long nowMillis) {
+        if (sentTimestamp <= 0) return 0;
+        return Math.max(0, sentTimestamp + RESEND_COOLDOWN_MILLIS - nowMillis);
+    }
+
+    /** 남은 쿨다운을 초 단위로 올림. 화면 안내 문구용. */
+    public int remainingResendCooldownSeconds(long nowMillis) {
+        long remaining = remainingResendCooldownMillis(nowMillis);
+        return (int) ((remaining + 999) / 1000);
     }
 
     /**

@@ -13,7 +13,20 @@ public interface AuthRepository {
         INVALID_LINK,    // 발송한 링크와 다르거나 형식이 잘못된 링크
         LINK_EXPIRED,    // 유효 시간이 지난 링크
         LINK_ALREADY_USED, // 이미 인증에 사용된 링크
-        EMAIL_MISMATCH   // 링크를 요청한 이메일과 입력한 이메일이 다름
+        EMAIL_MISMATCH,  // 링크를 요청한 이메일과 입력한 이메일이 다름
+        TOO_MANY_REQUESTS, // 발송 요청이 너무 잦음 (서버 제한)
+        NETWORK,         // 네트워크 오류
+        UNKNOWN          // 그 밖의 실패
+    }
+
+    /** 이 기기에서 마지막으로 링크를 요청한 이메일. 같은 기기에서 링크를 열면 재입력 없이 인증한다. 없으면 null. */
+    default String getPendingEmail() {
+        return null;
+    }
+
+    /** 앱으로 들어온 링크가 이메일 로그인 링크인지 확인한다. */
+    default boolean isSignInLink(String link) {
+        return link != null && !link.isEmpty();
     }
 
     interface Callback<T> {

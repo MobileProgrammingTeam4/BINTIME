@@ -1,5 +1,6 @@
 package com.team4.bintime;
 
+import android.content.Intent;
 import android.os.Bundle;
 
 import androidx.activity.OnBackPressedCallback;
@@ -11,6 +12,8 @@ import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.team4.bintime.auth.AuthRepositories;
+import com.team4.bintime.auth.OnboardingActivity;
 import com.team4.bintime.chat.ChatListFragment;
 import com.team4.bintime.matching.MatchingFragment;
 import com.team4.bintime.notification.NotificationListFragment;
@@ -64,6 +67,14 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // BT-013: 미인증 사용자는 핵심 기능(메인 탭)에 들어올 수 없다.
+        if (!AuthRepositories.get(this).isSignedIn()) {
+            super.onCreate(savedInstanceState);
+            startActivity(new Intent(this, OnboardingActivity.class)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
+            finish();
+            return;
+        }
         if (savedInstanceState != null) {
             MockRequestRepository restored = (MockRequestRepository) savedInstanceState.getSerializable("sharedRequests");
             if (restored != null) requests = restored;
