@@ -33,6 +33,15 @@ functions/lib/
 functions/.env
 functions/.env.*
 !functions/.env.example
+# 배포용 공개 설정(GEMINI_MODEL 등). 비밀값은 넣지 않는다.
+!functions/.env.bintime-mobile
+# Functions 에뮬레이터용 비밀값(GEMINI_API_KEY 등)
+functions/.secret.local
+.secret.local
+# Firebase 에뮬레이터 로그·내보낸 데이터
+*-debug.log
+ui-debug.log
+emulator-data/
 
 # OS
 .DS_Store
