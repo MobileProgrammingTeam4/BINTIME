@@ -135,6 +135,7 @@ matches/{matchId}
 notifications/{uid}/items/{notificationId}
 reviews/{reviewId}
 reports/{reportId}
+aiUsage/{uid}_{YYYY-MM-DD}
 
 Realtime Database
 chatRooms/{matchId}/members/{uid}
@@ -153,6 +154,7 @@ userChatRooms/{uid}/{matchId}
 | `chatRooms` | `matchId`를 룸 식별자로 사용, 메시지 발신자·권한 검증 |
 | `userChatRooms` | 사용자별 목록/읽지 않음 수, 서버와 동기화 |
 | `reviews` / `reports` | 참여·공개/작성 권한, 개인정보 최소 수집 |
+| `aiUsage` | BT-024 Gemini 게이트웨이의 사용자별 하루 호출 수(`uid`, `date`, `counts.{task}`, `total`, `updatedAt`). 날짜는 `Asia/Seoul`. **서버 전용**: Admin SDK만 쓰고 Rules는 앱 읽기·쓰기 모두 거부. 계약은 `docs/BT-024.md` |
 
 시간 규칙:
 
