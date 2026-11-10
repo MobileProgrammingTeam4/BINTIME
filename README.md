@@ -131,6 +131,7 @@ matches/{matchId}
 notifications/{uid}/items/{notificationId}
 reviews/{reviewId}
 reports/{reportId}
+aiUsage/{uid}_{YYYY-MM-DD}
 
 Realtime Database
 chatRooms/{matchId}/members/{uid}
@@ -143,6 +144,7 @@ userChatRooms/{uid}/{matchId}
 - 공강 계산의 입력 버전(`timetables.revision`)과 파생 결과(`availability.sourceRevision`)를 비교해 오래된 공강으로 매칭하지 않습니다.
 - `matches/{matchId}`가 **매칭의 기준 데이터**입니다. 채팅 생성은 별도 RTDB 작업이므로 재시도·부분 실패를 고려해 연결 상태를 관리합니다.
 - 개인 시간표 원본을 상대방에게 통째로 반환하지 않습니다. 검색 결과에는 필요한 겹침 시간 및 공개 가능한 프로필 정보만 담습니다.
+- `aiUsage/{uid}_{YYYY-MM-DD}`(BT-024)는 Gemini 게이트웨이의 사용자별 하루 호출 수입니다. 날짜는 `Asia/Seoul` 기준이며 **서버(Cloud Functions)만 쓰고 앱은 읽기·쓰기 모두 금지**합니다. 자세한 계약은 [`docs/BT-024.md`](./docs/BT-024.md)를 참고합니다.
 
 더 구체적인 역할별 데이터·상태 변경 경계 및 AI 에이전트 작업 규칙은 [`AGENTS.md`](./AGENTS.md)를 참고하세요.
 
