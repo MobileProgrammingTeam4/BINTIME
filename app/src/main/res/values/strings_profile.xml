@@ -26,6 +26,8 @@
     <string name="profile_error_nickname_required">닉네임을 입력해 주세요</string>
     <string name="profile_error_department_required">학과를 입력해 주세요</string>
     <string name="profile_error_check_required">필수 정보를 확인해 주세요</string>
+    <string name="profile_photo_load_failed">사진을 불러오지 못했어요. 다른 사진을 골라 주세요</string>
+    <string name="profile_load_failed">프로필을 불러오지 못했어요</string>
 
     <string name="profile_start_button">시작하기</string>
     <string name="profile_save_button">변경하기</string>

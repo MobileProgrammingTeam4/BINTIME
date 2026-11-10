@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -18,7 +19,8 @@ import androidx.core.content.ContextCompat;
 
 import com.team4.bintime.R;
 import com.team4.bintime.MainActivity;
-import com.team4.bintime.profile.MockProfileRepository;
+import com.team4.bintime.profile.ProfileRepositories;
+import com.team4.bintime.profile.ProfileRepository;
 import com.team4.bintime.timetable.TimetableSelectModeActivity;
 
 /**
@@ -398,12 +400,29 @@ public class EmailAuthActivity extends AppCompatActivity {
     }
 
     private void navigateAfterVerification(String uid, String email) {
-        // 프로필 존재 여부의 Firestore 조회는 BT-014 에서 연결한다.
-        Intent intent = MockProfileRepository.shared().hasCompletedProfile(uid)
-                ? new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                : TimetableSelectModeActivity.forSignup(this, email);
-        startActivity(intent);
-        finish();
+        // BT-014: 프로필을 만든 계정은 메인으로, 아니면 가입 단계(시간표 → 프로필)로 보낸다.
+        ProfileRepositories.get(this).hasCompletedProfile(uid, new ProfileRepository.Callback<Boolean>() {
+            @Override
+            public void onSuccess(Boolean completed) {
+                if (isFinishing() || isDestroyed()) return;
+                Intent intent = Boolean.TRUE.equals(completed)
+                        ? new Intent(EmailAuthActivity.this, MainActivity.class)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                        : TimetableSelectModeActivity.forSignup(EmailAuthActivity.this, email);
+                startActivity(intent);
+                finish();
+            }
+
+            @Override
+            public void onError(String message) {
+                if (isFinishing() || isDestroyed()) return;
+                // 로그인은 끝났으므로 온보딩이 프로필 확인을 다시 시도한다.
+                Toast.makeText(EmailAuthActivity.this, message, Toast.LENGTH_SHORT).show();
+                startActivity(new Intent(EmailAuthActivity.this, OnboardingActivity.class)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
+                finish();
+            }
+        });
     }
 
     /** 시연 버튼 영역은 Mock 모드의 발송 완료 화면에서만 보인다. */
@@ -487,6 +506,15 @@ public class EmailAuthActivity extends AppCompatActivity {
             default:
                 break;
         }
+
+        // 입력창이 없는 화면(발송 완료·만료·잘못된 링크)에서는 키보드를 내려 코드 입력 화면으로 오해하지 않게 한다.
+        if (layoutEmailInputSection.getVisibility() != View.VISIBLE) hideKeyboard();
+    }
+
+    private void hideKeyboard() {
+        etEmail.clearFocus();
+        InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+        if (imm != null) imm.hideSoftInputFromWindow(etEmail.getWindowToken(), 0);
     }
 
     private void handleBack() {

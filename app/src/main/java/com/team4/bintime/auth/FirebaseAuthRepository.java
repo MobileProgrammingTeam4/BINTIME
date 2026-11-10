@@ -101,6 +101,12 @@ public final class FirebaseAuthRepository implements AuthRepository {
     }
 
     @Override
+    public String getCurrentEmail() {
+        FirebaseUser user = auth.getCurrentUser();
+        return user != null ? user.getEmail() : null;
+    }
+
+    @Override
     public void signOut() {
         auth.signOut();
         prefs().edit().remove(KEY_PENDING_EMAIL).apply();

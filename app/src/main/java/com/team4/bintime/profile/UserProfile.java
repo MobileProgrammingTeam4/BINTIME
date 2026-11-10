@@ -20,6 +20,8 @@ public class UserProfile implements Serializable {
     private String gender;
     private String bio;
     private int photoResId;
+    /** Cloud Storage 프로필 사진 경로 (예: profileImages/{uid}/profile.jpg). 없으면 null. (BT-014) */
+    private String photoPath;
     private List<String> interestTags;
 
     public UserProfile() {
@@ -47,6 +49,7 @@ public class UserProfile implements Serializable {
         p.gender = "";
         p.bio = "";
         p.photoResId = 0;
+        p.photoPath = null;
         p.interestTags = new ArrayList<>();
         return p;
     }
@@ -62,6 +65,7 @@ public class UserProfile implements Serializable {
         p.gender = gender;
         p.bio = bio;
         p.photoResId = photoResId;
+        p.photoPath = photoPath;
         p.interestTags = interestTags != null ? new ArrayList<>(interestTags) : new ArrayList<>();
         return p;
     }
@@ -96,6 +100,9 @@ public class UserProfile implements Serializable {
 
     public int getPhotoResId() { return photoResId; }
     public void setPhotoResId(int photoResId) { this.photoResId = photoResId; }
+
+    public String getPhotoPath() { return photoPath; }
+    public void setPhotoPath(String photoPath) { this.photoPath = photoPath; }
 
     public List<String> getInterestTags() { return interestTags; }
     public void setInterestTags(List<String> interestTags) {

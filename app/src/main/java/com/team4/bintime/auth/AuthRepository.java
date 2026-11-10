@@ -57,6 +57,11 @@ public interface AuthRepository {
     /** 현재 로그인된 사용자 UID 반환 */
     String getCurrentUid();
 
+    /** 인증된 계정의 이메일. 알 수 없으면 null (Mock). */
+    default String getCurrentEmail() {
+        return null;
+    }
+
     /** 로그아웃 */
     void signOut();
 }

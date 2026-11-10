@@ -307,4 +307,53 @@ public class MockProfileRepositoryTest {
         assertTrue(defaultTags.contains("카페"));
         assertTrue(defaultTags.contains("산책"));
     }
+
+    // ---- BT-014 ----
+
+    @Test
+    public void uploadProfilePhoto_returnsPerUidPath() {
+        AtomicReference<String> pathRef = new AtomicReference<>();
+        repository.uploadProfilePhoto("uidA", new byte[]{1, 2, 3}, new ProfileRepository.Callback<String>() {
+            @Override public void onSuccess(String result) { pathRef.set(result); }
+            @Override public void onError(String message) {}
+        });
+        assertEquals("profileImages/uidA/profile.jpg", pathRef.get());
+    }
+
+    @Test
+    public void uploadProfilePhoto_rejectsEmptyBytes() {
+        Recorder<String> recorder = new Recorder<>();
+        repository.uploadProfilePhoto("uidA", new byte[0], recorder);
+        assertFalse(recorder.success);
+        assertNotNull(recorder.errorMessage);
+    }
+
+    @Test
+    public void hasCompletedProfile_async_matchesSavedUid() {
+        UserProfile created = UserProfile.empty();
+        created.setUid("uidNew");
+        created.setNickname("새친구");
+        created.setDepartment("소프트웨어학부");
+        repository.saveProfile(created, new Recorder<>());
+
+        AtomicReference<Boolean> completed = new AtomicReference<>();
+        repository.hasCompletedProfile("uidNew", new ProfileRepository.Callback<Boolean>() {
+            @Override public void onSuccess(Boolean result) { completed.set(result); }
+            @Override public void onError(String message) {}
+        });
+        assertEquals(Boolean.TRUE, completed.get());
+
+        repository.hasCompletedProfile("otherUid", new ProfileRepository.Callback<Boolean>() {
+            @Override public void onSuccess(Boolean result) { completed.set(result); }
+            @Override public void onError(String message) {}
+        });
+        assertEquals(Boolean.FALSE, completed.get());
+    }
+
+    @Test
+    public void copy_keepsPhotoPath() {
+        UserProfile p = UserProfile.empty();
+        p.setPhotoPath("profileImages/u/profile.jpg");
+        assertEquals("profileImages/u/profile.jpg", p.copy().getPhotoPath());
+    }
 }

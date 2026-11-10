@@ -1,0 +1,18 @@
+rules_version = '2';
+
+// BIN TIME Cloud Storage Security Rules
+// BT-014: 프로필 사진만 정의한다. 시간표 이미지(BT-025) 등은 담당 이슈에서 추가한다.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // profileImages/{uid}/profile.jpg — 로그인 사용자는 읽기, 본인만 5MB 미만 이미지 쓰기
+    match /profileImages/{uid}/{fileName} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null
+          && request.auth.uid == uid
+          && request.resource.size < 5 * 1024 * 1024
+          && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}
