@@ -33,6 +33,7 @@ public class ConfirmDialog extends DialogFragment {
     private static final String ARG_MESSAGE = "message";
     private static final String ARG_POSITIVE = "positive";
     private static final String ARG_NEGATIVE = "negative";
+    private static final String ARG_RESULT = "result";
 
     public static void show(FragmentManager fm, String requestKey, String title, String message, String positiveLabel) {
         show(fm, requestKey, title, message, positiveLabel, "취소");
@@ -40,12 +41,19 @@ public class ConfirmDialog extends DialogFragment {
 
     public static void show(FragmentManager fm, String requestKey, String title, String message,
                             String positiveLabel, String negativeLabel) {
+        show(fm, requestKey, title, message, positiveLabel, negativeLabel, new Bundle());
+    }
+
+    /** 동적으로 생기는 항목의 ID도 회전 후 동일한 결과 키로 전달한다. */
+    public static void show(FragmentManager fm, String requestKey, String title, String message,
+                            String positiveLabel, String negativeLabel, Bundle result) {
         Bundle args = new Bundle();
         args.putString(ARG_KEY, requestKey);
         args.putString(ARG_TITLE, title);
         args.putString(ARG_MESSAGE, message);
         args.putString(ARG_POSITIVE, positiveLabel);
         args.putString(ARG_NEGATIVE, negativeLabel);
+        args.putBundle(ARG_RESULT, new Bundle(result));
         ConfirmDialog dialog = new ConfirmDialog();
         dialog.setArguments(args);
         dialog.show(fm, requestKey);
@@ -65,7 +73,8 @@ public class ConfirmDialog extends DialogFragment {
         negative.setText(args.getString(ARG_NEGATIVE, "취소"));
         negative.setOnClickListener(v -> dismiss());
         positive.setOnClickListener(v -> {
-            getParentFragmentManager().setFragmentResult(args.getString(ARG_KEY), new Bundle());
+            Bundle result = args.getBundle(ARG_RESULT);
+            getParentFragmentManager().setFragmentResult(args.getString(ARG_KEY), result == null ? new Bundle() : result);
             dismiss();
         });
         return new AlertDialog.Builder(requireContext()).setView(view).create();

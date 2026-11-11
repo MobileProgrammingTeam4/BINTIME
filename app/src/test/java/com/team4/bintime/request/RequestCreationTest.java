@@ -63,4 +63,33 @@ public class RequestCreationTest {
         repo.respond(result.id, Status.CANCELED);
         assertEquals(2, calls[0]);
     }
+
+    @Test public void cancelNotifiesObserversAndAllowsNewRequestWithoutChangingOldSnapshot() {
+        MockRequestRepository repo = new MockRequestRepository("sender", false);
+        repo.create(RequestDraft.mock("receiver", "스터디", "2026-11-12", 600, 720), callback);
+        Item original = result;
+        int[] calls = {0};
+        Registration registration = repo.observe(() -> calls[0]++);
+        repo.cancel(original.id, callback);
+        repo.cancel(original.id, callback);
+        assertEquals(Status.CANCELED, original.status());
+        assertFalse(repo.hasPendingRequest("receiver"));
+        assertEquals(2, calls[0]);
+        repo.create(RequestDraft.mock("receiver", "스터디", "2026-11-13", 900, 1020), callback);
+        assertNotEquals(original.id, result.id);
+        assertEquals(600, original.startMinute);
+        assertEquals("2026-11-12", original.meetingDate);
+        registration.remove();
+    }
+
+    @Test public void receivedAndCompletedRequestsCannotBeCanceled() {
+        MockRequestRepository repo = new MockRequestRepository();
+        repo.cancel("received-1", callback);
+        assertNotNull(error);
+        assertEquals(Status.PENDING, repo.find("received-1").status());
+        error = null;
+        repo.cancel("completed-1", callback);
+        assertNotNull(error);
+        assertEquals(Status.ACCEPTED, repo.find("completed-1").status());
+    }
 }

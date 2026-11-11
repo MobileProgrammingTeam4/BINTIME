@@ -9,10 +9,12 @@ import { analyzeTimetableTask } from "./ai/tasks/analyzeTimetable";
 import { generateProfileTask } from "./ai/tasks/generateProfile";
 import { recommendPlaceTask } from "./ai/tasks/recommendPlace";
 import { suggestChatRepliesTask } from "./ai/tasks/suggestChatReplies";
-import { createRequestCallable } from "./requests/callable";
+import { cancelRequestCallable, createRequestCallable } from "./requests/callable";
 
 /** D · BT-019. BT-017 후보 검사 연결 전에는 SEARCH_NOT_CONNECTED로 거절한다. */
 export const createMatchRequest = createRequestCallable();
+/** D · BT-020. 발신자 본인의 PENDING 요청만 취소한다. */
+export const cancelMatchRequest = cancelRequestCallable();
 
 /** BT-024 연결 확인 */
 export const aiPing = createAiCallable(aiPingTask);

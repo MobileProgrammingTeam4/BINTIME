@@ -57,4 +57,19 @@ export class RequestService {
       return response(requestId, record);
     });
   }
+
+  async cancel(uid: string, requestId: string) {
+    const ref = this.db.collection("matchRequests").doc(requestId);
+    return this.db.runTransaction(async (tx) => {
+      const document = await tx.get(ref);
+      if (!document.exists) throw requestError("not-found", "REQUEST_NOT_FOUND", "요청을 찾을 수 없습니다.");
+      const record = document.data() as RequestRecord;
+      if (record.fromUid !== uid) throw requestError("permission-denied", "NOT_SENDER", "보낸 요청만 취소할 수 있습니다.");
+      if (record.status === "CANCELED") return response(requestId, record);
+      if (record.status !== "PENDING") throw requestError("failed-precondition", "REQUEST_NOT_PENDING", "이미 처리된 요청입니다.");
+      const canceled: RequestRecord = { ...record, status: "CANCELED", updatedAt: Timestamp.fromDate(this.now()) };
+      tx.update(ref, { status: canceled.status, updatedAt: canceled.updatedAt });
+      return response(requestId, canceled);
+    });
+  }
 }

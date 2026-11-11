@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { createRequestCallable } from "../src/requests/callable";
-import { createInput, disconnectedCandidates, validateSnapshot } from "../src/requests/contracts";
+import { cancelRequestCallable, createRequestCallable } from "../src/requests/callable";
+import { cancelInput, createInput, disconnectedCandidates, validateSnapshot } from "../src/requests/contracts";
 
 const now = new Date("2026-11-11T00:00:00Z");
 const valid = { toUid: "other", purpose: "스터디", meetingDate: "2026-11-11", startMinute: 600, endMinute: 660 };
@@ -35,5 +35,14 @@ describe("BT-019 요청 계약", () => {
     await expect(callable.run({ data: {} } as never)).rejects.toMatchObject({
       code: "unauthenticated", details: { reason: "UNAUTHENTICATED", requestId: expect.any(String) },
     });
+  });
+  it("취소도 미로그인·UID 위조·잘못된 식별자를 저장소 접근 전에 거절한다", async () => {
+    const callable = cancelRequestCallable(() => { throw new Error("must not access database"); });
+    await expect(callable.run({ data: {} } as never)).rejects.toMatchObject({ code: "unauthenticated" });
+    const requestId = "a".repeat(64);
+    expect(cancelInput.safeParse({ requestId }).success).toBe(true);
+    expect(cancelInput.safeParse({ requestId: "../victim" }).success).toBe(false);
+    await expect(callable.run({ auth: { uid: "me" }, data: { requestId, fromUid: "victim" } } as never))
+      .rejects.toMatchObject({ code: "invalid-argument" });
   });
 });
