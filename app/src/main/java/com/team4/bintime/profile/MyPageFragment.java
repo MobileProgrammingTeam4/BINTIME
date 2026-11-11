@@ -1,5 +1,6 @@
 package com.team4.bintime.profile;
 
+import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.Bundle;
@@ -10,6 +11,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -35,8 +38,16 @@ public class MyPageFragment extends Fragment {
     // 프로필 설정 화면과 같은 저장소를 사용해 수정 결과가 onResume() 에서 바로 반영되게 한다.
     private ProfileRepository profileRepo;
     private UserProfile currentProfile;
-    /** 마지막으로 표시한 사진 경로. onResume 마다 같은 사진을 다시 내려받지 않는다. */
+    /**
+     * 마지막으로 표시한 사진 경로. onResume 마다 같은 사진을 다시 내려받지 않는다.
+     * 사진은 항상 같은 경로(profileImages/{uid}/profile.jpg)에 덮어쓰므로, 프로필 수정이 저장되면 비운다.
+     */
     private String shownPhotoPath;
+    /** 프로필 수정 화면. 저장(RESULT_OK)하고 돌아오면 사진을 다시 불러온다 (#79 리뷰 반영). */
+    private final ActivityResultLauncher<Intent> editProfileLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (result.getResultCode() == Activity.RESULT_OK) shownPhotoPath = null;
+            });
 
     private ImageView imgMyPhoto;
     private TextView tvMyName;
@@ -144,7 +155,7 @@ public class MyPageFragment extends Fragment {
         root.findViewById(R.id.menuEditProfile).setOnClickListener(v -> {
             Intent intent = new Intent(requireContext(), ProfileSetupActivity.class);
             intent.putExtra(ProfileSetupActivity.EXTRA_MODE, ProfileSetupActivity.MODE_EDIT);
-            startActivity(intent);
+            editProfileLauncher.launch(intent);
         });
 
         // 2. 차단한 사용자 관리

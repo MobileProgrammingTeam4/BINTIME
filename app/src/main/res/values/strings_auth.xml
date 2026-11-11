@@ -6,6 +6,8 @@
     <string name="onboarding_title">같은 시간,\n다른 곳에 있는 너와</string>
     <string name="onboarding_subtitle">지금, 공강이 겹치는 사람과\n가까워질 수 있어요.</string>
     <string name="onboarding_start_button">시작하기</string>
+    <!-- BT-014: 로그인된 계정의 프로필 확인 실패 시 같은 버튼으로 재시도 -->
+    <string name="onboarding_retry_button">다시 시도</string>
 
     <!-- 학생 인증 공통 -->
     <string name="auth_header_title">학생 인증</string>

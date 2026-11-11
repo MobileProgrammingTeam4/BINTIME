@@ -21,7 +21,6 @@ import androidx.lifecycle.ViewModelProvider;
 import com.team4.bintime.R;
 import com.team4.bintime.MainActivity;
 import com.team4.bintime.profile.ProfileRepositories;
-import com.team4.bintime.profile.ProfileRepository;
 import com.team4.bintime.timetable.TimetableSelectModeActivity;
 
 /**
@@ -336,8 +335,8 @@ public class EmailAuthActivity extends AppCompatActivity {
      * 저장소 검증을 통과해야만 첫 가입의 시간표 등록 또는 기존 계정의 메인 화면으로 이동한다.
      */
     private void onVerificationLinkOpened(String email, String link) {
-        // 검증은 ViewModel 이 들고 있어 도중에 화면이 회전해도 결과가 새 Activity 로 전달된다.
-        viewModel.verify(authRepository, email, link);
+        // 검증과 프로필 조회는 ViewModel 이 들고 있어 도중에 화면이 회전해도 결과가 새 Activity 로 전달된다.
+        viewModel.verify(authRepository, ProfileRepositories.get(this), email, link);
     }
 
     /** ViewModel 이 전달한 검증 결과 처리. 회전 전에 끝난 결과도 새 Activity 가 한 번만 받는다. */
@@ -348,7 +347,7 @@ public class EmailAuthActivity extends AppCompatActivity {
             authState.setStatus(EmailVerificationState.Status.VERIFIED);
             otherDeviceLink = null;
             Toast.makeText(this, "학생 인증이 완료되었습니다!", Toast.LENGTH_SHORT).show();
-            navigateAfterVerification(result.uid, result.email);
+            navigateAfterVerification(result);
         } else if (result.failure != null) {
             handleVerificationFailure(result.failure, result.message);
         } else {
@@ -398,30 +397,25 @@ public class EmailAuthActivity extends AppCompatActivity {
         tvEmailHelper.setVisibility(View.VISIBLE);
     }
 
-    private void navigateAfterVerification(String uid, String email) {
-        // BT-014: 프로필을 만든 계정은 메인으로, 아니면 가입 단계(시간표 → 프로필)로 보낸다.
-        ProfileRepositories.get(this).hasCompletedProfile(uid, new ProfileRepository.Callback<Boolean>() {
-            @Override
-            public void onSuccess(Boolean completed) {
-                if (isFinishing() || isDestroyed()) return;
-                Intent intent = Boolean.TRUE.equals(completed)
-                        ? new Intent(EmailAuthActivity.this, MainActivity.class)
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                        : TimetableSelectModeActivity.forSignup(EmailAuthActivity.this, email);
-                startActivity(intent);
-                finish();
-            }
-
-            @Override
-            public void onError(String message) {
-                if (isFinishing() || isDestroyed()) return;
-                // 로그인은 끝났으므로 온보딩이 프로필 확인을 다시 시도한다.
-                Toast.makeText(EmailAuthActivity.this, message, Toast.LENGTH_SHORT).show();
-                startActivity(new Intent(EmailAuthActivity.this, OnboardingActivity.class)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
-                finish();
-            }
-        });
+    /**
+     * BT-014: 프로필을 만든 계정은 메인으로, 아니면 가입 단계(시간표 → 프로필)로 보낸다.
+     * 프로필 완료 여부는 ViewModel 이 이미 조회해 두었으므로 여기서는 비동기 작업 없이 바로 이동한다.
+     */
+    private void navigateAfterVerification(EmailAuthViewModel.Result result) {
+        Intent intent;
+        if (result.profileCompleted == null) {
+            // 로그인은 끝났지만 프로필을 확인하지 못했다. 온보딩이 다시 확인하고, 실패하면 재시도 버튼을 보여 준다.
+            if (result.message != null) Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show();
+            intent = new Intent(this, OnboardingActivity.class)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        } else if (result.profileCompleted) {
+            intent = new Intent(this, MainActivity.class)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        } else {
+            intent = TimetableSelectModeActivity.forSignup(this, result.email);
+        }
+        startActivity(intent);
+        finish();
     }
 
     /** 시연 버튼 영역은 Mock 모드의 발송 완료 화면에서만 보인다. */
