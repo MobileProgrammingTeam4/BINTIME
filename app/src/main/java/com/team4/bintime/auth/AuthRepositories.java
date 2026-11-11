@@ -29,11 +29,23 @@ public final class AuthRepositories {
     }
 
     /**
-     * Context 가 없는 곳에서 현재 로그인 UID 를 얻는다. 아직 {@link #get} 이 불리지 않았다면 Mock 기준.
-     * 앱 진입점(OnboardingActivity, MainActivity)이 먼저 get 을 호출한다.
+     * Context 가 없는 곳에서 현재 로그인 UID 를 얻는다.
+     * 프로세스 복원으로 중간 화면(예: 시간표 등록)부터 열려 {@link #get} 이 아직 불리지 않았어도,
+     * Firebase 가 초기화돼 있으면 그 앱 Context 로 저장소를 골라 Firebase UID 를 돌려준다.
      */
     public static String currentUid() {
         AuthRepository repository = selected;
-        return repository != null ? repository.getCurrentUid() : MockAuthRepository.shared().getCurrentUid();
+        if (repository == null) repository = selectWithoutContext();
+        return repository.getCurrentUid();
+    }
+
+    private static AuthRepository selectWithoutContext() {
+        try {
+            // google-services 플러그인이 적용되면 앱 시작 시 FirebaseApp 이 자동 초기화된다.
+            return get(FirebaseApp.getInstance().getApplicationContext());
+        } catch (RuntimeException notInitialized) {
+            // Firebase 미설정(CI·설정 전 팀원) 또는 JVM 단위 테스트: Mock 기준
+            return MockAuthRepository.shared();
+        }
     }
 }
