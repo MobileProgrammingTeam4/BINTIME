@@ -18,10 +18,22 @@
         </activity>
 
         <activity android:name=".MainActivity" android:exported="false" />
+        <!-- BT-013: 메일의 로그인 링크가 Firebase Hosting 기본 도메인(/__/auth/links)을 거쳐 이 화면으로 돌아온다 -->
         <activity
             android:name=".auth.EmailAuthActivity"
-            android:exported="false"
-            android:windowSoftInputMode="adjustResize" />
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="${authLinkHost}"
+                    android:pathPrefix="/__/auth/links" />
+            </intent-filter>
+        </activity>
         <activity
             android:name=".profile.ProfileSetupActivity"
             android:exported="false"

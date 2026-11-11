@@ -15,7 +15,7 @@ import androidx.fragment.app.Fragment;
 
 import com.google.android.material.chip.ChipGroup;
 import com.team4.bintime.R;
-import com.team4.bintime.auth.MockAuthRepository;
+import com.team4.bintime.auth.AuthRepositories;
 import com.team4.bintime.auth.OnboardingActivity;
 import com.team4.bintime.common.ChipViews;
 import com.team4.bintime.common.ConfirmDialog;
@@ -153,7 +153,7 @@ public class MyPageFragment extends Fragment {
     }
 
     private void logout() {
-        MockAuthRepository.shared().signOut();
+        AuthRepositories.get(requireContext()).signOut();
         Toast.makeText(requireContext(), R.string.my_logout_done, Toast.LENGTH_SHORT).show();
         Intent intent = new Intent(requireContext(), OnboardingActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);

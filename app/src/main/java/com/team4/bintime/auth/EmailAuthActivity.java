@@ -1,6 +1,7 @@
 package com.team4.bintime.auth;
 
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -22,13 +23,14 @@ import com.team4.bintime.timetable.TimetableSelectModeActivity;
 
 /**
  * 학교 이메일 링크 인증 화면 (Figma 100:1411, 235:1961, 268:1969, 268:2004, 268:2039).
- * (BT-003 / Issue #3)
+ * (BT-003 / Issue #3, BT-013 / Issue #13)
  *
  * Firebase Auth 이메일 링크 인증 방식에 맞추어 6자리 OTP 입력창 없이
  * 링크 발송 안내, 앱 복귀 대기, 재전송 및 링크 만료/오류 예외 흐름을 제공합니다.
  *
- * 화면 상태(만료·잘못된 링크·이메일 재입력)는 시연 버튼이 직접 바꾸지 않고,
- * {@link MockAuthRepository#verifySignInLink} 의 실패 사유에 따라 전환됩니다.
+ * google-services.json 이 있으면 실제 Firebase 링크가 App Link 로 이 화면에 돌아오고,
+ * 없으면 Mock 저장소와 시연 버튼으로 같은 흐름을 재현한다.
+ * 화면 상태(만료·잘못된 링크·이메일 재입력)는 저장소 검증의 실패 사유에 따라 전환됩니다.
  */
 public class EmailAuthActivity extends AppCompatActivity {
 
@@ -37,11 +39,15 @@ public class EmailAuthActivity extends AppCompatActivity {
     /** 시연용: 발송한 적 없는 형식의 링크. */
     private static final String DEMO_INVALID_LINK = MockAuthRepository.LINK_PREFIX + "invalid";
 
-    private final MockAuthRepository authRepository = MockAuthRepository.shared();
+    private AuthRepository authRepository;
+    /** Mock 모드에서만 존재. 시연 버튼이 발급 링크를 꺼내는 데 쓴다. */
+    private MockAuthRepository mockRepository;
     /** status 와 "인증 링크를 보낸 이메일" 을 보관한다. 입력창 내용은 EditText 가 직접 복원한다. */
     private EmailVerificationState authState = new EmailVerificationState();
     /** 다른 기기에서 연 링크. 이 기기에는 요청 이메일 정보가 없으므로 사용자가 이메일을 다시 입력한다. */
     private String otherDeviceLink;
+    /** 발송·검증 요청 중 중복 클릭 방지. */
+    private boolean requestInFlight;
 
     private TextView tvMainTitle;
     private TextView tvSubTitle;
@@ -49,7 +55,7 @@ public class EmailAuthActivity extends AppCompatActivity {
     private EditText etEmail;
     private TextView tvEmailHelper;
 
-    /** 목업 시연 버튼 영역. Figma 에 없는 영역이며 링크 발송 후에만 보인다. */
+    /** 목업 시연 버튼 영역. Figma 에 없는 영역이며 Mock 모드에서 링크 발송 후에만 보인다. */
     private LinearLayout layoutSentInfoSection;
     private TextView btnSimulateLinkClick;
 
@@ -60,6 +66,11 @@ public class EmailAuthActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_email_auth);
+
+        authRepository = AuthRepositories.get(this);
+        if (authRepository instanceof MockAuthRepository) {
+            mockRepository = (MockAuthRepository) authRepository;
+        }
 
         if (savedInstanceState != null) {
             EmailVerificationState restoredState =
@@ -77,6 +88,16 @@ public class EmailAuthActivity extends AppCompatActivity {
             }
         });
         updateUiForState(authState.getStatus());
+
+        // 메일의 링크로 앱이 처음 열린 경우. 회전 등으로 재생성된 경우는 이미 처리했으므로 건너뛴다.
+        if (savedInstanceState == null) handleIncomingLink(getIntent());
+    }
+
+    @Override
+    protected void onNewIntent(@NonNull Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleIncomingLink(intent);
     }
 
     @Override
@@ -84,6 +105,31 @@ public class EmailAuthActivity extends AppCompatActivity {
         super.onSaveInstanceState(outState);
         outState.putSerializable(STATE_AUTH, authState);
         outState.putString(STATE_OTHER_DEVICE_LINK, otherDeviceLink);
+    }
+
+    /**
+     * 메일 링크(App Link)로 돌아온 경우 처리.
+     * 같은 기기에서 요청했다면 저장된 이메일로 바로 인증하고, 아니면 이메일 재입력 화면을 보여 준다.
+     */
+    private void handleIncomingLink(Intent intent) {
+        if (intent == null) return;
+        Uri data = intent.getData();
+        if (data == null) return;
+        String link = data.toString();
+        if (!authRepository.isSignInLink(link)) {
+            updateUiForState(EmailVerificationState.Status.INVALID_LINK);
+            return;
+        }
+
+        String pendingEmail = authRepository.getPendingEmail();
+        if (pendingEmail != null && !pendingEmail.isEmpty()) {
+            authState.setEmail(pendingEmail);
+            onVerificationLinkOpened(pendingEmail, link);
+        } else {
+            otherDeviceLink = link;
+            etEmail.setText("");
+            updateUiForState(EmailVerificationState.Status.DIFFERENT_DEVICE);
+        }
     }
 
     private void initViews() {
@@ -114,6 +160,7 @@ public class EmailAuthActivity extends AppCompatActivity {
 
         // 메인 액션 버튼 클릭
         btnPrimaryAction.setOnClickListener(v -> {
+            if (requestInFlight) return;
             switch (authState.getStatus()) {
                 case INPUT:
                     sendEmailLink();
@@ -140,21 +187,23 @@ public class EmailAuthActivity extends AppCompatActivity {
             updateUiForState(EmailVerificationState.Status.INPUT);
         });
 
+        if (mockRepository == null) return;
+
         // 목업 시연용: 받은 메일의 링크를 이 기기에서 연 경우 (정상 인증)
         btnSimulateLinkClick.setOnClickListener(v ->
-                onVerificationLinkOpened(authState.getEmail(), authRepository.getIssuedLinkForDemo()));
+                onVerificationLinkOpened(authState.getEmail(), mockRepository.getIssuedLinkForDemo()));
 
         // 목업 시연용 예외: 실제로 저장소 검증을 거쳐 실패 사유에 맞는 화면으로 전환된다.
         findViewById(R.id.btnSimulateExpired).setOnClickListener(v -> {
-            String link = authRepository.getIssuedLinkForDemo();
-            authRepository.expirePendingLinkForDemo();
+            String link = mockRepository.getIssuedLinkForDemo();
+            mockRepository.expirePendingLinkForDemo();
             onVerificationLinkOpened(authState.getEmail(), link);
         });
         findViewById(R.id.btnSimulateInvalid).setOnClickListener(v ->
                 onVerificationLinkOpened(authState.getEmail(), DEMO_INVALID_LINK));
         findViewById(R.id.btnSimulateOtherDevice).setOnClickListener(v -> {
             // 다른 기기에는 요청 이메일이 저장되어 있지 않으므로 링크만 가진 채 이메일을 다시 입력받는다.
-            otherDeviceLink = authRepository.getIssuedLinkForDemo();
+            otherDeviceLink = mockRepository.getIssuedLinkForDemo();
             etEmail.setText("");
             updateUiForState(EmailVerificationState.Status.DIFFERENT_DEVICE);
         });
@@ -203,17 +252,24 @@ public class EmailAuthActivity extends AppCompatActivity {
             showEmailHelper(getString(R.string.auth_error_invalid_domain));
             return;
         }
+        // 같은 이메일로 방금 보냈다면 재발송 제한을 그대로 적용한다.
+        if (email.equalsIgnoreCase(authState.getEmail()) && isResendCoolingDown()) return;
 
+        requestInFlight = true;
         authRepository.sendSignInLink(email, new AuthRepository.Callback<Void>() {
             @Override
             public void onSuccess(Void result) {
-                authState.setStatus(EmailVerificationState.Status.SENT);
+                requestInFlight = false;
+                if (isFinishing() || isDestroyed()) return;
                 authState.setEmail(email);
+                authState.setSentTimestamp(System.currentTimeMillis());
                 updateUiForState(EmailVerificationState.Status.SENT);
             }
 
             @Override
             public void onError(String message) {
+                requestInFlight = false;
+                if (isFinishing() || isDestroyed()) return;
                 Toast.makeText(EmailAuthActivity.this, message, Toast.LENGTH_SHORT).show();
             }
         });
@@ -224,19 +280,36 @@ public class EmailAuthActivity extends AppCompatActivity {
         if (email.isEmpty()) {
             email = etEmail.getText().toString().trim();
         }
+        if (isResendCoolingDown()) return;
 
-        authRepository.resendSignInLink(email, new AuthRepository.Callback<Void>() {
+        requestInFlight = true;
+        final String target = email;
+        authRepository.resendSignInLink(target, new AuthRepository.Callback<Void>() {
             @Override
             public void onSuccess(Void result) {
+                requestInFlight = false;
+                if (isFinishing() || isDestroyed()) return;
+                authState.setEmail(target);
+                authState.setSentTimestamp(System.currentTimeMillis());
                 Toast.makeText(EmailAuthActivity.this, R.string.auth_resend_success, Toast.LENGTH_SHORT).show();
                 updateUiForState(EmailVerificationState.Status.SENT);
             }
 
             @Override
             public void onError(String message) {
+                requestInFlight = false;
+                if (isFinishing() || isDestroyed()) return;
                 Toast.makeText(EmailAuthActivity.this, message, Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    /** 재발송 쿨다운 중이면 남은 시간을 안내하고 true. */
+    private boolean isResendCoolingDown() {
+        int seconds = authState.remainingResendCooldownSeconds(System.currentTimeMillis());
+        if (seconds <= 0) return false;
+        Toast.makeText(this, getString(R.string.auth_resend_cooldown, seconds), Toast.LENGTH_SHORT).show();
+        return true;
     }
 
     private void completeDifferentDeviceAuth() {
@@ -254,9 +327,11 @@ public class EmailAuthActivity extends AppCompatActivity {
      * 저장소 검증을 통과해야만 첫 가입의 시간표 등록 또는 기존 계정의 메인 화면으로 이동한다.
      */
     private void onVerificationLinkOpened(String email, String link) {
+        requestInFlight = true;
         authRepository.verifySignInLink(email, link, new AuthRepository.Callback<String>() {
             @Override
             public void onSuccess(String uid) {
+                requestInFlight = false;
                 if (isFinishing() || isDestroyed()) return;
                 authState.setStatus(EmailVerificationState.Status.VERIFIED);
                 otherDeviceLink = null;
@@ -266,12 +341,14 @@ public class EmailAuthActivity extends AppCompatActivity {
 
             @Override
             public void onError(String message) {
+                requestInFlight = false;
                 if (isFinishing() || isDestroyed()) return;
                 Toast.makeText(EmailAuthActivity.this, message, Toast.LENGTH_SHORT).show();
             }
 
             @Override
             public void onFailure(AuthRepository.Failure failure, String message) {
+                requestInFlight = false;
                 if (isFinishing() || isDestroyed()) return;
                 handleVerificationFailure(failure, message);
             }
@@ -289,8 +366,23 @@ public class EmailAuthActivity extends AppCompatActivity {
                 break;
             case EMAIL_MISMATCH:
             case INVALID_EMAIL:
-                // 이메일 재입력 화면에 머무르며 입력값 오류를 안내한다.
-                showEmailHelper(message);
+                if (authState.getStatus() == EmailVerificationState.Status.DIFFERENT_DEVICE) {
+                    // 이메일 재입력 화면에 머무르며 입력값 오류를 안내한다.
+                    showEmailHelper(message);
+                } else {
+                    // 저장된 이메일로 자동 인증하다 실패한 경우: 이메일을 직접 입력받는다.
+                    if (otherDeviceLink == null) otherDeviceLink = getIntent() != null && getIntent().getData() != null
+                            ? getIntent().getData().toString() : null;
+                    etEmail.setText("");
+                    updateUiForState(EmailVerificationState.Status.DIFFERENT_DEVICE);
+                    showEmailHelper(message);
+                }
+                break;
+            case NETWORK:
+            case TOO_MANY_REQUESTS:
+            case UNKNOWN:
+                // 링크는 그대로 유효할 수 있으므로 현재 화면에 머무르고 다시 시도하게 한다.
+                Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
                 break;
             case LINK_NOT_SENT:
             default:
@@ -306,11 +398,17 @@ public class EmailAuthActivity extends AppCompatActivity {
     }
 
     private void navigateAfterVerification(String uid, String email) {
+        // 프로필 존재 여부의 Firestore 조회는 BT-014 에서 연결한다.
         Intent intent = MockProfileRepository.shared().hasCompletedProfile(uid)
                 ? new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK)
                 : TimetableSelectModeActivity.forSignup(this, email);
         startActivity(intent);
         finish();
+    }
+
+    /** 시연 버튼 영역은 Mock 모드의 발송 완료 화면에서만 보인다. */
+    private int demoVisibility(boolean show) {
+        return show && mockRepository != null ? View.VISIBLE : View.GONE;
     }
 
     private void updateUiForState(EmailVerificationState.Status status) {
@@ -332,7 +430,7 @@ public class EmailAuthActivity extends AppCompatActivity {
                 tvMainTitle.setText(R.string.auth_check_email_title);
                 tvSubTitle.setText(R.string.auth_check_email_subtitle);
                 layoutEmailInputSection.setVisibility(View.GONE);
-                layoutSentInfoSection.setVisibility(View.VISIBLE);
+                layoutSentInfoSection.setVisibility(demoVisibility(true));
 
                 tvSecondaryAction.setVisibility(View.VISIBLE);
                 tvSecondaryAction.setText(R.string.auth_reenter_email);

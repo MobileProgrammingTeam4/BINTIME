@@ -120,7 +120,7 @@
                     app:lineHeight="16dp" />
             </LinearLayout>
 
-            <!-- 목업 시연 전용 (Figma에 없는 영역). 실제 메일 링크 복귀는 BT-014에서 연결 -->
+            <!-- 목업 시연 전용 (Figma에 없는 영역). Firebase 연동(BT-013) 시에는 숨기고 실제 메일 링크로 복귀한다 -->
             <LinearLayout
                 android:id="@+id/layoutSentInfoSection"
                 android:layout_width="match_parent"

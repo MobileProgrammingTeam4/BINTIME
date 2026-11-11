@@ -22,7 +22,7 @@ import androidx.core.content.ContextCompat;
 import com.google.android.material.chip.ChipGroup;
 import com.team4.bintime.MainActivity;
 import com.team4.bintime.R;
-import com.team4.bintime.auth.MockAuthRepository;
+import com.team4.bintime.auth.AuthRepositories;
 import com.team4.bintime.common.ChipViews;
 import com.team4.bintime.common.ConfirmDialog;
 
@@ -226,7 +226,7 @@ public class ProfileSetupActivity extends AppCompatActivity {
     /** 최초 생성: 시연용 기본 프로필을 채우지 않고 인증된 계정 정보만 연결한 빈 폼으로 시작한다. */
     private void initCreateProfile() {
         profile = UserProfile.empty();
-        profile.setUid(MockAuthRepository.shared().getCurrentUid());
+        profile.setUid(AuthRepositories.get(this).getCurrentUid());
         profile.setEmail(getIntent().getStringExtra(EXTRA_USER_EMAIL));
         selectedTags.clear();
         updateCharCounters();
