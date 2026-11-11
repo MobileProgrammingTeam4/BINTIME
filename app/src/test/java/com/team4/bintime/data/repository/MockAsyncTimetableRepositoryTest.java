@@ -1,0 +1,366 @@
+package com.team4.bintime.data.repository;
+
+import com.team4.bintime.data.model.Course;
+import com.team4.bintime.data.model.TimeSlot;
+import com.team4.bintime.data.model.Timetable;
+
+import org.junit.Before;
+import org.junit.Test;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+
+/**
+ * [BT-015] MockAsyncTimetableRepository — 콜백·구독·계정 분리·겹침 거부.
+ */
+public class MockAsyncTimetableRepositoryTest {
+
+    private static final int MON = 1;
+    private static final int TUE = 2;
+
+    private String currentUid;
+    private MockAsyncTimetableRepository repo;
+
+    @Before
+    public void setUp() {
+        MockTimetableRepositoryImpl.getInstance().resetToMockData();
+        currentUid = "uid-a";
+        repo = new MockAsyncTimetableRepository(MockTimetableRepositoryImpl.getInstance(), () -> currentUid);
+    }
+
+    // ── 헬퍼 ─────────────────────────────────────────
+
+    private static Course course(String id, int day, int start, int end) {
+        return new Course(id, "수업" + id, null, null, null,
+                new ArrayList<>(Collections.singletonList(new TimeSlot(day, start, end))));
+    }
+
+    private static final class Result<T> implements AsyncTimetableRepository.Callback<T> {
+        T value;
+        TimetableFailure failure;
+        int calls;
+
+        @Override
+        public void onSuccess(T result) {
+            value = result;
+            calls++;
+        }
+
+        @Override
+        public void onError(TimetableFailure f) {
+            failure = f;
+            calls++;
+        }
+    }
+
+    private static final class Recorder implements AsyncTimetableRepository.Listener<Timetable> {
+        final List<Timetable> data = new ArrayList<>();
+        final List<TimetableFailure> errors = new ArrayList<>();
+
+        @Override
+        public void onData(Timetable t) {
+            data.add(t);
+        }
+
+        @Override
+        public void onError(TimetableFailure f) {
+            errors.add(f);
+        }
+
+        Timetable last() {
+            return data.get(data.size() - 1);
+        }
+    }
+
+    private <T> Result<T> ok(Result<T> r) {
+        assertEquals(1, r.calls);
+        assertNull("unexpected failure " + r.failure, r.failure);
+        return r;
+    }
+
+    private static void assertFailure(TimetableFailure.Code code, Result<?> r) {
+        assertEquals(1, r.calls);
+        assertNotNull(r.failure);
+        assertEquals(code, r.failure.getCode());
+    }
+
+    private Result<Course> add(Course c) {
+        Result<Course> r = new Result<>();
+        repo.addCourse(c, r);
+        return r;
+    }
+
+    // ── 구독 ─────────────────────────────────────────
+
+    @Test
+    public void observe_unregistered_deliversNull() {
+        Recorder rec = new Recorder();
+        repo.observeTimetable(rec);
+        assertEquals(1, rec.data.size());
+        assertNull(rec.data.get(0));
+    }
+
+    @Test
+    public void observe_receivesUpdatesAfterAddAndDelete() {
+        Recorder rec = new Recorder();
+        repo.observeTimetable(rec);
+        ok(add(course("a", MON, 600, 690)));
+        assertEquals(2, rec.data.size());
+        assertEquals(1, rec.last().getCourseCount());
+
+        Result<Void> del = new Result<>();
+        repo.deleteCourse("a", del);
+        ok(del);
+        assertEquals(3, rec.data.size());
+        assertEquals(0, rec.last().getCourseCount());
+    }
+
+    @Test
+    public void observe_removeStopsUpdates_andIsIdempotent() {
+        Recorder rec = new Recorder();
+        AsyncTimetableRepository.Registration reg = repo.observeTimetable(rec);
+        reg.remove();
+        reg.remove();
+        ok(add(course("a", MON, 600, 690)));
+        assertEquals(1, rec.data.size());
+    }
+
+    @Test
+    public void observe_notSignedIn_error() {
+        currentUid = null;
+        Recorder rec = new Recorder();
+        AsyncTimetableRepository.Registration reg = repo.observeTimetable(rec);
+        assertTrue(rec.data.isEmpty());
+        assertEquals(TimetableFailure.Code.NOT_SIGNED_IN, rec.errors.get(0).getCode());
+        reg.remove();
+    }
+
+    @Test
+    public void observe_snapshotIsCopy() {
+        ok(add(course("a", MON, 600, 690)));
+        Recorder rec = new Recorder();
+        repo.observeTimetable(rec);
+        Timetable snap = rec.last();
+        snap.getCourses().get(0).getTimeSlots().get(0).setEndMinute(1000);
+        snap.getCourses().clear();
+
+        Recorder again = new Recorder();
+        repo.observeTimetable(again);
+        assertEquals(1, again.last().getCourseCount());
+        assertEquals(690, again.last().getCourses().get(0).getTimeSlots().get(0).getEndMinute());
+        assertNotSame(snap, again.last());
+    }
+
+    // ── 계정 분리 ─────────────────────────────────────
+
+    @Test
+    public void accounts_separated() {
+        Recorder recA = new Recorder();
+        repo.observeTimetable(recA);
+
+        currentUid = "uid-b";
+        Recorder recB = new Recorder();
+        repo.observeTimetable(recB);
+        ok(add(course("b1", MON, 600, 690)));
+
+        assertEquals(1, recA.data.size());   // A는 B의 쓰기 알림을 받지 않는다
+        assertEquals(1, recB.last().getCourseCount());
+
+        currentUid = "uid-a";
+        ok(add(course("a1", MON, 600, 690)));  // B와 같은 시간이어도 A에서는 겹침이 아니다
+        assertEquals(1, recA.last().getCourseCount());
+        assertEquals("a1", recA.last().getCourses().get(0).getCourseId());
+        assertEquals(1, recB.last().getCourseCount());
+    }
+
+    // ── 추가 ─────────────────────────────────────────
+
+    @Test
+    public void add_returnsSanitizedCopy() {
+        Course c = new Course("a", "  자료구조 ", " ", null, null,
+                new ArrayList<>(Collections.singletonList(new TimeSlot(MON, 600, 690))));
+        Result<Course> r = ok(add(c));
+        assertEquals("자료구조", r.value.getName());
+        assertNull(r.value.getProfessor());
+        assertNotSame(c, r.value);
+    }
+
+    @Test
+    public void add_overlap_rejectedAndNotSaved() {
+        ok(add(course("a", MON, 600, 690)));
+        Recorder rec = new Recorder();
+        repo.observeTimetable(rec);
+        Result<Course> r = add(course("b", MON, 660, 720));
+        assertFailure(TimetableFailure.Code.OVERLAP, r);
+        assertEquals("a", r.failure.getConflictingCourseId());
+        assertEquals(1, rec.data.size());
+        assertEquals(1, rec.last().getCourseCount());
+    }
+
+    @Test
+    public void add_touching_allowed() {
+        ok(add(course("a", MON, 600, 660)));
+        ok(add(course("b", MON, 660, 720)));
+    }
+
+    @Test
+    public void add_duplicateId_invalid() {
+        ok(add(course("a", MON, 600, 660)));
+        assertFailure(TimetableFailure.Code.INVALID_COURSE, add(course("a", TUE, 600, 660)));
+    }
+
+    @Test
+    public void add_invalidOrNull_invalid() {
+        assertFailure(TimetableFailure.Code.INVALID_COURSE, add(null));
+        assertFailure(TimetableFailure.Code.INVALID_COURSE, add(course("a", MON, 660, 600)));
+    }
+
+    @Test
+    public void add_notSignedIn() {
+        currentUid = null;
+        assertFailure(TimetableFailure.Code.NOT_SIGNED_IN, add(course("a", MON, 600, 660)));
+    }
+
+    @Test
+    public void add_incrementsRevision() {
+        ok(add(course("a", MON, 600, 660)));
+        Recorder rec = new Recorder();
+        repo.observeTimetable(rec);
+        int before = rec.last().getRevision();
+        ok(add(course("b", TUE, 600, 660)));
+        assertEquals(before + 1, rec.last().getRevision());
+    }
+
+    @Test
+    public void nullCallback_allowed() {
+        repo.addCourse(course("a", MON, 600, 660), null);
+        repo.addCourse(course("b", MON, 630, 700), null);
+        repo.deleteCourse("a", null);
+        Recorder rec = new Recorder();
+        repo.observeTimetable(rec);
+        assertEquals(0, rec.last().getCourseCount());
+    }
+
+    // ── 수정 ─────────────────────────────────────────
+
+    @Test
+    public void update_moveWithinOwnTime_allowed() {
+        ok(add(course("a", MON, 600, 690)));
+        Result<Course> r = new Result<>();
+        repo.updateCourse(course("a", MON, 630, 720), r);
+        ok(r);
+        Recorder rec = new Recorder();
+        repo.observeTimetable(rec);
+        assertEquals(720, rec.last().getCourses().get(0).getTimeSlots().get(0).getEndMinute());
+    }
+
+    @Test
+    public void update_overlapWithOther_rejected() {
+        ok(add(course("a", MON, 600, 690)));
+        ok(add(course("b", MON, 780, 840)));
+        Result<Course> r = new Result<>();
+        repo.updateCourse(course("a", MON, 630, 800), r);
+        assertFailure(TimetableFailure.Code.OVERLAP, r);
+        assertEquals("b", r.failure.getConflictingCourseId());
+    }
+
+    @Test
+    public void update_missing_notFound() {
+        Result<Course> r = new Result<>();
+        repo.updateCourse(course("zz", MON, 600, 660), r);
+        assertFailure(TimetableFailure.Code.NOT_FOUND, r);
+    }
+
+    // ── 삭제 ─────────────────────────────────────────
+
+    @Test
+    public void delete_missing_idempotentSuccess_noNotify() {
+        Recorder rec = new Recorder();
+        repo.observeTimetable(rec);
+        Result<Void> r = new Result<>();
+        repo.deleteCourse("none", r);
+        ok(r);
+        assertEquals(1, rec.data.size());
+    }
+
+    @Test
+    public void delete_emptyId_invalid() {
+        Result<Void> r = new Result<>();
+        repo.deleteCourse(" ", r);
+        assertFailure(TimetableFailure.Code.INVALID_COURSE, r);
+    }
+
+    @Test
+    public void delete_notSignedIn() {
+        currentUid = null;
+        Result<Void> r = new Result<>();
+        repo.deleteCourse("a", r);
+        assertFailure(TimetableFailure.Code.NOT_SIGNED_IN, r);
+    }
+
+    // ── 일괄 교체 ─────────────────────────────────────
+
+    @Test
+    public void replace_newTimetable_revision1() {
+        Recorder rec = new Recorder();
+        repo.observeTimetable(rec);
+        Result<Void> r = new Result<>();
+        repo.replaceCourses(Arrays.asList(course("a", MON, 600, 660), course("b", MON, 660, 720)), r);
+        ok(r);
+        assertEquals(2, rec.last().getCourseCount());
+        assertEquals(1, rec.last().getRevision());
+    }
+
+    @Test
+    public void replace_existing_replacesAllAndBumpsRevision() {
+        ok(add(course("old", MON, 600, 660)));
+        Recorder rec = new Recorder();
+        repo.observeTimetable(rec);
+        int before = rec.last().getRevision();
+        Result<Void> r = new Result<>();
+        repo.replaceCourses(Collections.singletonList(course("new", MON, 600, 660)), r);
+        ok(r);
+        assertEquals(1, rec.last().getCourseCount());
+        assertEquals("new", rec.last().getCourses().get(0).getCourseId());
+        assertEquals(before + 1, rec.last().getRevision());
+    }
+
+    @Test
+    public void replace_overlapInBatch_rejectedAndUnchanged() {
+        ok(add(course("old", MON, 600, 660)));
+        Result<Void> r = new Result<>();
+        repo.replaceCourses(Arrays.asList(course("a", MON, 600, 690), course("b", MON, 660, 720)), r);
+        assertFailure(TimetableFailure.Code.OVERLAP, r);
+        Recorder rec = new Recorder();
+        repo.observeTimetable(rec);
+        assertEquals("old", rec.last().getCourses().get(0).getCourseId());
+    }
+
+    @Test
+    public void replace_null_invalid_emptyAllowed() {
+        Result<Void> bad = new Result<>();
+        repo.replaceCourses(null, bad);
+        assertFailure(TimetableFailure.Code.INVALID_COURSE, bad);
+
+        ok(add(course("a", MON, 600, 660)));
+        Result<Void> empty = new Result<>();
+        repo.replaceCourses(Collections.emptyList(), empty);
+        ok(empty);
+        Recorder rec = new Recorder();
+        repo.observeTimetable(rec);
+        assertEquals(0, rec.last().getCourseCount());
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void constructor_nullArgs_throw() {
+        new MockAsyncTimetableRepository(null, () -> "x");
+    }
+}

@@ -16,6 +16,7 @@ import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.lifecycle.ViewModelProvider;
 
 import com.team4.bintime.R;
 import com.team4.bintime.MainActivity;
@@ -48,8 +49,10 @@ public class EmailAuthActivity extends AppCompatActivity {
     private EmailVerificationState authState = new EmailVerificationState();
     /** 다른 기기에서 연 링크. 이 기기에는 요청 이메일 정보가 없으므로 사용자가 이메일을 다시 입력한다. */
     private String otherDeviceLink;
-    /** 발송·검증 요청 중 중복 클릭 방지. */
+    /** 발송 요청 중 중복 클릭 방지. 링크 검증 중 여부는 {@link EmailAuthViewModel#isVerifying()}. */
     private boolean requestInFlight;
+    /** 링크 검증 요청을 화면 회전 뒤에도 유지한다. */
+    private EmailAuthViewModel viewModel;
 
     private TextView tvMainTitle;
     private TextView tvSubTitle;
@@ -73,6 +76,7 @@ public class EmailAuthActivity extends AppCompatActivity {
         if (authRepository instanceof MockAuthRepository) {
             mockRepository = (MockAuthRepository) authRepository;
         }
+        viewModel = new ViewModelProvider(this).get(EmailAuthViewModel.class);
 
         if (savedInstanceState != null) {
             EmailVerificationState restoredState =
@@ -90,6 +94,9 @@ public class EmailAuthActivity extends AppCompatActivity {
             }
         });
         updateUiForState(authState.getStatus());
+
+        // 검증 결과 구독. 회전 중 끝난 검증 결과도 여기서 받아 다음 화면으로 이동한다.
+        viewModel.getVerification().observe(this, this::onVerificationResult);
 
         // 메일의 링크로 앱이 처음 열린 경우. 회전 등으로 재생성된 경우는 이미 처리했으므로 건너뛴다.
         if (savedInstanceState == null) handleIncomingLink(getIntent());
@@ -162,7 +169,7 @@ public class EmailAuthActivity extends AppCompatActivity {
 
         // 메인 액션 버튼 클릭
         btnPrimaryAction.setOnClickListener(v -> {
-            if (requestInFlight) return;
+            if (requestInFlight || viewModel.isVerifying()) return;
             switch (authState.getStatus()) {
                 case INPUT:
                     sendEmailLink();
@@ -329,32 +336,24 @@ public class EmailAuthActivity extends AppCompatActivity {
      * 저장소 검증을 통과해야만 첫 가입의 시간표 등록 또는 기존 계정의 메인 화면으로 이동한다.
      */
     private void onVerificationLinkOpened(String email, String link) {
-        requestInFlight = true;
-        authRepository.verifySignInLink(email, link, new AuthRepository.Callback<String>() {
-            @Override
-            public void onSuccess(String uid) {
-                requestInFlight = false;
-                if (isFinishing() || isDestroyed()) return;
-                authState.setStatus(EmailVerificationState.Status.VERIFIED);
-                otherDeviceLink = null;
-                Toast.makeText(EmailAuthActivity.this, "학생 인증이 완료되었습니다!", Toast.LENGTH_SHORT).show();
-                navigateAfterVerification(uid, email);
-            }
+        // 검증은 ViewModel 이 들고 있어 도중에 화면이 회전해도 결과가 새 Activity 로 전달된다.
+        viewModel.verify(authRepository, email, link);
+    }
 
-            @Override
-            public void onError(String message) {
-                requestInFlight = false;
-                if (isFinishing() || isDestroyed()) return;
-                Toast.makeText(EmailAuthActivity.this, message, Toast.LENGTH_SHORT).show();
-            }
-
-            @Override
-            public void onFailure(AuthRepository.Failure failure, String message) {
-                requestInFlight = false;
-                if (isFinishing() || isDestroyed()) return;
-                handleVerificationFailure(failure, message);
-            }
-        });
+    /** ViewModel 이 전달한 검증 결과 처리. 회전 전에 끝난 결과도 새 Activity 가 한 번만 받는다. */
+    private void onVerificationResult(EmailAuthViewModel.Result result) {
+        if (result == null || !result.consume()) return;
+        if (isFinishing() || isDestroyed()) return;
+        if (result.isSuccess()) {
+            authState.setStatus(EmailVerificationState.Status.VERIFIED);
+            otherDeviceLink = null;
+            Toast.makeText(this, "학생 인증이 완료되었습니다!", Toast.LENGTH_SHORT).show();
+            navigateAfterVerification(result.uid, result.email);
+        } else if (result.failure != null) {
+            handleVerificationFailure(result.failure, result.message);
+        } else {
+            Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void handleVerificationFailure(AuthRepository.Failure failure, String message) {
