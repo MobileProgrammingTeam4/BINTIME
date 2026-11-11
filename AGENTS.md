@@ -13,7 +13,7 @@
 ## 1. 매 작업 시작 시 실행할 프리플라이트
 
 1. `pwd`, `git status`, `git branch --show-current`, 폴더 구조를 확인합니다. 기존 사용자 변경 사항을 덮어쓰지 않습니다.
-2. 루트의 `README.md`와 `AGENTS.md`, 관련 BT Issue와 선행 이슈를 읽습니다. **BT-###은 계획 ID이며 실제 GitHub #번호가 아님**에 유의합니다.
+2. 루트의 `README.md`와 `AGENTS.md`, 공통 계약·시간 규칙 문서 [`docs/BT-012.md`](./docs/BT-012.md), 관련 BT Issue와 선행 이슈를 읽습니다. **BT-###은 계획 ID이며 실제 GitHub #번호가 아님**에 유의합니다.
 3. Android 프로젝트 위치(루트 또는 `android/`), `build.gradle(.kts)`, `settings.gradle(.kts)`, `gradlew` 및 `functions/`, `firebase.json`, Rules 파일의 실제 존재 여부를 확인합니다.
 4. 변경할 화면·경로·함수·데이터 필드, 담당 영역(A~E), 보안 영향, 검증 명령을 먼저 정리합니다.
 5. 필요한 **최소 범위로만 수정**합니다. 요청되지 않은 SDK 업그레이드·패키지 이동·의존성 추가·일괄 리팩터링을 하지 않습니다.
@@ -120,6 +120,8 @@ firebase.json
 
 ## 5. Firestore·RTDB 공통 계약
 
+필드 이름·UID 출처·요청/매칭 식별자·분 단위 시간 규칙·Repository 연결은 [`docs/BT-012.md`](./docs/BT-012.md)의 팀 결정을 우선 확인합니다. 합의와 실제 구현 상태, 후속 이슈에서 확정할 제안을 구분하고 미구현 계약을 동작 완료로 보고하지 않습니다.
+
 아래 이름은 팀의 **설계 기준**입니다. 실제 구현이 다르면 독자적으로 바꾸지 말고 담당자와 상의 후 스키마와 문서를 동기화합니다.
 
 ```text
@@ -151,6 +153,7 @@ userChatRooms/{uid}/{matchId}
 | `matchSettings` | `isMatching`, `minOverlapMinutes`, `purposes`, `preferredTags` 등 |
 | `matchRequests` | `fromUid`, `toUid`, `status`, `meetingDate`, `startMinute`, `endMinute`, `overlapMinutes` 등 **시간 스냅샷** |
 | 요청 생성 계약 | `createMatchRequest(candidateId, clientRequestId)`, 서버 전용 `matchRequestGuards` 중복 잠금 및 BT-017 연결 경계는 `docs/BT-019.md`를 따릅니다. 실제 검색 미연결은 실패로 처리합니다. |
+| 요청 목록·취소 계약 | UID별 발신/수신 Firestore 리스너, `cancelMatchRequest(requestId)`, 두 복합 인덱스와 검증 범위는 `docs/BT-020.md`를 따릅니다. |
 | `matches` | `participantUids`, `requestId`, `status`, `meetingDate`, `startMinute`, `endMinute`, `chatReady` 등 **확정 스냅샷** |
 | `chatRooms` | `matchId`를 룸 식별자로 사용, 메시지 발신자·권한 검증 |
 | `userChatRooms` | 사용자별 목록/읽지 않음 수, 서버와 동기화 |
