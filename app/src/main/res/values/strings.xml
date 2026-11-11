@@ -13,4 +13,5 @@
     <string name="timetable_edit_title">시간표 수정</string>
     <string name="timetable_register_new">새로운 시간표 등록</string>
     <string name="timetable_register_current">이 시간표로 등록</string>
+    <string name="request_search_not_connected">실제 매칭 검색 연결 후 요청할 수 있어요.</string>
 </resources>

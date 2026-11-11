@@ -46,12 +46,6 @@ public class MockMatchRepositoryTest {
         assertEquals("45분", MatchFilter.formatDuration(45));
     }
 
-    @Test
-    public void requestMatch_blocksDuplicate() {
-        assertTrue(MockMatchRepository.requestMatch("u5"));
-        assertTrue(MockMatchRepository.isRequested("u5"));
-        assertFalse(MockMatchRepository.requestMatch("u5")); // 같은 상대에게 두 번 신청 불가
-    }
 
     @Test
     public void find_returnsCandidateOrNull() {

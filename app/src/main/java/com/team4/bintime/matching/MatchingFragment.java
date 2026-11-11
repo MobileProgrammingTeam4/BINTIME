@@ -29,6 +29,7 @@ import com.team4.bintime.common.StateView;
 import com.team4.bintime.common.ActionMenu;
 
 import com.team4.bintime.request.MockRequestRepository;
+import com.team4.bintime.request.RequestRepository;
 import com.team4.bintime.request.RequestTabsController;
 import com.team4.bintime.request.MatchAcceptedActivity;
 import com.team4.bintime.notification.MatchRequestDialog;
@@ -52,7 +53,7 @@ public class MatchingFragment extends Fragment {
 
     private View statusCard, matchContent;
     private TextView statusTitle, statusDesc, count;
-    private MockRequestRepository requestRepository = new MockRequestRepository();
+    private RequestRepository requestRepository;
     private RequestTabsController requestTabs;
     private View requestContent;
     private int selectedTab;

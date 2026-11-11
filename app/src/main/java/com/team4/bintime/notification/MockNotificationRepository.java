@@ -1,6 +1,7 @@
 package com.team4.bintime.notification;
 
 import com.team4.bintime.request.MockRequestRepository;
+import com.team4.bintime.request.RequestRepository;
 import java.util.Arrays;
 import java.util.List;
 
@@ -16,7 +17,7 @@ public final class MockNotificationRepository {
         return Arrays.asList(new Item(Type.MESSAGE, "completed-1"), new Item(Type.ACCEPTED, "completed-1"),
                 new Item(Type.REQUEST, "received-1"), new Item(Type.REVIEW, "completed-1"));
     }
-    public boolean canRespond(Item event, MockRequestRepository requests) {
+    public boolean canRespond(Item event, RequestRepository requests) {
         MockRequestRepository.Item request = requests.find(event.requestId);
         return event.type == Type.REQUEST && request != null && !request.sent
                 && request.status() == MockRequestRepository.Status.PENDING;
