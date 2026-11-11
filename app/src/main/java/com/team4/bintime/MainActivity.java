@@ -68,7 +68,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         // BT-013: 미인증 사용자는 핵심 기능(메인 탭)에 들어올 수 없다.
-        if (!AuthRepositories.get(this).isSignedIn()) {
+        // Firebase 모드에서만 확인한다. Mock 로그인은 메모리에만 있어 프로세스 복원 시 로그아웃으로 보이고,
+        // MainActivity 는 exported=false 라 Mock 모드에서는 가입 흐름을 거쳐야만 들어온다.
+        if (AuthRepositories.isFirebaseEnabled(this) && !AuthRepositories.get(this).isSignedIn()) {
             super.onCreate(savedInstanceState);
             startActivity(new Intent(this, OnboardingActivity.class)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
