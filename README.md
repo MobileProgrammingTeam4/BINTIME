@@ -103,6 +103,8 @@ overlapMinutes = max(0, min(endA, endB) - max(startA, startB))
 
 ## 4. 기술 설계와 데이터 책임
 
+**공통 데이터 계약과 시간 규칙은 [`docs/BT-012.md`](./docs/BT-012.md)를 먼저 확인합니다.** 필드 이름·UID·요청/매칭 식별자·분 단위 시간·Repository 연동을 변경할 때 이 문서의 팀 결정과 후속 확정 항목을 따릅니다.
+
 | 구성 | 용도 | 핵심 원칙 |
 |---|---|---|
 | **Android Java/XML** | 화면·상호작용·상태 표시 | Activity/Fragment에서 서버 상태 변경 로직 분리 |

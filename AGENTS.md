@@ -13,7 +13,7 @@
 ## 1. 매 작업 시작 시 실행할 프리플라이트
 
 1. `pwd`, `git status`, `git branch --show-current`, 폴더 구조를 확인합니다. 기존 사용자 변경 사항을 덮어쓰지 않습니다.
-2. 루트의 `README.md`와 `AGENTS.md`, 관련 BT Issue와 선행 이슈를 읽습니다. **BT-###은 계획 ID이며 실제 GitHub #번호가 아님**에 유의합니다.
+2. 루트의 `README.md`와 `AGENTS.md`, 공통 계약·시간 규칙 문서 [`docs/BT-012.md`](./docs/BT-012.md), 관련 BT Issue와 선행 이슈를 읽습니다. **BT-###은 계획 ID이며 실제 GitHub #번호가 아님**에 유의합니다.
 3. Android 프로젝트 위치(루트 또는 `android/`), `build.gradle(.kts)`, `settings.gradle(.kts)`, `gradlew` 및 `functions/`, `firebase.json`, Rules 파일의 실제 존재 여부를 확인합니다.
 4. 변경할 화면·경로·함수·데이터 필드, 담당 영역(A~E), 보안 영향, 검증 명령을 먼저 정리합니다.
 5. 필요한 **최소 범위로만 수정**합니다. 요청되지 않은 SDK 업그레이드·패키지 이동·의존성 추가·일괄 리팩터링을 하지 않습니다.
@@ -119,6 +119,8 @@ firebase.json
 - Firebase 리스너 등록과 해제는 Android Lifecycle에 맞춥니다. 비동기 콜백이 이미 종료된 화면을 변경하지 않게 합니다.
 
 ## 5. Firestore·RTDB 공통 계약
+
+필드 이름·UID 출처·요청/매칭 식별자·분 단위 시간 규칙·Repository 연결은 [`docs/BT-012.md`](./docs/BT-012.md)의 팀 결정을 우선 확인합니다. 합의와 실제 구현 상태, 후속 이슈에서 확정할 제안을 구분하고 미구현 계약을 동작 완료로 보고하지 않습니다.
 
 아래 이름은 팀의 **설계 기준**입니다. 실제 구현이 다르면 독자적으로 바꾸지 말고 담당자와 상의 후 스키마와 문서를 동기화합니다.
 
