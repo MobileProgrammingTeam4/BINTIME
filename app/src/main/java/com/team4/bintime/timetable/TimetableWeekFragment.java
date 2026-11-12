@@ -1,6 +1,7 @@
 package com.team4.bintime.timetable;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
@@ -19,6 +20,7 @@ import androidx.lifecycle.ViewModelProvider;
 import com.google.android.material.materialswitch.MaterialSwitch;
 import com.team4.bintime.MainActivity;
 import com.team4.bintime.R;
+import com.team4.bintime.auth.AuthRepositories;
 import com.team4.bintime.data.model.Timetable;
 import com.team4.bintime.data.repository.AsyncTimetableRepository;
 import com.team4.bintime.data.repository.FreeSlotValidator;
@@ -40,6 +42,8 @@ import java.util.Collections;
  *       {@code saveFreeSlots}로 저장한다. 저장하지 않은 선택이 있는 동안에는 들어오는 값으로 덮어쓰지 않는다.</li>
  *   <li>저장은 {@link TimetableWeekViewModel}의 {@link LatestValueSaveQueue}가 한 번에 하나씩 보낸다. 저장 중에
  *       바뀐 선택은 현재 요청이 끝난 뒤 최신 값으로 다시 저장한다. View가 사라져도 큐는 취소되지 않는다.</li>
+ *   <li>큐는 로그인 UID별 ViewModel에 있다. 저장 요청 직전마다 UID를 다시 확인해 로그아웃·계정 변경이면 대기 선택을
+ *       버린다. 화면이 살아 있는 채로 계정이 바뀌면(onStart에서 확인) 새 계정의 큐로 바꾸고 화면 상태를 초기화한다.</li>
  *   <li>매칭 대상 공강 구간이 40개를 넘는 선택은 저장 전에 안내하고 되돌린다.</li>
  *   <li>저장이 실패하면 안내하고 화면의 선택을 그대로 둔 채 "다시 저장 필요"로 남긴다. 다음 저장 시도(칸 변경·
  *       탭 이탈) 때 최신 선택으로 재시도한다.</li>
@@ -67,6 +71,8 @@ public class TimetableWeekFragment extends Fragment {
     private boolean loaded;
     /** 공강 선택 저장 큐(ViewModel 소유). needsSave()면 저장하지 않은 선택이 있다. */
     private LatestValueSaveQueue<long[], TimetableFailure> saveQueue;
+    /** saveQueue를 받은 UID(ViewModel 키). */
+    private String queueOwnerUid;
 
     public TimetableWeekFragment() {
         super(R.layout.fragment_timetable_week);
@@ -75,8 +81,17 @@ public class TimetableWeekFragment extends Fragment {
     @Override
     public void onCreate(Bundle state) {
         super.onCreate(state);
-        saveQueue = new ViewModelProvider(this).get(TimetableWeekViewModel.class)
-                .freeSlotQueue(TimetableRepositories.get(requireContext()));
+        bindQueue(AuthRepositories.get(requireContext()).getCurrentUid());
+    }
+
+    /** 로그인 UID별 ViewModel의 저장 큐에 붙는다. 회전으로 다시 만들어져도 UID가 같으면 같은 큐를 받는다. */
+    private void bindQueue(String uid) {
+        if (saveQueue != null) saveQueue.setListener(null);
+        Context app = requireContext().getApplicationContext();
+        queueOwnerUid = uid;
+        saveQueue = new ViewModelProvider(this)
+                .get(TimetableWeekViewModel.key(uid), TimetableWeekViewModel.class)
+                .freeSlotQueue(uid, () -> AuthRepositories.get(app).getCurrentUid(), TimetableRepositories.get(app));
         saveQueue.setListener(new LatestValueSaveQueue.Listener<TimetableFailure>() {
             @Override
             public void onAllSaved() {
@@ -90,7 +105,30 @@ public class TimetableWeekFragment extends Fragment {
                     Toast.makeText(getContext(), TimetableMessages.of(failure), Toast.LENGTH_LONG).show();
                 }
             }
+
+            @Override
+            public void onDiscarded() {
+                // 로그아웃·계정 변경으로 대기 선택을 버렸다. 새 계정 화면은 onStart에서 다시 붙는다.
+                handler.removeCallbacks(saveRunnable);
+            }
         });
+    }
+
+    /** 화면이 살아 있는 채로 계정이 바뀌었으면 새 계정의 큐로 바꾸고 이전 계정의 화면 상태를 버린다. */
+    private void rebindIfAccountChanged() {
+        String uid = AuthRepositories.get(requireContext()).getCurrentUid();
+        if (uid == null ? queueOwnerUid == null : uid.equals(queueOwnerUid)) return;
+        handler.removeCallbacks(saveRunnable);
+        if (registration != null) {
+            registration.remove();
+            registration = null;
+        }
+        bindQueue(uid);
+        draft = new TimetableDraft(Collections.emptyList());
+        latest = null;
+        acceptedCells = new long[7];
+        loaded = false;
+        render();
     }
 
     @Override
@@ -115,6 +153,7 @@ public class TimetableWeekFragment extends Fragment {
     @Override
     public void onStart() {
         super.onStart();
+        rebindIfAccountChanged();
         subscribe();
     }
 
