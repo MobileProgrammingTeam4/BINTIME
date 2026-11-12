@@ -148,10 +148,12 @@ userChatRooms/{uid}/{matchId}
 | 데이터 | 필수 계약 또는 검증 |
 |---|---|
 | `Auth UID` | 문서 소유자와 참가자 판별에 사용. 클라이언트 입력만 신뢰 금지 |
-| `timetables/{uid}.revision` | 수정마다 증가, `availability.sourceRevision`과 비교 |
-| `availability` | 선택/계산된 공강 슬롯, 분 단위 정수 시간 및 요일 |
+| `timetables/{uid}.revision` | 수업 변경마다 증가, 공강 선택만 바꾸면 유지. `availability.sourceRevision`과 비교 |
+| `timetables/{uid}.freeCells` | 월~일 7개의 48비트 정수로 선택 원본 보존. `semester`는 생략/null 허용 |
+| `availability` | 선택 원본을 병합한 60분 이상 슬롯과 `sourceRevision`. 서버가 30분 경계·원본·수업 비겹침·revision을 재검증 |
 | `matchSettings` | `isMatching`, `minOverlapMinutes`, `purposes`, `preferredTags` 등 |
 | `matchRequests` | `fromUid`, `toUid`, `status`, `meetingDate`, `startMinute`, `endMinute`, `overlapMinutes` 등 **시간 스냅샷** |
+| 요청 생성 계약 | `createMatchRequest({candidateId, clientRequestId})`: 상대 UID와 재시도 UUID만 입력. 양측 최소 겹침의 큰 값, 프로필·차단·시간표·확정 매칭 충돌을 같은 서버 트랜잭션에서 검증. 계약은 `docs/BT-019.md` |
 | 요청 생성 계약 | `createMatchRequest(candidateId, clientRequestId)`, 서버 전용 `matchRequestGuards` 중복 잠금 및 BT-017 연결 경계는 `docs/BT-019.md`를 따릅니다. 실제 검색 미연결은 실패로 처리합니다. |
 | `matches` | `participantUids`, `requestId`, `status`, `meetingDate`, `startMinute`, `endMinute`, `chatReady` 등 **확정 스냅샷** |
 | `chatRooms` | `matchId`를 룸 식별자로 사용, 메시지 발신자·권한 검증 |
