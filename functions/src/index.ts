@@ -9,6 +9,7 @@ import { analyzeTimetableTask } from "./ai/tasks/analyzeTimetable";
 import { generateProfileTask } from "./ai/tasks/generateProfile";
 import { recommendPlaceTask } from "./ai/tasks/recommendPlace";
 import { suggestChatRepliesTask } from "./ai/tasks/suggestChatReplies";
+import { createSearchCallable } from "./matching/callable";
 
 /** BT-024 연결 확인 */
 export const aiPing = createAiCallable(aiPingTask);
@@ -20,6 +21,9 @@ export const generateProfile = createAiCallable(generateProfileTask);
 export const recommendPlace = createAiCallable(recommendPlaceTask);
 /** E · BT-041 */
 export const suggestChatReplies = createAiCallable(suggestChatRepliesTask);
+
+/** A · BT-017 매칭 후보 검색 */
+export const searchMatches = createSearchCallable();
 
 // A · BT-027 evaluateMatch 는 서버 내부 전용이라 Callable 로 열지 않는다(./ai/internal 의 evaluateMatch 사용).
 // 팀 결정으로 열어야 하면: export const evaluateMatch = createAiCallable(evaluateMatchTask);
