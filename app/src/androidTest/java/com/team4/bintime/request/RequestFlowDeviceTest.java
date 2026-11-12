@@ -92,8 +92,13 @@ public class RequestFlowDeviceTest {
                 assertTrue("새로 생성된 요청에도 취소 확인창이 연결돼야 한다", clicked);
             });
             idle(); screenshot("03-cancel-dialog");
+            // 프로세스 복원 때 Mock 인증 메모리만 사라지는 상황을 재현한다.
+            MockAuthRepository.shared().signOut();
+            assertFalse(MockAuthRepository.shared().isSignedIn());
             main.recreate(); idle();
             main.onActivity(activity -> {
+                assertEquals(original.fromUid, AuthRepositories.get(activity).getCurrentUid());
+                assertTrue(AuthRepositories.get(activity).isSignedIn());
                 MatchingFragment matching = null;
                 for (Fragment fragment : activity.getSupportFragmentManager().getFragments()) {
                     if (fragment instanceof MatchingFragment) matching = (MatchingFragment) fragment;

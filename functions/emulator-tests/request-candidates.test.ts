@@ -3,10 +3,11 @@ import { readFileSync } from "node:fs";
 import { deleteApp, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment } from "@firebase/rules-unit-testing";
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, onSnapshot, orderBy, query, serverTimestamp, setDoc, where } from "firebase/firestore";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { RequestService } from "../src/requests/service";
 import { SearchCandidateResolver } from "../src/requests/candidates";
+import { cancelRequestCallable } from "../src/requests/callable";
 
 // 다른 파일의 clearFirestore와 겹치지 않는 로컬 demo 프로젝트. 운영 인증/Functions/Gemini는 호출하지 않는다.
 const projectId = "demo-bintime-request-candidates";
@@ -113,5 +114,26 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)("BT-017 → BT-019 실제 
     await assertSucceeds(setDoc(doc(client, "matchSettings/sender"), { isMatching: true, minOverlapMinutes: 60, purposes: [], preferredTags: [], updatedAt: serverTimestamp() }));
     for (const path of ["timetables/sender", "availability/sender", "matchSettings/sender"]) await assertFails(getDoc(doc(peer, path)));
     for (const path of ["matchRequestGuards/guard", "aiUsage/sender_2026-11-12", "matches/existing"]) await assertFails(getDoc(doc(client, path)));
+  });
+  it("실제 후보 요청과 취소가 양측 목록에 반영되고 공강 변경 뒤에도 취소 스냅샷을 보존한다", async () => {
+    const waitBoth = (status: string) => ["sender", "receiver"].map(uid => new Promise<string>((resolve, reject) => {
+      const client = env.authenticatedContext(uid).firestore();
+      const q = query(collection(client, "matchRequests"), where(uid === "sender" ? "fromUid" : "toUid", "==", uid), orderBy("createdAt", "desc"));
+      const timer = setTimeout(() => { stop(); reject(Error("listener timeout")); }, 10_000);
+      const stop = onSnapshot(q, snapshot => {
+        const item = snapshot.docs.find(d => d.get("status") === status);
+        if (item) { clearTimeout(timer); stop(); resolve(item.id); }
+      }, error => { clearTimeout(timer); stop(); reject(error); });
+    }));
+    const pending = waitBoth("PENDING");
+    const created = await service.create("sender", input());
+    expect(await Promise.all(pending)).toEqual([created.id, created.id]);
+    await db.doc("availability/sender").update({ sourceRevision: 999 });
+    const canceled = waitBoth("CANCELED");
+    const callable = cancelRequestCallable(() => service, () => [".ac.kr"]);
+    const result = await callable.run({ auth: { uid: "sender", token: { email: "test@school.ac.kr", email_verified: true } }, data: { requestId: created.id } } as never);
+    expect(await Promise.all(canceled)).toEqual([created.id, created.id]);
+    expect(result).toMatchObject({ status: "CANCELED", fromUid: "sender", toUid: "receiver", purpose: created.purpose,
+      meetingDate: created.meetingDate, startMinute: created.startMinute, endMinute: created.endMinute, overlapMinutes: created.overlapMinutes });
   });
 });

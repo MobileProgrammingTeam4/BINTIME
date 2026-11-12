@@ -37,12 +37,12 @@ describe("BT-019 요청 계약", () => {
     });
   });
   it("취소도 미로그인·UID 위조·잘못된 식별자를 저장소 접근 전에 거절한다", async () => {
-    const callable = cancelRequestCallable(() => { throw new Error("must not access database"); });
+    const callable = cancelRequestCallable(() => { throw new Error("must not access database"); }, () => [".ac.kr"]);
     await expect(callable.run({ data: {} } as never)).rejects.toMatchObject({ code: "unauthenticated" });
     const requestId = "a".repeat(64);
     expect(cancelInput.safeParse({ requestId }).success).toBe(true);
     expect(cancelInput.safeParse({ requestId: "../victim" }).success).toBe(false);
-    await expect(callable.run({ auth: { uid: "me" }, data: { requestId, fromUid: "victim" } } as never))
+    await expect(callable.run({ auth: { uid: "me", token: { email: "me@school.ac.kr", email_verified: true } }, data: { requestId, fromUid: "victim" } } as never))
       .rejects.toMatchObject({ code: "invalid-argument" });
   });
 });

@@ -67,7 +67,7 @@ final class FirebaseRequestRepository implements RequestRepository {
 
     @Override public void cancel(String requestId, Callback callback) {
         if (!signedIn()) { callback.onError("다시 로그인해주세요."); return; }
-        if (!updating.add(requestId)) return;
+        if (!updating.add(requestId)) { callback.onError("이미 요청을 취소하고 있어요."); return; }
         changed();
         Map<String, Object> input = new HashMap<>();
         input.put("requestId", requestId);

@@ -96,8 +96,8 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)("BT-019 Firestore 에뮬�
         if (canceled) { clearTimeout(timer); stop(); resolve(canceled.id); }
       }, reject);
     }));
-    const callable = cancelRequestCallable(() => service);
-    const canceled = await callable.run({ auth: { uid: "sender", token: {} }, data: { requestId: original.id } } as never);
+    const callable = cancelRequestCallable(() => service, () => [".ac.kr"]);
+    const canceled = await callable.run({ auth: { uid: "sender", token: { email: "test@school.ac.kr", email_verified: true } }, data: { requestId: original.id } } as never);
     expect(canceled).toMatchObject({ ...snapshot, status: "CANCELED", overlapMinutes: 90 });
     expect(await Promise.all(waits)).toEqual([original.id, original.id]);
     expect(await service.cancel("sender", original.id)).toEqual(canceled);
