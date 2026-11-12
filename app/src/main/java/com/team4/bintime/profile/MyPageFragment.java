@@ -1,6 +1,8 @@
 package com.team4.bintime.profile;
 
+import android.app.Activity;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -9,6 +11,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -32,8 +36,18 @@ public class MyPageFragment extends Fragment {
     private static final String KEY_DELETE_ACCOUNT = "myDeleteAccount";
 
     // 프로필 설정 화면과 같은 저장소를 사용해 수정 결과가 onResume() 에서 바로 반영되게 한다.
-    private final MockProfileRepository profileRepo = MockProfileRepository.shared();
+    private ProfileRepository profileRepo;
     private UserProfile currentProfile;
+    /**
+     * 마지막으로 표시한 사진 경로. onResume 마다 같은 사진을 다시 내려받지 않는다.
+     * 사진은 항상 같은 경로(profileImages/{uid}/profile.jpg)에 덮어쓰므로, 프로필 수정이 저장되면 비운다.
+     */
+    private String shownPhotoPath;
+    /** 프로필 수정 화면. 저장(RESULT_OK)하고 돌아오면 사진을 다시 불러온다 (#79 리뷰 반영). */
+    private final ActivityResultLauncher<Intent> editProfileLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (result.getResultCode() == Activity.RESULT_OK) shownPhotoPath = null;
+            });
 
     private ImageView imgMyPhoto;
     private TextView tvMyName;
@@ -44,6 +58,7 @@ public class MyPageFragment extends Fragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        profileRepo = ProfileRepositories.get(requireContext());
         getChildFragmentManager().setFragmentResultListener(KEY_LOGOUT, this, (key, result) -> logout());
         // 실제 계정 삭제는 후속 이슈 범위라, 완료된 것처럼 안내하지 않는다.
         getChildFragmentManager().setFragmentResultListener(KEY_DELETE_ACCOUNT, this, (key, result) ->
@@ -67,7 +82,7 @@ public class MyPageFragment extends Fragment {
         chipGroupMyTags = view.findViewById(R.id.chipGroupMyTags);
 
         bindMenuActions(view);
-        loadProfileData();
+        shownPhotoPath = null;
     }
 
     @Override
@@ -76,19 +91,21 @@ public class MyPageFragment extends Fragment {
         loadProfileData();
     }
 
+    /** 로그인한 본인 UID 의 프로필만 불러온다 (BT-014). */
     private void loadProfileData() {
-        profileRepo.getProfile("u1", new ProfileRepository.Callback<UserProfile>() {
+        String uid = AuthRepositories.get(requireContext()).getCurrentUid();
+        profileRepo.getProfile(uid, new ProfileRepository.Callback<UserProfile>() {
             @Override
-            public void onSuccess(UserProfile profile) {
+            public void onSuccess(UserProfile loaded) {
+                if (!isAdded() || getView() == null) return;
+                UserProfile profile = loaded != null ? loaded : UserProfile.empty();
                 currentProfile = profile;
-                if (!isAdded()) return;
 
                 tvMyName.setText(profile.getNickname());
                 tvMyInfo.setText(profile.getFormattedSummary());
                 tvMyBio.setText(profile.getBio());
 
-                imgMyPhoto.setImageResource(profile.getPhotoResId() != 0
-                        ? profile.getPhotoResId() : R.drawable.img_profile_placeholder);
+                bindPhoto(profile);
 
                 chipGroupMyTags.removeAllViews();
                 if (profile.getInterestTags() != null) {
@@ -100,7 +117,36 @@ public class MyPageFragment extends Fragment {
             }
 
             @Override
-            public void onError(String message) {}
+            public void onError(String message) {
+                if (!isAdded()) return;
+                Toast.makeText(requireContext(), R.string.profile_load_failed, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    /** Storage 사진 → 시연 리소스 → 기본 이미지 순. 다른 계정 사진이 남지 않도록 먼저 기본 이미지로 바꾼다. */
+    private void bindPhoto(UserProfile profile) {
+        String path = profile.getPhotoPath();
+        if (path == null || path.isEmpty()) {
+            shownPhotoPath = null;
+            imgMyPhoto.setImageResource(profile.getPhotoResId() != 0
+                    ? profile.getPhotoResId() : R.drawable.img_profile_placeholder);
+            return;
+        }
+        if (path.equals(shownPhotoPath)) return;
+        imgMyPhoto.setImageResource(R.drawable.img_profile_placeholder);
+        profileRepo.loadProfilePhoto(path, new ProfileRepository.Callback<Bitmap>() {
+            @Override
+            public void onSuccess(Bitmap bitmap) {
+                if (!isAdded() || getView() == null) return;
+                imgMyPhoto.setImageBitmap(bitmap);
+                shownPhotoPath = path;
+            }
+
+            @Override
+            public void onError(String message) {
+                // 사진만 실패한 경우 기본 이미지를 유지한다.
+            }
         });
     }
 
@@ -109,7 +155,7 @@ public class MyPageFragment extends Fragment {
         root.findViewById(R.id.menuEditProfile).setOnClickListener(v -> {
             Intent intent = new Intent(requireContext(), ProfileSetupActivity.class);
             intent.putExtra(ProfileSetupActivity.EXTRA_MODE, ProfileSetupActivity.MODE_EDIT);
-            startActivity(intent);
+            editProfileLauncher.launch(intent);
         });
 
         // 2. 차단한 사용자 관리

@@ -3,6 +3,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { defineSecret } from "firebase-functions/params";
 import { FirestoreMatchAccess } from "./access";
 import { resolveMode } from "./config";
+import { ALLOWED_EMAIL_SUFFIXES_ENV, parseAllowedEmailSuffixes } from "./emailPolicy";
 import { AiError } from "./errors";
 import { GenAiModelClient, type ModelClient } from "./gemini";
 import type { AiDeps } from "./types";
@@ -51,6 +52,7 @@ export function defaultDeps(): AiDeps {
     matches: new FirestoreMatchAccess(db),
     now: () => new Date(),
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    allowedEmailSuffixes: parseAllowedEmailSuffixes(process.env[ALLOWED_EMAIL_SUFFIXES_ENV]),
   };
   return cached;
 }
