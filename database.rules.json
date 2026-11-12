@@ -17,7 +17,7 @@
               ".validate": "newData.isString() && newData.val() === auth.uid"
             },
             "content": {
-              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 1000 && newData.val().matches(/[^ \\t\\r\\n]/)"
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 1000 && newData.val().replace(' ', '').replace('\\t', '').replace('\\r', '').replace('\\n', '').length > 0"
             },
             "createdAt": {
               ".validate": "newData.isNumber() && newData.val() === now"
