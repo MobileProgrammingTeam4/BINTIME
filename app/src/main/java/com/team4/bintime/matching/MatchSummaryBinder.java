@@ -2,6 +2,7 @@ package com.team4.bintime.matching;
 
 import android.content.Context;
 import android.content.ContextWrapper;
+import android.graphics.Bitmap;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -16,6 +17,8 @@ import com.team4.bintime.request.RequestRepositories;
 import com.team4.bintime.request.RequestRepository;
 import com.team4.bintime.model.MatchCandidate;
 import com.team4.bintime.model.MatchFilter;
+import com.team4.bintime.profile.ProfileRepositories;
+import com.team4.bintime.profile.ProfileRepository;
 
 /** 매칭 카드와 프로필 상세가 같이 쓰는 화면 채우기·매칭 신청 처리. */
 public final class MatchSummaryBinder {
@@ -25,8 +28,7 @@ public final class MatchSummaryBinder {
 
     /** view_match_summary.xml 채우기. showPlace=true 면 AI 추천 장소 줄도 표시(상세 화면). */
     public static void bind(View summary, MatchCandidate c, boolean showPlace) {
-        // shortcut: 모든 후보에 기본 프로필 이미지, Firebase Storage 프로필 사진 연동 시 사진이 있으면 교체
-        ((ImageView) summary.findViewById(R.id.avatar)).setImageResource(R.drawable.img_default_profile);
+        bindAvatar(summary.findViewById(R.id.avatar), c.photoPath);
         text(summary, R.id.name, c.name);
         text(summary, R.id.info, c.department + " " + c.grade + "학년 · " + c.gender);
         text(summary, R.id.matchRate, "매칭률 " + c.matchRate + "%");
@@ -81,6 +83,24 @@ public final class MatchSummaryBinder {
                     Toast.makeText(activity, message, Toast.LENGTH_LONG).show();
                 }
             });
+        });
+    }
+
+    /**
+     * 기본 이미지를 먼저 깔고 Storage 사진이 오면 교체한다. 카드 재사용 시 다른 후보 사진이 늦게 덮지 않도록
+     * 경로를 tag 로 비교한다. shortcut: 메모리 캐시 없음, 스크롤로 다시 붙을 때마다 다시 받는다.
+     */
+    private static void bindAvatar(ImageView avatar, String photoPath) {
+        avatar.setTag(photoPath);
+        avatar.setImageResource(R.drawable.img_default_profile);
+        if (photoPath == null || photoPath.isEmpty()) return;
+        ProfileRepositories.get(avatar.getContext()).loadProfilePhoto(photoPath, new ProfileRepository.Callback<Bitmap>() {
+            @Override public void onSuccess(Bitmap bitmap) {
+                if (photoPath.equals(avatar.getTag())) avatar.setImageBitmap(bitmap);
+            }
+            @Override public void onError(String message) {
+                // 사진만 실패하면 기본 이미지를 유지한다.
+            }
         });
     }
 
