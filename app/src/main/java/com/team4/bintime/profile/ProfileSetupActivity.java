@@ -109,7 +109,7 @@ public class ProfileSetupActivity extends AppCompatActivity {
             tvDepartmentError.setVisibility(View.GONE);
         });
         // 확인 다이얼로그 결과는 화면 회전 뒤에도 받도록 매번 등록한다.
-        getSupportFragmentManager().setFragmentResultListener(KEY_CANCEL_EDIT, this, (key, result) -> finish());
+        getSupportFragmentManager().setFragmentResultListener(KEY_CANCEL_EDIT, this, (key, result) -> handleCancelConfirmed());
 
         mode = getIntent().getIntExtra(EXTRA_MODE, MODE_CREATE);
         boolean restored = false;
@@ -460,11 +460,26 @@ public class ProfileSetupActivity extends AppCompatActivity {
     }
 
     private void handleBackAction() {
+        // 저장(업로드)은 시작하면 취소할 수 없다. 나가도 저장되므로 "저장되지 않아요" 안내와 어긋나지 않게
+        // 저장 중에는 나가기·수정 취소를 막는다(#79 D 리뷰). 회전 시 작업 유지와는 별개다.
+        if (saveViewModel.isSaving()) {
+            Toast.makeText(this, R.string.profile_saving_wait, Toast.LENGTH_SHORT).show();
+            return;
+        }
         if (mode == MODE_EDIT) {
             showCancelConfirmDialog();
         } else {
             finish();
         }
+    }
+
+    /** '수정 취소하기' 확인. 다이얼로그가 떠 있는 사이 저장이 시작됐다면 닫지 않는다. */
+    private void handleCancelConfirmed() {
+        if (saveViewModel.isSaving()) {
+            Toast.makeText(this, R.string.profile_saving_wait, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        finish();
     }
 
     /** 수정 취소 확인 (Figma 122:1959). 공통 ConfirmDialog 를 써서 화면 회전 후에도 유지된다. */
