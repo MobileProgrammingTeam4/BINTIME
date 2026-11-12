@@ -20,6 +20,8 @@ public class MatchCandidate {
     public final List<String> tags;
     public final List<String> reasons;   // AI 추천 이유 줄들
     public final String intro;
+    /** 겹치는 공강 날짜 표시. 실데이터는 "오늘(월)" 또는 "11/17(화)" */
+    public String dayLabel = "오늘";
 
     // 프로필 상세 화면 전용 (없으면 해당 영역을 빈 상태로 표시)
     public String aiPlace;               // AI 추천 장소 — 3주차 Gemini 장소 추천으로 대체

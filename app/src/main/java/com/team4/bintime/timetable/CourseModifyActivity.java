@@ -55,6 +55,7 @@ public class CourseModifyActivity extends AppCompatActivity {
         save.setOnClickListener(v -> {
             Course course = fields.validated(draft, index);
             if (course == null) return;
+            if (!adding) course.keepIdentityOf(original); // 같은 저장소 수업을 가리키고 교수·색상 유지
             if (adding) draft.courses.add(course);
             else draft.courses.set(index, course);
             setResult(RESULT_OK, draft.result());

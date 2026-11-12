@@ -1,9 +1,14 @@
 package com.team4.bintime.profile;
 
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+
 import com.team4.bintime.R;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Sprint 1 목업용 가상 프로필 저장소.
@@ -11,7 +16,8 @@ import java.util.List;
  *
  * 프로필 설정 화면과 마이페이지가 같은 데이터를 보도록 {@link #shared()} 인스턴스를 사용한다.
  * 메모리에만 저장하므로 앱 프로세스가 종료되면 기본 시연 값으로 돌아간다.
- * 실제 Firestore `users/{uid}`·`publicProfiles/{uid}` 저장은 BT-015에서 같은 {@link ProfileRepository} 구현으로 교체한다.
+ * google-services.json 이 있으면 {@link FirebaseProfileRepository}(Firestore `users/{uid}`·`publicProfiles/{uid}`,
+ * Storage `profileImages/{uid}`)가 대신 쓰인다 (BT-014, {@link ProfileRepositories}).
  */
 public class MockProfileRepository implements ProfileRepository {
 
@@ -30,8 +36,37 @@ public class MockProfileRepository implements ProfileRepository {
 
     private UserProfile currentProfile;
 
+    /** 시연용 업로드 사진. 경로 → JPEG 바이트. */
+    private final Map<String, byte[]> photos = new HashMap<>();
+
     public boolean hasCompletedProfile(String uid) {
         return uid != null && uid.equals(currentProfile.getUid());
+    }
+
+    @Override
+    public void hasCompletedProfile(String uid, Callback<Boolean> callback) {
+        if (callback != null) callback.onSuccess(hasCompletedProfile(uid));
+    }
+
+    @Override
+    public void uploadProfilePhoto(String uid, byte[] jpegBytes, Callback<String> callback) {
+        if (uid == null || jpegBytes == null || jpegBytes.length == 0) {
+            if (callback != null) callback.onError("사진을 불러오지 못했어요.");
+            return;
+        }
+        String path = ProfileDocuments.photoPath(uid);
+        photos.put(path, jpegBytes.clone());
+        if (callback != null) callback.onSuccess(path);
+    }
+
+    @Override
+    public void loadProfilePhoto(String photoPath, Callback<Bitmap> callback) {
+        byte[] bytes = photoPath != null ? photos.get(photoPath) : null;
+        if (bytes == null) {
+            if (callback != null) callback.onError("사진을 불러오지 못했어요.");
+            return;
+        }
+        if (callback != null) callback.onSuccess(BitmapFactory.decodeByteArray(bytes, 0, bytes.length));
     }
 
     public MockProfileRepository() {

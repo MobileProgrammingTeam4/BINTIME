@@ -1,12 +1,18 @@
 import { HttpsError } from "firebase-functions/v2/https";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { logger } from "firebase-functions";
 import { createAiCallable } from "../src/ai/callable";
 import { AiError, REASONS, toHttpsError } from "../src/ai/errors";
 import { aiPingTask } from "../src/ai/tasks/aiPing";
 import { makeDeps } from "./helpers";
 
-const request = (auth?: { uid: string }) =>
-  ({ data: {}, auth: auth ? { uid: auth.uid, token: {} } : undefined, rawRequest: {} }) as never;
+type Token = { email?: unknown; email_verified?: unknown };
+const SCHOOL: Token = { email: "student@kookmin.ac.kr", email_verified: true };
+
+const request = (auth?: { uid: string; token?: Token }) =>
+  ({ data: {}, auth: auth ? { uid: auth.uid, token: auth.token ?? SCHOOL } : undefined, rawRequest: {} }) as never;
+
+afterEach(() => vi.restoreAllMocks());
 
 describe("Callable 래퍼", () => {
   it("Auth 토큰이 없으면 unauthenticated + 표준 details", async () => {
@@ -23,6 +29,51 @@ describe("Callable 래퍼", () => {
     const res = await fn.run(request({ uid: "uid-me" }));
     expect(res.data).toEqual({ reply: "pong" });
     expect([...deps.usageStore.counts.keys()][0]).toMatch(/^uid-me_/);
+  });
+});
+
+describe("Callable 래퍼: 학교 이메일 검사", () => {
+  const denied = {
+    code: "permission-denied",
+    details: { reason: "PERMISSION_DENIED", retryable: false, requestId: expect.any(String) },
+  };
+
+  it.each<[string, Token]>([
+    ["이메일 미인증", { email: "student@kookmin.ac.kr", email_verified: false }],
+    ["email_verified 없음", { email: "student@kookmin.ac.kr" }],
+    ["이메일 없음", { email_verified: true }],
+    ["허용 밖 도메인", { email: "student@gmail.com", email_verified: true }],
+    ["접미사 속임수", { email: "student@kookmin.ac.kr.evil.com", email_verified: true }],
+  ])("%s → PERMISSION_DENIED, 사용량 차감 없음", async (_label, token) => {
+    const deps = makeDeps();
+    const fn = createAiCallable(aiPingTask, {}, () => deps);
+    await expect(fn.run(request({ uid: "uid-me", token }))).rejects.toMatchObject(denied);
+    expect(deps.usageStore.counts.size).toBe(0);
+  });
+
+  it("허용 목록 설정이 비면 모두 거부", async () => {
+    const deps = makeDeps({ allowedEmailSuffixes: [] });
+    const fn = createAiCallable(aiPingTask, {}, () => deps);
+    await expect(fn.run(request({ uid: "uid-me" }))).rejects.toMatchObject(denied);
+    expect(deps.usageStore.counts.size).toBe(0);
+  });
+
+  it("대소문자가 달라도 학교 이메일이면 통과", async () => {
+    const deps = makeDeps();
+    const fn = createAiCallable(aiPingTask, {}, () => deps);
+    const res = await fn.run(request({ uid: "uid-me", token: { email: "Student@Kookmin.AC.KR", email_verified: true } }));
+    expect(res.data).toEqual({ reply: "pong" });
+  });
+
+  it("거절 로그에 이메일 원문을 남기지 않는다", async () => {
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+    const fn = createAiCallable(aiPingTask, {}, () => makeDeps());
+    const email = "secret.person@kookmin.ac.kr.evil.com";
+    await expect(fn.run(request({ uid: "uid-me", token: { email, email_verified: true } }))).rejects.toMatchObject(denied);
+    expect(warn).toHaveBeenCalledWith("ai_callable_denied", expect.objectContaining({ cause: "EMAIL_DOMAIN_NOT_ALLOWED" }));
+    const logged = JSON.stringify(warn.mock.calls);
+    expect(logged).not.toContain("secret.person");
+    expect(logged).not.toContain("evil.com");
   });
 });
 

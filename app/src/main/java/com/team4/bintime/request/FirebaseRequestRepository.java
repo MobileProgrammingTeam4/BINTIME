@@ -92,7 +92,7 @@ final class FirebaseRequestRepository implements RequestRepository {
             callback.onError("실제 매칭 검색 연결 후 요청할 수 있어요."); return;
         }
         if (uid.equals(draft.toUid)) { callback.onError("자신에게 요청할 수 없어요."); return; }
-        if (!submitting.add(draft.toUid)) return;
+        if (!submitting.add(draft.toUid)) { callback.onError("이미 요청을 보내고 있어요."); return; }
         changed();
         Map<String, Object> input = new HashMap<>();
         input.put("candidateId", draft.candidateId);
@@ -143,6 +143,9 @@ final class FirebaseRequestRepository implements RequestRepository {
                 if ("CANDIDATE_EXPIRED".equals(reason)) return "공강 정보가 바뀌었어요. 다시 검색해주세요.";
                 if ("NOT_SENDER".equals(reason)) return "내가 보낸 요청만 취소할 수 있어요.";
                 if ("REQUEST_NOT_PENDING".equals(reason)) return "이미 처리된 요청이에요. 목록을 확인해주세요.";
+                if ("INVALID_CANDIDATE".equals(reason)) return "요청 조건이 바뀌었어요. 다시 검색해주세요.";
+                if ("MATCH_CONFLICT".equals(reason)) return "이미 확정된 매칭과 시간이 겹쳐요.";
+                if ("PERMISSION_DENIED".equals(reason)) return "학교 이메일로 다시 로그인해주세요.";
             }
         }
         return "요청을 처리하지 못했어요. 연결을 확인하고 다시 시도해주세요.";

@@ -6,6 +6,8 @@
     <string name="onboarding_title">같은 시간,\n다른 곳에 있는 너와</string>
     <string name="onboarding_subtitle">지금, 공강이 겹치는 사람과\n가까워질 수 있어요.</string>
     <string name="onboarding_start_button">시작하기</string>
+    <!-- BT-014: 로그인된 계정의 프로필 확인 실패 시 같은 버튼으로 재시도 -->
+    <string name="onboarding_retry_button">다시 시도</string>
 
     <!-- 학생 인증 공통 -->
     <string name="auth_header_title">학생 인증</string>
@@ -20,7 +22,8 @@
 
     <!-- 학생 인증 - 이메일 확인 안내 (발송 완료) -->
     <string name="auth_check_email_title">이메일을 확인해 주세요</string>
-    <string name="auth_check_email_subtitle">받은 이메일의 인증 링크를 눌러 로그인을 완료해 주세요</string>
+    <!-- 링크를 연 기기에서 로그인되므로, 앱이 설치된 휴대폰에서 메일을 열도록 안내한다 (Figma 문구에서 변경, 디자인 공유 필요) -->
+    <string name="auth_check_email_subtitle">이 휴대폰에서 메일을 열고 인증 링크를 눌러 주세요\n코드를 입력할 필요 없이 자동으로 로그인돼요</string>
     <string name="auth_reenter_email">이메일 다시 입력하기</string>
     <string name="auth_resend_link_button">인증 링크 다시 보내기</string>
     <string name="auth_resend_success">인증 링크를 다시 보냈어요</string>

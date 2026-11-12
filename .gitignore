@@ -35,6 +35,7 @@ functions/.env.*
 !functions/.env.example
 # 배포용 공개 설정(GEMINI_MODEL 등). 비밀값은 넣지 않는다.
 !functions/.env.bintime-mobile
+!functions/.env.demo-bintime
 # Functions 에뮬레이터용 비밀값(GEMINI_API_KEY 등)
 functions/.secret.local
 .secret.local

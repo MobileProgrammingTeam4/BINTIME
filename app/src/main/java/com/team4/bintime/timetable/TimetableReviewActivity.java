@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -14,15 +15,27 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.team4.bintime.R;
 import com.team4.bintime.common.ConfirmDialog;
+import com.team4.bintime.data.model.Timetable;
+import com.team4.bintime.data.repository.AsyncTimetableRepository;
+import com.team4.bintime.data.repository.TimetableFailure;
+import com.team4.bintime.data.repository.TimetableRepositories;
 
 import java.util.Collections;
 
+/**
+ * 인식 결과 검수 / 기존 시간표 수정. [BT-015] 기존 시간표 수정은 저장소에서 한 번 읽어 온 뒤에만
+ * 편집·확인을 허용한다(읽기 전 빈 목록으로 저장해 수업을 지우지 않도록). 저장은 다음 화면
+ * {@link TimetableRegistrationActivity}의 등록 완료에서 한다.
+ */
 public class TimetableReviewActivity extends AppCompatActivity {
     private static final String EDIT_EXISTING = "edit_existing_timetable";
     private static final String DELETE_COURSE = "delete_timetable_course";
+    private static final String LOADED = "timetable_review_loaded";
     private TimetableDraft draft;
     private int pendingDelete = -1;
     private boolean editingExisting;
+    private boolean loaded;
+    private AsyncTimetableRepository.Registration loading;
 
     public static Intent forEditing(Context context) {
         return new Intent(context, TimetableReviewActivity.class).putExtra(EDIT_EXISTING, true);
@@ -40,9 +53,8 @@ public class TimetableReviewActivity extends AppCompatActivity {
     private final ActivityResultLauncher<Intent> registration = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(), result -> {
                 if (result.getResultCode() != RESULT_OK) return;
-                TimetableDraft updated = TimetableDraft.read(result.getData());
-                if (updated == null) return;
-                if (editingExisting) MockTimetableRepository.save(updated);
+                if (TimetableDraft.read(result.getData()) == null) return;
+                // 저장은 TimetableRegistrationActivity가 끝냈다.
                 setResult(RESULT_OK, result.getData());
                 finish();
             });
@@ -59,8 +71,8 @@ public class TimetableReviewActivity extends AppCompatActivity {
         super.onCreate(state);
         setContentView(R.layout.activity_timetable_review);
         editingExisting = getIntent().getBooleanExtra(EDIT_EXISTING, false);
-        draft = editingExisting && state == null
-                ? MockTimetableRepository.load() : TimetableDraft.restore(state, getIntent());
+        loaded = !editingExisting || (state != null && state.getBoolean(LOADED, false));
+        draft = loaded ? TimetableDraft.restore(state, getIntent()) : null;
         if (draft == null) {
             draft = editingExisting ? new TimetableDraft(Collections.emptyList())
                     : TimetableDraft.mockRecognition();
@@ -92,6 +104,50 @@ public class TimetableReviewActivity extends AppCompatActivity {
             pendingDelete = -1;
         });
         showCourses();
+        setEditable(loaded);
+        if (!loaded) loadExisting();
+    }
+
+    private void loadExisting() {
+        loading = TimetableLoader.loadOnce(TimetableRepositories.get(this),
+                new AsyncTimetableRepository.Callback<Timetable>() {
+                    @Override
+                    public void onSuccess(Timetable timetable) {
+                        if (isFinishing() || isDestroyed()) return;
+                        draft = TimetableDraftMapper.toDraft(timetable);
+                        loaded = true;
+                        showCourses();
+                        setEditable(true);
+                    }
+
+                    @Override
+                    public void onError(TimetableFailure failure) {
+                        if (isFinishing() || isDestroyed()) return;
+                        Toast.makeText(TimetableReviewActivity.this,
+                                failure.getCode() == TimetableFailure.Code.NOT_SIGNED_IN
+                                        ? TimetableMessages.of(failure) : TimetableMessages.LOAD_FAILED,
+                                Toast.LENGTH_LONG).show();
+                        finish();
+                    }
+                });
+    }
+
+    /** 기존 시간표를 읽기 전에는 추가·수정·삭제·확인을 막는다. */
+    private void setEditable(boolean editable) {
+        for (int id : new int[]{R.id.timetable_add_course, R.id.btnConfirm, R.id.timetable_register_new}) {
+            View v = findViewById(id);
+            v.setEnabled(editable);
+            v.setAlpha(editable ? 1f : 0.5f);
+        }
+        LinearLayout courseList = findViewById(R.id.layoutLectureList);
+        courseList.setVisibility(editable ? View.VISIBLE : View.INVISIBLE);
+        if (!editable) findViewById(R.id.timetable_recognition_empty).setVisibility(View.GONE);
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (loading != null) loading.remove();
+        super.onDestroy();
     }
 
     private void showCourses() {
@@ -128,5 +184,6 @@ public class TimetableReviewActivity extends AppCompatActivity {
         super.onSaveInstanceState(out);
         draft.save(out);
         out.putInt(DELETE_COURSE, pendingDelete);
+        out.putBoolean(LOADED, loaded);
     }
 }

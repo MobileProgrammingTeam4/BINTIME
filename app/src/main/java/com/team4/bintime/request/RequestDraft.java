@@ -25,7 +25,7 @@ public final class RequestDraft {
         this.mock = mock;
     }
 
-    /** BT-017 연결점. candidateId는 서버가 발급하고 검증할 불투명 식별자다. */
+    /** BT-017 계약: candidateId = 상대 UID. BT-018은 실제 검색 후보만 전달하고 재시도 시 UUID를 유지한다. */
     public static RequestDraft verified(String candidateId, String toUid, String clientRequestId) {
         return new RequestDraft(candidateId, clientRequestId, toUid, null, null, 0, 0, false);
     }

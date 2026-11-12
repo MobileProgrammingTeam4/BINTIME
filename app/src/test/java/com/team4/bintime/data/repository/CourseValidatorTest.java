@@ -272,6 +272,57 @@ public class CourseValidatorTest {
         assertCode(TimetableFailure.Code.INVALID_COURSE, CourseValidator.validateFields(s));
     }
 
+    // ── PR ① 리뷰 보완 (B) ──────────────────────────
+
+    @Test
+    public void courseId_reservedAndDotIdsRejected() {
+        for (String id : new String[]{"__name__", "____", "__x__", ".", "..", "a/b"}) {
+            Course c = course("x", slot(MON, 600, 660));
+            c.setCourseId(id);
+            assertCode(TimetableFailure.Code.INVALID_COURSE, CourseValidator.validateFields(c));
+        }
+        for (String id : new String[]{"_x_", "__x", "x__", "a.b", "...", "__"}) {
+            assertEquals(id, true, CourseValidator.isValidDocumentId(id));
+        }
+    }
+
+    @Test
+    public void multiSlotExisting_secondSlotOverlaps() {
+        // 기존 수업의 두 번째 칸(화)과 겹친다.
+        Course existing = course("e", slot(MON, 600, 690), slot(TUE, 780, 870));
+        Course candidate = course("c", slot(TUE, 840, 900));
+        TimetableFailure f = CourseValidator.validate(candidate, Collections.singletonList(existing));
+        assertCode(TimetableFailure.Code.OVERLAP, f);
+        assertEquals("e", f.getConflictingCourseId());
+    }
+
+    @Test
+    public void multiSlot_noOverlapWhenTouching() {
+        Course existing = course("e", slot(MON, 600, 690), slot(TUE, 780, 870));
+        Course candidate = course("c", slot(MON, 690, 720), slot(TUE, 870, 900));
+        assertNull(CourseValidator.validate(candidate, Collections.singletonList(existing)));
+    }
+
+    @Test
+    public void existingWithNullCourses_skipped() {
+        List<Course> existing = new ArrayList<>(Arrays.asList(null, course("e", slot(MON, 600, 690)), null));
+        assertNull(CourseValidator.validate(course("c", slot(TUE, 600, 690)), existing));
+        TimetableFailure f = CourseValidator.validate(course("c", slot(MON, 660, 720)), existing);
+        assertCode(TimetableFailure.Code.OVERLAP, f);
+        assertEquals("e", f.getConflictingCourseId());
+    }
+
+    @Test
+    public void existingWithNullSlotOrEmptySlots_skipped() {
+        Course nullList = new Course("n1", "n", null, null, null, null); // 시간대 없음(빈 목록)
+        Course nullSlot = new Course("n2", "n", null, null, null,
+                new ArrayList<>(Arrays.asList(null, slot(TUE, 600, 690))));
+        List<Course> existing = Arrays.asList(nullList, nullSlot);
+        assertNull(CourseValidator.validate(course("c", slot(MON, 600, 690)), existing));
+        assertCode(TimetableFailure.Code.OVERLAP,
+                CourseValidator.validate(course("c", slot(TUE, 660, 720)), existing));
+    }
+
     private static String repeat(char ch, int n) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < n; i++) sb.append(ch);
