@@ -1,7 +1,7 @@
 import type { Firestore, Transaction } from "firebase-admin/firestore";
 import { z } from "zod";
 import { FirestoreMatchStore, type MatchStore, resolveCandidate } from "../matching/search";
-import { type Slot, VALID_MIN_OVERLAP } from "../matching/eligibility";
+import { type Slot } from "../matching/eligibility";
 import { type CandidateResolver, requestError } from "./contracts";
 
 const slot = z.object({
@@ -71,15 +71,11 @@ export class SearchCandidateResolver implements CandidateResolver {
     };
     const candidate = await resolveCandidate(checked, fromUid, candidateId, now);
     if (!candidate) throw invalidCandidate();
-    const [mine, theirs, applicant, recipient] = await Promise.all([
-      checked.settings(fromUid), checked.settings(candidateId),
+    const [applicant, recipient] = await Promise.all([
       tx.get(this.db.doc(`users/${fromUid}`)), tx.get(this.db.doc(`publicProfiles/${candidateId}`)),
     ]);
-    // A 전달 계약: 양쪽 최소 겹침 중 큰 값. A의 현재 검색 코드가 보완되기 전에도 요청은 우회하지 않는다.
-    if (!mine || !theirs || !VALID_MIN_OVERLAP.includes(mine.minOverlapMinutes as typeof VALID_MIN_OVERLAP[number])
-        || !VALID_MIN_OVERLAP.includes(theirs.minOverlapMinutes as typeof VALID_MIN_OVERLAP[number])
-        || candidate.overlapMinutes < Math.max(mine.minOverlapMinutes, theirs.minOverlapMinutes)
-        || applicant.get("profileCompleted") !== true || !recipient.exists) throw invalidCandidate();
+    // 최소 겹침은 README 및 A의 정정대로 검색자 설정이다. A의 evaluate 판정을 그대로 재사용한다.
+    if (applicant.get("profileCompleted") !== true || !recipient.exists) throw invalidCandidate();
     for (const uid of [fromUid, candidateId]) {
       const existing = await tx.get(this.db.collection("matches")
         .where("participantUids", "array-contains", uid).where("meetingDate", "==", candidate.meetingDate));

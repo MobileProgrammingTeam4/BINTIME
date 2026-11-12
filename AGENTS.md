@@ -153,7 +153,7 @@ userChatRooms/{uid}/{matchId}
 | `availability` | 선택 원본을 병합한 60분 이상 슬롯과 `sourceRevision`. 서버가 30분 경계·원본·수업 비겹침·revision을 재검증 |
 | `matchSettings` | `isMatching`, `minOverlapMinutes`, `purposes`, `preferredTags` 등 |
 | `matchRequests` | `fromUid`, `toUid`, `status`, `meetingDate`, `startMinute`, `endMinute`, `overlapMinutes` 등 **시간 스냅샷** |
-| 요청 생성 계약 | `createMatchRequest({candidateId, clientRequestId})`: 상대 UID와 재시도 UUID만 입력. 양측 최소 겹침의 큰 값, 프로필·차단·시간표·확정 매칭 충돌을 같은 서버 트랜잭션에서 검증. 계약은 `docs/BT-019.md` |
+| 요청 생성 계약 | `createMatchRequest({candidateId, clientRequestId})`: 상대 UID와 재시도 UUID만 입력. 검색자가 선택한 최소 겹침, 프로필·차단·시간표·확정 매칭 충돌을 같은 서버 트랜잭션에서 검증. 계약은 `docs/BT-019.md` |
 | 요청 생성 계약 | `createMatchRequest(candidateId, clientRequestId)`, 서버 전용 `matchRequestGuards` 중복 잠금 및 BT-017 연결 경계는 `docs/BT-019.md`를 따릅니다. 실제 검색 미연결은 실패로 처리합니다. |
 | `matches` | `participantUids`, `requestId`, `status`, `meetingDate`, `startMinute`, `endMinute`, `chatReady` 등 **확정 스냅샷** |
 | `chatRooms` | `matchId`를 룸 식별자로 사용, 메시지 발신자·권한 검증 |
