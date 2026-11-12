@@ -1,0 +1,45 @@
+rules_version = '2';
+
+// BIN TIME Firestore Security Rules
+// BT-014: users/{uid}, publicProfiles/{uid} 만 정의한다. 나머지 컬렉션은 기본 거부이며
+// 각 담당 이슈에서 규칙을 추가한다. (콘솔 게시 전 팀 리뷰 필요)
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // 앱 ProfileValidator 와 같은 필수값·길이 제한 (닉네임 1~10자, 학과 필수, 소개 150자 이하)
+    function validProfile() {
+      let d = request.resource.data;
+      return d.uid == request.auth.uid
+          && d.nickname is string && d.nickname.size() >= 1 && d.nickname.size() <= 10
+          && d.department is string && d.department.size() >= 1
+          && (!('bio' in d) || (d.bio is string && d.bio.size() <= 150))
+          && (!('interestTags' in d) || d.interestTags is list)
+          && (!('photoPath' in d) || d.photoPath == null
+              || d.photoPath == 'profileImages/' + request.auth.uid + '/profile.jpg');
+    }
+
+    // 전체 프로필(이메일 포함): 본인만 읽고 쓴다. 이메일은 인증 토큰의 값만 허용한다.
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid) && validProfile()
+          && request.resource.data.email == request.auth.token.email;
+      allow delete: if false; // 회원 탈퇴는 후속 이슈에서 서버로 처리
+    }
+
+    // 공개 프로필: 로그인 사용자만 읽고, 본인만 쓴다. 이메일 등 개인정보 필드는 금지.
+    match /publicProfiles/{uid} {
+      allow read: if signedIn();
+      allow create, update: if isOwner(uid) && validProfile()
+          && !('email' in request.resource.data);
+      allow delete: if false;
+    }
+  }
+}
