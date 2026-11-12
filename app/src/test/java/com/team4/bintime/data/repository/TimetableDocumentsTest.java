@@ -39,6 +39,23 @@ public class TimetableDocumentsTest {
     }
 
     @Test
+    public void timetableDocument_nullSemesterOmitted() {
+        Map<String, Object> doc = TimetableDocuments.toTimetableDocument("u1", null, 1);
+        assertFalse(doc.containsKey("semester"));
+        assertEquals(2, doc.size());
+    }
+
+    @Test
+    public void assemble_missingOrNullSemester_isNull() {
+        Map<String, Object> parent = new HashMap<>();
+        parent.put("uid", "u1");
+        parent.put("revision", 2L);
+        assertNull(TimetableDocuments.assemble("u1", parent, Collections.emptyList()).getSemester());
+        parent.put("semester", null);
+        assertNull(TimetableDocuments.assemble("u1", parent, Collections.emptyList()).getSemester());
+    }
+
+    @Test
     public void courseDocument_allFields() {
         Course c = new Course("c1", "자료구조", "김교수", "공학관 301호", "#E0F0FF",
                 new ArrayList<>(Arrays.asList(new TimeSlot(1, 600, 690), new TimeSlot(3, 615, 700))));

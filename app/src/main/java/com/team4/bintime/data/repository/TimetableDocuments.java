@@ -13,7 +13,7 @@ import java.util.Map;
  * [BT-015] 시간표 ↔ Firestore 문서 변환. Android/Firebase 의존성이 없어 단위 테스트로 검증한다.
  *
  * <pre>
- * timetables/{uid}                    uid, semester, revision, updatedAt
+ * timetables/{uid}                    uid, semester?, revision, updatedAt
  * timetables/{uid}/courses/{courseId} courseId, name, professor?, classroom?, colorCode?,
  *                                     timeSlots[{dayOfWeek, startMinute, endMinute}], createdAt, updatedAt
  * </pre>
@@ -52,11 +52,11 @@ public final class TimetableDocuments {
         return timetablePath(uid) + "/" + COURSES + "/" + courseId;
     }
 
-    /** timetables/{uid} 문서(updatedAt 제외). */
+    /** timetables/{uid} 문서(updatedAt 제외). semester는 null 허용이며 null이면 필드를 넣지 않는다. */
     public static Map<String, Object> toTimetableDocument(String uid, String semester, int revision) {
         Map<String, Object> doc = new LinkedHashMap<>();
         doc.put(F_UID, uid);
-        doc.put(F_SEMESTER, semester);
+        if (semester != null) doc.put(F_SEMESTER, semester);
         doc.put(F_REVISION, revision);
         return doc;
     }
