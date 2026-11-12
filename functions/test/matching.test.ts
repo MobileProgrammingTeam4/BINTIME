@@ -91,8 +91,22 @@ describe("문서 파싱", () => {
   it("문서가 없으면 null(=OFF)", () => {
     expect(parseSettings(undefined)).toBeNull();
   });
+  const rev = { revision: 3 };
+  const avail = (slots: unknown[], sourceRevision = 3) => ({ slots, sourceRevision });
   it("잘못된 슬롯은 버린다", () => {
-    expect(parseSlots({ slots: [s(1, 600, 660), { dayOfWeek: 8, startMinute: 0, endMinute: 60 }, s(1, 700, 650)] })).toEqual([s(1, 600, 660)]);
+    expect(parseSlots(avail([s(1, 600, 660), { dayOfWeek: 8, startMinute: 0, endMinute: 60 }, s(1, 700, 650)]), rev)).toEqual([s(1, 600, 660)]);
+  });
+  it("sourceRevision 이 시간표 revision 과 다르거나 시간표가 없으면 빈 목록", () => {
+    expect(parseSlots(avail([s(1, 600, 660)], 2), rev)).toEqual([]);
+    expect(parseSlots(avail([s(1, 600, 660)]), undefined)).toEqual([]);
+    expect(parseSlots({ slots: [s(1, 600, 660)] }, rev)).toEqual([]);
+  });
+  it("30분 경계가 아닌 슬롯은 버린다 (10:01~11:31)", () => {
+    expect(parseSlots(avail([s(1, 601, 691)]), rev)).toEqual([]);
+  });
+  it("붙거나 겹친 슬롯은 합치고, 합친 뒤 60분 미만은 버린다", () => {
+    expect(parseSlots(avail([s(2, 630, 660), s(1, 600, 630), s(1, 630, 660), s(1, 720, 750)]), rev)).toEqual([s(1, 600, 660)]);
+    expect(parseSlots(avail([s(1, 600, 690), s(1, 660, 720)]), rev)).toEqual([s(1, 600, 720)]);
   });
 });
 
