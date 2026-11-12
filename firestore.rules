@@ -138,16 +138,26 @@ service cloud.firestore {
     // availability/{uid} = { slots, sourceRevision, updatedAt } (팀 결정, A)
     // slots: FreeTimeCalculator.matchableFreeSlots 결과(붙은 칸 병합 + 60분 이상). 본인만 읽고 쓴다.
     // 다른 사용자는 읽을 수 없고 매칭 검색 서버 함수가 Admin SDK로 읽는다.
-    // 규칙에는 반복문이 없어 slots 원소를 상한(40개)까지 하나씩 풀어서 검사한다.
-    // 수업과의 겹침은 규칙으로 검사할 수 없으므로 서버도 slots를 다시 정규화해야 한다.
-    function validAvailSlot(s) {
-      return validSlot(s)
-          && s.startMinute % 30 == 0 && s.endMinute % 30 == 0
-          && s.endMinute - s.startMinute >= 60;
-    }
-
-    function validAvailSlotAt(slots, i) {
-      return slots.size() <= i || validAvailSlot(slots[i]);
+    //
+    // 규칙 식 평가 한도(요청당 1000식) 때문에 slots 원소는 "map인지"만 검사한다.
+    // 원소마다 값 범위·30분 단위·60분 이상까지 검사하면 B의 에뮬레이터 측정에서 slots 6개부터
+    // 한도를 넘어 저장이 거부됐다. 슬롯 상세 검증은 규칙이 아니라
+    //   - 클라이언트: FreeSlotValidator·FreeCells (요일 1~7, 0 <= start < end <= 1440, 30분 경계,
+    //     수업 겹침, 붙은 칸 병합 후 60분 이상만 저장, 40개 상한)
+    //   - 서버: 매칭 검색(searchMatches, A)이 slots를 읽을 때 다시 정규화
+    //     (형식·범위가 틀린 원소 제외, 30분 경계·60분 이상 확인). 규칙을 우회한 값도 여기서 걸러진다.
+    // 가 맡는다. 규칙에는 반복문이 없어 상한(40개)까지 원소를 하나씩 풀어서 검사한다.
+    function availSlotsAreMaps(slots) {
+      return (slots.size() <= 0 || slots[0] is map) && (slots.size() <= 1 || slots[1] is map) && (slots.size() <= 2 || slots[2] is map) && (slots.size() <= 3 || slots[3] is map)
+          && (slots.size() <= 4 || slots[4] is map) && (slots.size() <= 5 || slots[5] is map) && (slots.size() <= 6 || slots[6] is map) && (slots.size() <= 7 || slots[7] is map)
+          && (slots.size() <= 8 || slots[8] is map) && (slots.size() <= 9 || slots[9] is map) && (slots.size() <= 10 || slots[10] is map) && (slots.size() <= 11 || slots[11] is map)
+          && (slots.size() <= 12 || slots[12] is map) && (slots.size() <= 13 || slots[13] is map) && (slots.size() <= 14 || slots[14] is map) && (slots.size() <= 15 || slots[15] is map)
+          && (slots.size() <= 16 || slots[16] is map) && (slots.size() <= 17 || slots[17] is map) && (slots.size() <= 18 || slots[18] is map) && (slots.size() <= 19 || slots[19] is map)
+          && (slots.size() <= 20 || slots[20] is map) && (slots.size() <= 21 || slots[21] is map) && (slots.size() <= 22 || slots[22] is map) && (slots.size() <= 23 || slots[23] is map)
+          && (slots.size() <= 24 || slots[24] is map) && (slots.size() <= 25 || slots[25] is map) && (slots.size() <= 26 || slots[26] is map) && (slots.size() <= 27 || slots[27] is map)
+          && (slots.size() <= 28 || slots[28] is map) && (slots.size() <= 29 || slots[29] is map) && (slots.size() <= 30 || slots[30] is map) && (slots.size() <= 31 || slots[31] is map)
+          && (slots.size() <= 32 || slots[32] is map) && (slots.size() <= 33 || slots[33] is map) && (slots.size() <= 34 || slots[34] is map) && (slots.size() <= 35 || slots[35] is map)
+          && (slots.size() <= 36 || slots[36] is map) && (slots.size() <= 37 || slots[37] is map) && (slots.size() <= 38 || slots[38] is map) && (slots.size() <= 39 || slots[39] is map);
     }
 
     // sourceRevision은 같은 트랜잭션에서 쓴 뒤의 부모 시간표 revision과 같아야 한다.
@@ -155,16 +165,7 @@ service cloud.firestore {
       let d = request.resource.data;
       return d.keys().hasOnly(['slots', 'sourceRevision', 'updatedAt'])
           && d.slots is list && d.slots.size() <= 40
-          && validAvailSlotAt(d.slots, 0) && validAvailSlotAt(d.slots, 1) && validAvailSlotAt(d.slots, 2) && validAvailSlotAt(d.slots, 3)
-          && validAvailSlotAt(d.slots, 4) && validAvailSlotAt(d.slots, 5) && validAvailSlotAt(d.slots, 6) && validAvailSlotAt(d.slots, 7)
-          && validAvailSlotAt(d.slots, 8) && validAvailSlotAt(d.slots, 9) && validAvailSlotAt(d.slots, 10) && validAvailSlotAt(d.slots, 11)
-          && validAvailSlotAt(d.slots, 12) && validAvailSlotAt(d.slots, 13) && validAvailSlotAt(d.slots, 14) && validAvailSlotAt(d.slots, 15)
-          && validAvailSlotAt(d.slots, 16) && validAvailSlotAt(d.slots, 17) && validAvailSlotAt(d.slots, 18) && validAvailSlotAt(d.slots, 19)
-          && validAvailSlotAt(d.slots, 20) && validAvailSlotAt(d.slots, 21) && validAvailSlotAt(d.slots, 22) && validAvailSlotAt(d.slots, 23)
-          && validAvailSlotAt(d.slots, 24) && validAvailSlotAt(d.slots, 25) && validAvailSlotAt(d.slots, 26) && validAvailSlotAt(d.slots, 27)
-          && validAvailSlotAt(d.slots, 28) && validAvailSlotAt(d.slots, 29) && validAvailSlotAt(d.slots, 30) && validAvailSlotAt(d.slots, 31)
-          && validAvailSlotAt(d.slots, 32) && validAvailSlotAt(d.slots, 33) && validAvailSlotAt(d.slots, 34) && validAvailSlotAt(d.slots, 35)
-          && validAvailSlotAt(d.slots, 36) && validAvailSlotAt(d.slots, 37) && validAvailSlotAt(d.slots, 38) && validAvailSlotAt(d.slots, 39)
+          && availSlotsAreMaps(d.slots)
           && d.sourceRevision is int
           && existsAfter(timetablePath(uid))
           && d.sourceRevision == getAfter(timetablePath(uid)).data.revision
