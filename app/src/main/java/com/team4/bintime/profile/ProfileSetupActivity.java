@@ -1,6 +1,8 @@
 package com.team4.bintime.profile;
 
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -14,10 +16,12 @@ import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.PickVisualMediaRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.lifecycle.ViewModelProvider;
 
 import com.google.android.material.chip.ChipGroup;
 import com.team4.bintime.MainActivity;
@@ -32,8 +36,12 @@ import java.util.ArrayList;
  * 프로필 최초 설정 및 프로필 수정 화면 (Figma 41:10218, 102:2684, 122:1959).
  * (BT-004 / Issue #4)
  *
- * 마이페이지와 같은 {@link MockProfileRepository#shared()} 를 사용하므로 저장 즉시 마이페이지에 반영된다.
+ * (BT-014 / Issue #14) 로그인 UID 의 프로필을 {@link ProfileRepositories#get} 저장소(Firestore 또는 Mock)에 저장하고,
+ * 새로 고른 사진은 압축 후 Cloud Storage 에 올린다. 마이페이지와 같은 저장소라 저장 즉시 반영된다.
  * 화면 회전 시에는 저장소를 다시 읽지 않고 작성 중인 값(입력·선택 태그)을 그대로 복원한다.
+ * 단, 수정 모드에서 기존 프로필 조회가 끝나기 전에 회전했다면 다시 조회한다. 조회가 끝나기 전에는
+ * 빈 값으로 기존 프로필(소개·태그·사진·성별)을 덮어쓰지 않도록 저장을 막는다 (#79 리뷰 반영).
+ * 저장(사진 압축·업로드·프로필 저장)은 {@link ProfileSaveViewModel} 이 진행해, 업로드 중 회전해도 저장이 누락되지 않는다.
  */
 public class ProfileSetupActivity extends AppCompatActivity {
 
@@ -46,12 +54,23 @@ public class ProfileSetupActivity extends AppCompatActivity {
     private static final String STATE_PROFILE = "userProfile";
     private static final String STATE_SELECTED_TAGS = "selectedTags";
     private static final String STATE_AI_FEEDBACK = "aiFeedbackVisible";
+    private static final String STATE_PHOTO_URI = "selectedPhotoUri";
+    private static final String STATE_PROFILE_LOADED = "profileLoaded";
     private static final String KEY_CANCEL_EDIT = "profileCancelEdit";
 
     private int mode = MODE_CREATE;
-    private final MockProfileRepository profileRepo = MockProfileRepository.shared();
+    private ProfileRepository profileRepo;
     private UserProfile profile = UserProfile.empty();
+    /** 저장 기준이 되는 프로필이 준비됐는지. 수정 모드는 원격 조회 성공 후에만 true. */
+    private boolean profileLoaded;
+    /** 기존 프로필 조회 중. 저장 버튼 연타로 조회가 중복되지 않게 한다. */
+    private boolean profileLoading;
     private final ArrayList<String> selectedTags = new ArrayList<>();
+    /** 이번 화면에서 새로 고른 사진. 저장할 때만 업로드한다. */
+    private Uri selectedPhotoUri;
+    private ActivityResultLauncher<PickVisualMediaRequest> photoPicker;
+    /** 저장 작업. 화면이 다시 만들어져도 유지된다. */
+    private ProfileSaveViewModel saveViewModel;
 
     private ImageView imgProfilePhoto;
     private TextView tvPhotoLabel;
@@ -75,6 +94,13 @@ public class ProfileSetupActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_profile_setup);
+        profileRepo = ProfileRepositories.get(this);
+        saveViewModel = new ViewModelProvider(this).get(ProfileSaveViewModel.class);
+        photoPicker = registerForActivityResult(new ActivityResultContracts.PickVisualMedia(), uri -> {
+            if (uri == null) return; // 선택 취소
+            selectedPhotoUri = uri;
+            bindPhoto();
+        });
         departmentLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
             if (result.getResultCode() != RESULT_OK || result.getData() == null) return;
             String department = result.getData().getStringExtra(DepartmentSearchActivity.EXTRA_DEPARTMENT);
@@ -83,7 +109,7 @@ public class ProfileSetupActivity extends AppCompatActivity {
             tvDepartmentError.setVisibility(View.GONE);
         });
         // 확인 다이얼로그 결과는 화면 회전 뒤에도 받도록 매번 등록한다.
-        getSupportFragmentManager().setFragmentResultListener(KEY_CANCEL_EDIT, this, (key, result) -> finish());
+        getSupportFragmentManager().setFragmentResultListener(KEY_CANCEL_EDIT, this, (key, result) -> handleCancelConfirmed());
 
         mode = getIntent().getIntExtra(EXTRA_MODE, MODE_CREATE);
         boolean restored = false;
@@ -92,7 +118,9 @@ public class ProfileSetupActivity extends AppCompatActivity {
             mode = savedInstanceState.getInt(STATE_MODE, mode);
             UserProfile restoredProfile = (UserProfile) savedInstanceState.getSerializable(STATE_PROFILE);
             ArrayList<String> restoredTags = savedInstanceState.getStringArrayList(STATE_SELECTED_TAGS);
-            if (restoredProfile != null) {
+            selectedPhotoUri = savedInstanceState.getParcelable(STATE_PHOTO_URI);
+            // 조회 완료 전에 회전한 경우 복원값은 초기 빈 프로필이므로 복원으로 보지 않고 다시 조회한다.
+            if (restoredProfile != null && savedInstanceState.getBoolean(STATE_PROFILE_LOADED)) {
                 profile = restoredProfile;
                 selectedTags.clear();
                 if (restoredTags != null) selectedTags.addAll(restoredTags);
@@ -104,6 +132,7 @@ public class ProfileSetupActivity extends AppCompatActivity {
         setupSpinners();
         // 입력값과 스피너 선택은 View 상태 복원으로 유지되므로, 회전 시에는 저장소 값으로 덮어쓰지 않는다.
         if (restored) {
+            profileLoaded = true;
             bindPhoto();
             tvAiFeedback.setVisibility(savedInstanceState.getBoolean(STATE_AI_FEEDBACK) ? View.VISIBLE : View.GONE);
         } else if (mode == MODE_EDIT) {
@@ -113,6 +142,9 @@ public class ProfileSetupActivity extends AppCompatActivity {
         }
         setupTags();
         bindEvents();
+        // 회전 전에 시작한 저장이 아직 진행 중이면 버튼을 막아 두고, 끝나면 결과를 받아 이동한다.
+        btnSubmit.setEnabled(!saveViewModel.isSaving());
+        saveViewModel.getResult().observe(this, this::onSaveResult);
 
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
@@ -129,6 +161,8 @@ public class ProfileSetupActivity extends AppCompatActivity {
         outState.putSerializable(STATE_PROFILE, profile);
         outState.putStringArrayList(STATE_SELECTED_TAGS, selectedTags);
         outState.putBoolean(STATE_AI_FEEDBACK, tvAiFeedback.getVisibility() == View.VISIBLE);
+        outState.putParcelable(STATE_PHOTO_URI, selectedPhotoUri);
+        outState.putBoolean(STATE_PROFILE_LOADED, profileLoaded);
     }
 
     private void initViews() {
@@ -190,9 +224,22 @@ public class ProfileSetupActivity extends AppCompatActivity {
     }
 
     private void loadProfileData() {
-        profileRepo.getProfile("u1", new ProfileRepository.Callback<UserProfile>() {
+        if (profileLoading) return;
+        profileLoading = true;
+        profileLoaded = false;
+        String uid = AuthRepositories.get(this).getCurrentUid();
+        profileRepo.getProfile(uid, new ProfileRepository.Callback<UserProfile>() {
             @Override
             public void onSuccess(UserProfile user) {
+                if (isFinishing() || isDestroyed()) return;
+                profileLoading = false;
+                profileLoaded = true;
+                if (user == null) {
+                    // 원격 문서가 아직 없으면 본인 UID 의 빈 프로필로 수정을 시작한다.
+                    user = UserProfile.empty();
+                    user.setUid(uid);
+                    user.setEmail(AuthRepositories.get(ProfileSetupActivity.this).getCurrentEmail());
+                }
                 profile = user;
                 etNickname.setText(profile.getNickname());
                 tvDepartment.setText(profile.getDepartment());
@@ -212,12 +259,16 @@ public class ProfileSetupActivity extends AppCompatActivity {
                 if (profile.getInterestTags() != null) {
                     selectedTags.addAll(profile.getInterestTags());
                 }
+                // 칩은 조회 전에 만들어졌을 수 있으므로 기존 태그가 선택 상태로 보이도록 다시 그린다.
+                setupTags();
 
                 updateCharCounters();
             }
 
             @Override
             public void onError(String message) {
+                if (isFinishing() || isDestroyed()) return;
+                profileLoading = false;
                 Toast.makeText(ProfileSetupActivity.this, message, Toast.LENGTH_SHORT).show();
             }
         });
@@ -225,15 +276,34 @@ public class ProfileSetupActivity extends AppCompatActivity {
 
     /** 최초 생성: 시연용 기본 프로필을 채우지 않고 인증된 계정 정보만 연결한 빈 폼으로 시작한다. */
     private void initCreateProfile() {
+        profileLoaded = true;
         profile = UserProfile.empty();
         profile.setUid(AuthRepositories.get(this).getCurrentUid());
-        profile.setEmail(getIntent().getStringExtra(EXTRA_USER_EMAIL));
+        // 인증된 계정 이메일을 우선 사용하고, Mock 모드에서는 가입 화면이 넘긴 값을 쓴다.
+        String email = AuthRepositories.get(this).getCurrentEmail();
+        profile.setEmail(email != null ? email : getIntent().getStringExtra(EXTRA_USER_EMAIL));
         selectedTags.clear();
         updateCharCounters();
     }
 
+    /** 새로 고른 사진 → 저장된 Storage 사진 → 시연 리소스 순으로 표시한다. */
     private void bindPhoto() {
-        if (profile.getPhotoResId() != 0) {
+        if (selectedPhotoUri != null) {
+            imgProfilePhoto.setImageURI(selectedPhotoUri);
+        } else if (profile.getPhotoPath() != null && !profile.getPhotoPath().isEmpty()) {
+            profileRepo.loadProfilePhoto(profile.getPhotoPath(), new ProfileRepository.Callback<Bitmap>() {
+                @Override
+                public void onSuccess(Bitmap bitmap) {
+                    if (isFinishing() || isDestroyed() || selectedPhotoUri != null) return;
+                    imgProfilePhoto.setImageBitmap(bitmap);
+                }
+
+                @Override
+                public void onError(String message) {
+                    // 사진을 못 불러와도 나머지 프로필 수정은 계속할 수 있다.
+                }
+            });
+        } else if (profile.getPhotoResId() != 0) {
             imgProfilePhoto.setImageResource(profile.getPhotoResId());
         }
     }
@@ -300,8 +370,11 @@ public class ProfileSetupActivity extends AppCompatActivity {
         });
 
         // 프로필 사진 변경 클릭 시 토스트
+        // 시스템 사진 선택기: 저장소 권한 없이 사용자가 고른 사진 1장만 접근한다.
         findViewById(R.id.layoutPhotoContainer).setOnClickListener(v ->
-                Toast.makeText(this, "사진 선택 갤러리 (시연 목업)", Toast.LENGTH_SHORT).show());
+                photoPicker.launch(new PickVisualMediaRequest.Builder()
+                        .setMediaType(ActivityResultContracts.PickVisualMedia.ImageOnly.INSTANCE)
+                        .build()));
 
         // 하단 버튼 클릭 (시작하기 / 변경하기)
         btnSubmit.setOnClickListener(v -> saveProfileAndFinish());
@@ -316,6 +389,12 @@ public class ProfileSetupActivity extends AppCompatActivity {
     }
 
     private void saveProfileAndFinish() {
+        if (!profileLoaded) {
+            // 기존 프로필을 아직 못 읽었다: 빈 값으로 덮어쓰지 않고 다시 불러온다.
+            Toast.makeText(this, R.string.profile_not_loaded_retry, Toast.LENGTH_SHORT).show();
+            loadProfileData();
+            return;
+        }
         String nickname = etNickname.getText().toString().trim();
         String department = tvDepartment.getText().toString().trim();
 
@@ -340,33 +419,35 @@ public class ProfileSetupActivity extends AppCompatActivity {
         draft.setBio(etBio.getText().toString().trim());
         draft.setInterestTags(new ArrayList<>(selectedTags));
 
+        if (saveViewModel.isSaving()) return;
         btnSubmit.setEnabled(false); // 중복 저장 방지
-        profileRepo.saveProfile(draft, new ProfileRepository.Callback<Void>() {
-            @Override
-            public void onSuccess(Void result) {
-                if (isFinishing() || isDestroyed()) return;
-                profile = draft;
-                if (mode == MODE_CREATE) {
-                    Toast.makeText(ProfileSetupActivity.this, "프로필이 생성되었습니다!", Toast.LENGTH_SHORT).show();
-                    // 온보딩·인증 화면으로 뒤로 돌아가지 않도록 태스크를 새로 시작한다.
-                    Intent intent = new Intent(ProfileSetupActivity.this, MainActivity.class);
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                    startActivity(intent);
-                    finish();
-                } else {
-                    Toast.makeText(ProfileSetupActivity.this, "프로필이 수정되었습니다!", Toast.LENGTH_SHORT).show();
-                    setResult(RESULT_OK);
-                    finish();
-                }
-            }
+        // 새 사진이 있으면 압축 → Storage 업로드 → 경로를 프로필에 넣어 저장. 진행은 ViewModel 이 맡는다.
+        saveViewModel.save(profileRepo, getApplicationContext().getContentResolver(), draft,
+                selectedPhotoUri, getString(R.string.profile_photo_load_failed));
+    }
 
-            @Override
-            public void onError(String message) {
-                if (isFinishing() || isDestroyed()) return;
-                btnSubmit.setEnabled(true);
-                Toast.makeText(ProfileSetupActivity.this, message, Toast.LENGTH_SHORT).show();
-            }
-        });
+    /** ViewModel 이 전달한 저장 결과. 회전 중에 끝난 결과도 새 Activity 가 한 번만 받는다. */
+    private void onSaveResult(ProfileSaveViewModel.Result result) {
+        if (result == null || !result.consume()) return;
+        if (isFinishing() || isDestroyed()) return;
+        if (!result.isSuccess()) {
+            btnSubmit.setEnabled(true);
+            Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        profile = result.saved;
+        selectedPhotoUri = null;
+        if (mode == MODE_CREATE) {
+            Toast.makeText(this, "프로필이 생성되었습니다!", Toast.LENGTH_SHORT).show();
+            // 온보딩·인증 화면으로 뒤로 돌아가지 않도록 태스크를 새로 시작한다.
+            Intent intent = new Intent(this, MainActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+        } else {
+            Toast.makeText(this, "프로필이 수정되었습니다!", Toast.LENGTH_SHORT).show();
+            setResult(RESULT_OK);
+        }
+        finish();
     }
 
     private void showFieldError(TextView errorView, ProfileValidator.Error error) {
@@ -379,11 +460,26 @@ public class ProfileSetupActivity extends AppCompatActivity {
     }
 
     private void handleBackAction() {
+        // 저장(업로드)은 시작하면 취소할 수 없다. 나가도 저장되므로 "저장되지 않아요" 안내와 어긋나지 않게
+        // 저장 중에는 나가기·수정 취소를 막는다(#79 D 리뷰). 회전 시 작업 유지와는 별개다.
+        if (saveViewModel.isSaving()) {
+            Toast.makeText(this, R.string.profile_saving_wait, Toast.LENGTH_SHORT).show();
+            return;
+        }
         if (mode == MODE_EDIT) {
             showCancelConfirmDialog();
         } else {
             finish();
         }
+    }
+
+    /** '수정 취소하기' 확인. 다이얼로그가 떠 있는 사이 저장이 시작됐다면 닫지 않는다. */
+    private void handleCancelConfirmed() {
+        if (saveViewModel.isSaving()) {
+            Toast.makeText(this, R.string.profile_saving_wait, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        finish();
     }
 
     /** 수정 취소 확인 (Figma 122:1959). 공통 ConfirmDialog 를 써서 화면 회전 후에도 유지된다. */

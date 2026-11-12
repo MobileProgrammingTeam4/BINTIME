@@ -29,6 +29,8 @@ export interface AiDeps {
   matches: MatchAccess;
   now: () => Date;
   sleep: (ms: number) => Promise<void>;
+  /** 학교 이메일 허용 접미사(ALLOWED_EMAIL_SUFFIXES). 비어 있으면 Callable 호출을 모두 거부한다. */
+  allowedEmailSuffixes: readonly string[];
 }
 
 /**

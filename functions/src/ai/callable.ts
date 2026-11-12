@@ -3,6 +3,7 @@ import { onCall, type CallableOptions } from "firebase-functions/v2/https";
 import { REGION } from "./config";
 import { GEMINI_API_KEY, defaultDeps } from "./deps";
 import { logger } from "firebase-functions";
+import { checkSchoolEmail } from "./emailPolicy";
 import { AiError, describeError, toHttpsError } from "./errors";
 import { runAiTask } from "./gateway";
 import type { AiDeps, AiResponse, AiTask } from "./types";
@@ -11,6 +12,7 @@ type ExtraOptions = Pick<CallableOptions, "timeoutSeconds" | "memory">;
 
 /**
  * 작업 하나를 앱용 Callable 로 연다. 인증은 Auth 토큰(request.auth)으로만 확인한다.
+ * 로그인 직후 토큰의 email_verified 와 학교 이메일 접미사(ALLOWED_EMAIL_SUFFIXES)를 검사한다.
  * 모든 오류는 HttpsError(details: { reason, retryable, requestId }) 로 바꿔 보낸다.
  */
 export function createAiCallable<I, O>(
@@ -33,7 +35,14 @@ export function createAiCallable<I, O>(
       const requestId = randomUUID();
       try {
         if (!request.auth?.uid) throw new AiError("UNAUTHENTICATED");
-        return await runAiTask(task, request.data, { uid: request.auth.uid, requestId }, deps());
+        const resolved = deps();
+        // 학교 이메일 검사는 사용량 차감(runAiTask) 전에 한다. 이메일 원문은 로그에 남기지 않는다.
+        const denyCause = checkSchoolEmail(request.auth.token, resolved.allowedEmailSuffixes);
+        if (denyCause) {
+          logger.warn("ai_callable_denied", { task: task.name, requestId, uid: request.auth.uid, cause: denyCause });
+          throw new AiError("PERMISSION_DENIED", denyCause);
+        }
+        return await runAiTask(task, request.data, { uid: request.auth.uid, requestId }, resolved);
       } catch (error) {
         // runAiTask 밖(의존성 준비 등)에서 난 예상하지 못한 오류도 원인을 남긴다. 앱에는 INTERNAL 만 보낸다.
         if (!(error instanceof AiError)) {
