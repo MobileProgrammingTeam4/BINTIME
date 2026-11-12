@@ -1,0 +1,43 @@
+import { randomUUID } from "node:crypto";
+import { getApps, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
+import { logger } from "firebase-functions";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { REGION } from "../ai/config";
+import { ALLOWED_EMAIL_SUFFIXES_ENV, checkSchoolEmail, parseAllowedEmailSuffixes } from "../ai/emailPolicy";
+import { FirestoreMatchStore, type MatchStore, searchMatches } from "./search";
+
+function defaultStore(): MatchStore {
+  if (getApps().length === 0) initializeApp();
+  return new FirestoreMatchStore(getFirestore());
+}
+
+const defaultSuffixes = () => parseAllowedEmailSuffixes(process.env[ALLOWED_EMAIL_SUFFIXES_ENV]);
+
+/**
+ * A · BT-017. 입력 없이 토큰 UID 의 matchSettings·availability 로 검색한다(필터는 서버 저장값이 기준).
+ * 학교 이메일 검사는 AI Callable(#87)과 같은 기준이다. 이메일 원문은 로그에 남기지 않는다.
+ */
+export function createSearchCallable(
+  store: () => MatchStore = defaultStore,
+  now: () => Date = () => new Date(),
+  suffixes: () => readonly string[] = defaultSuffixes,
+) {
+  return onCall({ region: REGION, timeoutSeconds: 30, maxInstances: 10 }, async (request) => {
+    if (!request.auth?.uid) {
+      throw new HttpsError("unauthenticated", "로그인이 필요합니다.", { reason: "UNAUTHENTICATED", retryable: false });
+    }
+    const denyCause = checkSchoolEmail(request.auth.token, suffixes());
+    if (denyCause) {
+      logger.warn("search_matches_denied", { uid: request.auth.uid, cause: denyCause });
+      throw new HttpsError("permission-denied", "학교 이메일 인증이 필요합니다.", { reason: "PERMISSION_DENIED", retryable: false });
+    }
+    try {
+      return await searchMatches(store(), request.auth.uid, now());
+    } catch (error) {
+      const requestId = randomUUID();
+      logger.error("search_matches_failed", { requestId, message: error instanceof Error ? error.message : String(error) });
+      throw new HttpsError("internal", "매칭 검색에 실패했어요.", { reason: "INTERNAL", retryable: true, requestId });
+    }
+  });
+}

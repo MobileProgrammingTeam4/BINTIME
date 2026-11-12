@@ -10,8 +10,9 @@ import { generateProfileTask } from "./ai/tasks/generateProfile";
 import { recommendPlaceTask } from "./ai/tasks/recommendPlace";
 import { suggestChatRepliesTask } from "./ai/tasks/suggestChatReplies";
 import { createRequestCallable } from "./requests/callable";
+import { createSearchCallable } from "./matching/callable";
 
-/** D · BT-019. BT-017 후보 검사 연결 전에는 SEARCH_NOT_CONNECTED로 거절한다. */
+/** D · BT-019 요청 생성. */
 export const createMatchRequest = createRequestCallable();
 
 /** BT-024 연결 확인 */
@@ -24,6 +25,9 @@ export const generateProfile = createAiCallable(generateProfileTask);
 export const recommendPlace = createAiCallable(recommendPlaceTask);
 /** E · BT-041 */
 export const suggestChatReplies = createAiCallable(suggestChatRepliesTask);
+
+/** A · BT-017 매칭 후보 검색 */
+export const searchMatches = createSearchCallable();
 
 // A · BT-027 evaluateMatch 는 서버 내부 전용이라 Callable 로 열지 않는다(./ai/internal 의 evaluateMatch 사용).
 // 팀 결정으로 열어야 하면: export const evaluateMatch = createAiCallable(evaluateMatchTask);

@@ -30,8 +30,10 @@ public final class MatchSummaryBinder {
         text(summary, R.id.name, c.name);
         text(summary, R.id.info, c.department + " " + c.grade + "학년 · " + c.gender);
         text(summary, R.id.matchRate, "매칭률 " + c.matchRate + "%");
+        // AI 매칭률(BT-027/028) 연결 전 실데이터 후보는 0 이라 숨긴다
+        summary.findViewById(R.id.matchRate).setVisibility(c.matchRate > 0 ? View.VISIBLE : View.GONE);
         text(summary, R.id.matchReason, c.matchReason);
-        text(summary, R.id.time, "오늘 " + c.overlapStart + " ~ " + c.overlapEnd);
+        text(summary, R.id.time, c.dayLabel + " " + c.overlapStart + " ~ " + c.overlapEnd);
         text(summary, R.id.duration, MatchFilter.formatDuration(c.overlapMinutes()) + " 겹침");
         text(summary, R.id.reasons, String.join("\n", c.reasons));
         TextView place = summary.findViewById(R.id.aiPlace);
