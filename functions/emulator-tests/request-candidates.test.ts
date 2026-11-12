@@ -53,10 +53,14 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)("BT-017 → BT-019 실제 
     await db.doc(`matchSettings/${uid}`).update({ isMatching: false });
     await expect(service.create("sender", input())).rejects.toMatchObject({ details: { reason: "INVALID_CANDIDATE" } });
   });
-  it("상대 최소 180분을 내 최소 60분으로 우회하지 못한다", async () => {
+  it("검색자 최소 60분이면 상대 최소 180분이어도 교집합 90분을 허용한다", async () => {
     await db.doc("matchSettings/receiver").update({ minOverlapMinutes: 180 });
+    expect((await service.create("sender", input())).overlapMinutes).toBe(90);
+  });
+  it("검색자 최소 120분은 90분 교집합을 거절하고 90분 경계는 허용한다", async () => {
+    await db.doc("matchSettings/sender").update({ minOverlapMinutes: 120 });
     await expect(service.create("sender", input())).rejects.toMatchObject({ details: { reason: "INVALID_CANDIDATE" } });
-    await db.doc("matchSettings/receiver").update({ minOverlapMinutes: 90 });
+    await db.doc("matchSettings/sender").update({ minOverlapMinutes: 90 });
     expect((await service.create("sender", input())).overlapMinutes).toBe(90);
   });
   it("목적 불일치·양방향 차단·프로필 미완성을 거절한다", async () => {
