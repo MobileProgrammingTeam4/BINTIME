@@ -11,6 +11,8 @@ export const DEFAULT_MIN_OVERLAP = 60;
 export const PURPOSE_ALL = "전체";
 /** 오늘부터 다음 주 같은 요일까지 본다(오늘 이미 지난 공강도 다음 주에 다시 찾도록 8일). */
 const SEARCH_DAYS = 8;
+/** 매칭 대상 공강 최소 길이(BT-016 matchableFreeSlots, #88 Rules 와 같은 값). */
+const MIN_SLOT_MINUTES = 60;
 
 const slot = z
   .object({
@@ -36,24 +38,41 @@ const settings = z.object({
 export type MatchSettings = z.infer<typeof settings>;
 
 /**
- * availability/{uid} (C · BT-016, #88) = { slots, sourceRevision, updatedAt }. slots 만 읽는다.
+ * availability/{uid} (C · BT-016, #88) = { slots, sourceRevision, updatedAt }.
  * 규칙은 원소가 map 인지만 보므로 값 검사는 여기서 한다(#88 합의).
  */
-const availability = z.object({ slots: z.array(z.unknown()).max(200) });
+const availability = z.object({ slots: z.array(z.unknown()).max(200), sourceRevision: z.number().int() });
+const timetable = z.object({ revision: z.number().int() });
 
 export function parseSettings(data: unknown): MatchSettings | null {
   const parsed = settings.safeParse(data);
   return parsed.success ? parsed.data : null;
 }
 
-/** 형식이 틀린 슬롯은 버린다. 문서가 없거나 형식이 틀리면 빈 목록. */
-export function parseSlots(data: unknown): Slot[] {
-  const parsed = availability.safeParse(data);
-  if (!parsed.success) return [];
-  return parsed.data.slots.flatMap((raw) => {
-    const s = slot.safeParse(raw);
-    return s.success ? [s.data] : [];
-  });
+/**
+ * 매칭에 쓸 공강. README "오래된 공강으로 매칭하지 않는다": timetables.revision 과 sourceRevision 이 다르면 빈 목록.
+ * 30분 경계가 아닌 슬롯은 버리고, 같은 요일에 붙거나 겹친 슬롯은 합친 뒤 60분 미만은 버린다(matchableFreeSlots 와 같은 기준).
+ */
+export function parseSlots(availabilityData: unknown, timetableData: unknown): Slot[] {
+  const a = availability.safeParse(availabilityData);
+  const t = timetable.safeParse(timetableData);
+  if (!a.success || !t.success || a.data.sourceRevision !== t.data.revision) return [];
+  const valid = a.data.slots
+    .flatMap((raw) => {
+      const s = slot.safeParse(raw);
+      return s.success && s.data.startMinute % 30 === 0 && s.data.endMinute % 30 === 0 ? [s.data] : [];
+    })
+    .sort((x, y) => x.dayOfWeek - y.dayOfWeek || x.startMinute - y.startMinute);
+  const merged: Slot[] = [];
+  for (const s of valid) {
+    const last = merged[merged.length - 1];
+    if (last && last.dayOfWeek === s.dayOfWeek && s.startMinute <= last.endMinute) {
+      last.endMinute = Math.max(last.endMinute, s.endMinute);
+    } else {
+      merged.push({ ...s });
+    }
+  }
+  return merged.filter((s) => s.endMinute - s.startMinute >= MIN_SLOT_MINUTES);
 }
 
 export interface SeoulTime {

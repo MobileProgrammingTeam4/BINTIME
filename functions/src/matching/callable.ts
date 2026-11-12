@@ -8,8 +8,9 @@ import { ALLOWED_EMAIL_SUFFIXES_ENV, checkSchoolEmail, parseAllowedEmailSuffixes
 import { FirestoreMatchStore, type MatchStore, searchMatches } from "./search";
 
 function defaultStore(): MatchStore {
-  if (getApps().length === 0) initializeApp();
-  return new FirestoreMatchStore(getFirestore());
+  // 이름 있는 앱만 있을 때도 기본 앱을 쓰도록 ai/deps.ts 와 같은 방식(#89 D 리뷰 1번).
+  const app = getApps().find((existing) => existing.name === "[DEFAULT]") ?? initializeApp();
+  return new FirestoreMatchStore(getFirestore(app));
 }
 
 const defaultSuffixes = () => parseAllowedEmailSuffixes(process.env[ALLOWED_EMAIL_SUFFIXES_ENV]);

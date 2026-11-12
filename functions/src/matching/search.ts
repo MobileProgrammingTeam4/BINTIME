@@ -35,7 +35,11 @@ export class FirestoreMatchStore implements MatchStore {
   }
 
   async slots(uid: string) {
-    return parseSlots((await this.get(this.db.doc(`availability/${uid}`))).data());
+    const [availability, timetable] = await Promise.all([
+      this.get(this.db.doc(`availability/${uid}`)),
+      this.get(this.db.doc(`timetables/${uid}`)),
+    ]);
+    return parseSlots(availability.data(), timetable.data());
   }
 
   async blocked(a: string, b: string) {
@@ -60,7 +64,8 @@ async function eitherBlocked(store: MatchStore, a: string, b: string) {
 
 /**
  * 후보 1명 재판정. 검색과 요청 생성(D · BT-019 CandidateResolver)이 같은 규칙을 쓰도록 공유한다.
- * shortcut: 기존 매칭 충돌·timetables revision 비교는 matches(BT-033)·시간표 Firestore(BT-015) 연결 후 추가.
+ * 최소 겹침은 검색자 설정 기준(README "검색자가 고른 최소 겹침 시간 이상"). revision·30분 경계는 parseSlots 가 본다.
+ * shortcut: 기존 매칭 충돌은 D 요청 트랜잭션(BT-019)·matches(BT-033)에서 확인한다.
  */
 export async function resolveCandidate(
   store: MatchStore,
