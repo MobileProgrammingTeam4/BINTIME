@@ -33,6 +33,7 @@ export function makeDeps(options: {
   steps?: Step[];
   matches?: Record<string, string[]>;
   now?: Date;
+  allowedEmailSuffixes?: string[];
 } = {}): TestDeps {
   const usageStore = new MemoryUsageStore();
   const client = new FakeModelClient(options.steps ?? []);
@@ -47,6 +48,7 @@ export function makeDeps(options: {
     sleep: async (ms) => {
       sleeps.push(ms);
     },
+    allowedEmailSuffixes: options.allowedEmailSuffixes ?? [".ac.kr", ".edu"],
     usageStore,
     client,
     sleeps,
