@@ -3,9 +3,12 @@ package com.team4.bintime.timetable;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -15,17 +18,52 @@ import androidx.fragment.app.Fragment;
 import com.google.android.material.materialswitch.MaterialSwitch;
 import com.team4.bintime.MainActivity;
 import com.team4.bintime.R;
+import com.team4.bintime.data.model.Timetable;
+import com.team4.bintime.data.repository.AsyncTimetableRepository;
+import com.team4.bintime.data.repository.FreeSlotValidator;
+import com.team4.bintime.data.repository.TimetableFailure;
+import com.team4.bintime.data.repository.TimetableRepositories;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.Collections;
 
+/**
+ * 주간 시간표 탭. [BT-015/016]
+ * <ul>
+ *   <li>화면이 보이는 동안(onStart~onStop) 시간표를 구독해 다른 화면·기기의 변경을 반영한다.</li>
+ *   <li>빈 칸을 누르면 공강 선택이 바뀌고, 마지막 누름 후 약 0.8초 뒤 또는 탭을 벗어날 때(숨김·onStop)
+ *       {@code saveFreeSlots}로 저장한다. 저장하지 않은 선택이 있는 동안에는 들어오는 값으로 덮어쓰지 않는다.</li>
+ *   <li>매칭 대상 공강 구간이 40개를 넘는 선택은 저장 전에 안내하고 되돌린다.</li>
+ *   <li>저장이 실패하면 안내하고 서버 값으로 다시 그린다.</li>
+ * </ul>
+ */
 public class TimetableWeekFragment extends Fragment {
+    private static final long SAVE_DELAY_MS = 800;
+
     private final ActivityResultLauncher<Intent> manage = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(), result -> {
                 if (result.getResultCode() == Activity.RESULT_OK) render();
             });
+
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Runnable saveRunnable = this::flushFreeSlots;
+
+    private AsyncTimetableRepository.Registration registration;
+    /** 화면에 그리는 시간표. 구독 값으로 바뀌며, 칸을 누르면 선택만 바뀐다. */
+    private TimetableDraft draft = new TimetableDraft(Collections.emptyList());
+    /** 마지막으로 받은 저장소 값. 저장 실패·저장 완료 뒤 다시 그릴 때 쓴다. */
+    private Timetable latest;
+    /** 마지막으로 받아들인 선택(40개 상한 초과 시 되돌릴 값). */
+    private long[] acceptedCells = new long[7];
+    /** 저장소 값을 한 번이라도 받았다. 그 전에는 칸 선택을 받지 않는다(빈 화면으로 저장된 선택을 덮지 않도록). */
+    private boolean loaded;
+    /** 저장 예약됐거나 저장 중인 선택이 있다. */
+    private boolean dirty;
+    /** 칸 변경 순번. 저장 콜백이 끝났을 때 그 사이 새 변경이 있었는지 본다. */
+    private int editSequence;
 
     public TimetableWeekFragment() {
         super(R.layout.fragment_timetable_week);
@@ -33,8 +71,10 @@ public class TimetableWeekFragment extends Fragment {
 
     @Override
     public void onViewCreated(@NonNull View view, Bundle state) {
-        view.findViewById(R.id.manage_timetable).setOnClickListener(v ->
-                manage.launch(TimetableReviewActivity.forEditing(requireContext())));
+        view.findViewById(R.id.manage_timetable).setOnClickListener(v -> {
+            flushFreeSlots();
+            manage.launch(TimetableReviewActivity.forEditing(requireContext()));
+        });
         view.findViewById(R.id.btnChangeSlot).setVisibility(View.GONE);
         TextView footer = view.findViewById(R.id.matching_status_footer);
         footer.setGravity(Gravity.CENTER);
@@ -43,23 +83,71 @@ public class TimetableWeekFragment extends Fragment {
     }
 
     @Override
+    public void onStart() {
+        super.onStart();
+        subscribe();
+    }
+
+    @Override
+    public void onStop() {
+        flushFreeSlots();
+        if (registration != null) {
+            registration.remove();
+            registration = null;
+        }
+        super.onStop();
+    }
+
+    @Override
     public void onHiddenChanged(boolean hidden) {
         super.onHiddenChanged(hidden);
-        if (!hidden) render();
+        if (hidden) flushFreeSlots();
+        else render();
+    }
+
+    @Override
+    public void onDestroyView() {
+        handler.removeCallbacks(saveRunnable);
+        super.onDestroyView();
+    }
+
+    private void subscribe() {
+        if (registration != null) return;
+        registration = TimetableRepositories.get(requireContext()).observeTimetable(
+                new AsyncTimetableRepository.Listener<Timetable>() {
+                    @Override
+                    public void onData(Timetable timetable) {
+                        latest = timetable;
+                        loaded = true;
+                        if (!dirty) applyLatest();
+                    }
+
+                    @Override
+                    public void onError(TimetableFailure failure) {
+                        registration = null;
+                        if (getContext() == null) return;
+                        Toast.makeText(getContext(),
+                                failure.getCode() == TimetableFailure.Code.NOT_SIGNED_IN
+                                        ? TimetableMessages.of(failure) : TimetableMessages.LOAD_FAILED,
+                                Toast.LENGTH_LONG).show();
+                    }
+                });
+    }
+
+    private void applyLatest() {
+        draft = TimetableDraftMapper.toDraft(latest);
+        draft.discardOccupiedFreeSlots();
+        acceptedCells = draft.freeCells();
+        render();
     }
 
     private void render() {
         View view = getView();
-        if (view == null) return;
+        if (view == null || !(getActivity() instanceof MainActivity)) return;
         MainActivity host = (MainActivity) requireActivity();
-        TimetableDraft saved = MockTimetableRepository.load();
-        TimetableDraft draft = saved == null ? new TimetableDraft(Collections.emptyList()) : saved;
         TimetableWeekView week = view.findViewById(R.id.timetable_week);
         week.setTitle("주간 시간표");
-        week.bind(draft, () -> {
-            MockTimetableRepository.save(draft);
-            updateStatus(view, host, draft);
-        });
+        week.bind(draft, () -> onCellToggled(view, host));
         MaterialSwitch toggle = view.findViewById(R.id.switchMatching);
         toggle.setOnCheckedChangeListener(null);
         toggle.setChecked(host.isMatchingOn());
@@ -68,6 +156,55 @@ public class TimetableWeekFragment extends Fragment {
             updateStatus(view, host, draft);
         });
         updateStatus(view, host, draft);
+    }
+
+    private void onCellToggled(View view, MainActivity host) {
+        if (!loaded) {
+            draft.setFreeCells(acceptedCells);
+            render();
+            return;
+        }
+        long[] cells = draft.freeCells();
+        if (FreeSlotValidator.checkLimit(cells) != null) {
+            // 저장 전에 안내하고 이번 선택을 되돌린다.
+            Toast.makeText(requireContext(), TimetableMessages.TOO_MANY_FREE_SLOTS, Toast.LENGTH_LONG).show();
+            draft.setFreeCells(acceptedCells);
+            render();
+            return;
+        }
+        if (Arrays.equals(cells, acceptedCells)) return;
+        acceptedCells = cells;
+        dirty = true;
+        editSequence++;
+        handler.removeCallbacks(saveRunnable);
+        handler.postDelayed(saveRunnable, SAVE_DELAY_MS);
+        updateStatus(view, host, draft);
+    }
+
+    /** 예약된 저장을 바로 실행한다. 저장할 변경이 없으면 아무것도 하지 않는다. */
+    private void flushFreeSlots() {
+        handler.removeCallbacks(saveRunnable);
+        if (!dirty || getContext() == null) return;
+        int sequence = editSequence;
+        TimetableRepositories.get(requireContext()).saveFreeSlots(TimetableDraftMapper.toFreeSlots(draft),
+                new AsyncTimetableRepository.Callback<Void>() {
+                    @Override
+                    public void onSuccess(Void ignored) {
+                        if (sequence != editSequence) return; // 그 사이 새 변경이 있으면 그 저장이 마무리한다
+                        dirty = false;
+                        if (latest != null) applyLatest();
+                    }
+
+                    @Override
+                    public void onError(TimetableFailure failure) {
+                        if (sequence != editSequence) return;
+                        dirty = false;
+                        if (getContext() != null) {
+                            Toast.makeText(getContext(), TimetableMessages.of(failure), Toast.LENGTH_LONG).show();
+                        }
+                        applyLatest(); // 서버 값으로 되돌린다
+                    }
+                });
     }
 
     private void updateStatus(View view, MainActivity host, TimetableDraft draft) {
