@@ -79,8 +79,8 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)("BT-019 Firestore 에뮬�
         const timer = setTimeout(() => { stop(); reject(new Error("snapshot timeout")); }, 10_000);
         const stop = onSnapshot(q, (s) => { if (!s.empty) { clearTimeout(timer); stop(); resolve(s.docs[0].id); } }, reject);
       }));
-    const callable = createRequestCallable(() => service);
-    const result = await callable.run({ auth: { uid: "sender", token: {} },
+    const callable = createRequestCallable(() => service, () => [".ac.kr"]);
+    const result = await callable.run({ auth: { uid: "sender", token: { email: "test@school.ac.kr", email_verified: true } },
       data: { candidateId: "candidate-1", clientRequestId: randomUUID() } } as never);
     expect(await Promise.all(waits)).toEqual([result.id, result.id]);
   });

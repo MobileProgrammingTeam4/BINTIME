@@ -45,6 +45,12 @@ public final class MatchSummaryBinder {
     /** [매칭 신청] 버튼: 이미 신청했으면 '신청 완료'로 잠그고, 아니면 누를 때 신청 + 완료 팝업. */
     static void bindRequestButton(TextView button, MatchCandidate c) {
         RequestRepository repository = RequestRepositories.get(button.getContext());
+        bindRequestButton(button, c, repository.isMock() ? RequestDraft.mock(c) : null);
+    }
+
+    /** BT-018 연결점. 실제 검색 후보는 verified draft를 공급한다. Mock 카드를 Firebase로 보내지 않는다. */
+    public static void bindRequestButton(TextView button, MatchCandidate c, RequestDraft draft) {
+        RequestRepository repository = RequestRepositories.get(button.getContext());
         boolean requested = repository.hasPendingRequest(c.uid);
         boolean submitting = repository.isSubmitting(c.uid);
         button.setText(submitting ? "신청 중…" : requested ? "신청 완료" : "매칭 신청");
@@ -52,12 +58,13 @@ public final class MatchSummaryBinder {
         button.setAlpha(requested || submitting ? 0.4f : 1f);
         button.setOnClickListener(v -> {
             FragmentActivity activity = activityOf(v.getContext());
-            if (!repository.isMock()) {
-                Toast.makeText(activity, R.string.request_search_not_connected, Toast.LENGTH_LONG).show();
-                return; // BT-017이 아직 Mock이므로 실제 후보인 것처럼 서버에 보내지 않는다.
+            if (draft == null || draft.mock != repository.isMock() || !c.uid.equals(draft.toUid)
+                    || (!repository.isMock() && !c.uid.equals(draft.candidateId))) {
+                Toast.makeText(activity, "매칭 검색 결과에서 상대를 다시 선택해주세요.", Toast.LENGTH_LONG).show();
+                return;
             }
             button.setEnabled(false);
-            repository.create(RequestDraft.mock(c), new RequestRepository.Callback() {
+            repository.create(draft, new RequestRepository.Callback() {
                 @Override public void onSuccess(RequestRepository.Item item) {
                     if (activity.isFinishing() || activity.isDestroyed() || !button.isAttachedToWindow()) return;
                     bindRequestButton(button, c);
@@ -67,7 +74,10 @@ public final class MatchSummaryBinder {
                 }
                 @Override public void onError(String message) {
                     if (activity.isFinishing() || activity.isDestroyed() || !button.isAttachedToWindow()) return;
-                    bindRequestButton(button, c);
+                    // 네트워크 실패 후 같은 draft/UUID로 재시도할 수 있도록 리스너를 바꾸지 않는다.
+                    button.setEnabled(true);
+                    button.setText("매칭 신청");
+                    button.setAlpha(1f);
                     Toast.makeText(activity, message, Toast.LENGTH_LONG).show();
                 }
             });
