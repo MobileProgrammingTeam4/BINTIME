@@ -1,5 +1,6 @@
 package com.team4.bintime.data.repository;
 
+import com.team4.bintime.data.availability.FreeCells;
 import com.team4.bintime.data.model.Course;
 import com.team4.bintime.data.model.TimeSlot;
 import com.team4.bintime.data.model.Timetable;
@@ -13,7 +14,7 @@ import java.util.Map;
  * [BT-015] 시간표 ↔ Firestore 문서 변환. Android/Firebase 의존성이 없어 단위 테스트로 검증한다.
  *
  * <pre>
- * timetables/{uid}                    uid, semester?, revision, updatedAt
+ * timetables/{uid}                    uid, semester?, revision, freeCells?, updatedAt
  * timetables/{uid}/courses/{courseId} courseId, name, professor?, classroom?, colorCode?,
  *                                     timeSlots[{dayOfWeek, startMinute, endMinute}], createdAt, updatedAt
  * </pre>
@@ -28,6 +29,8 @@ public final class TimetableDocuments {
     public static final String F_UID = "uid";
     public static final String F_SEMESTER = "semester";
     public static final String F_REVISION = "revision";
+    /** [BT-016] 공강 선택 원본. 요일(월~일)별 48칸 비트마스크 정수 7개. {@link FreeCells} 참고. */
+    public static final String F_FREE_CELLS = "freeCells";
     public static final String F_CREATED_AT = "createdAt";
     public static final String F_UPDATED_AT = "updatedAt";
 
@@ -115,7 +118,8 @@ public final class TimetableDocuments {
 
     /**
      * 부모 문서 + 수업 목록 → Timetable. 부모 문서가 없고 수업도 없으면 미등록(null).
-     * 부모 문서 없이 수업만 있으면(규칙상 생기지 않아야 함) revision 0으로 조립한다.
+     * 부모 문서 없이 수업만 있으면(앱은 항상 부모와 함께 쓰지만 규칙이 강제하지는 않음) revision 0으로 조립한다.
+     * [BT-016] 부모 문서의 freeCells를 {@link Timetable#getFreeSlots()}(공강 선택 원본)로 채운다.
      */
     public static Timetable assemble(String uid, Map<String, Object> parent, List<Course> courses) {
         boolean noCourses = courses == null || courses.isEmpty();
@@ -124,12 +128,19 @@ public final class TimetableDocuments {
         Integer revision = parent == null ? null : readInt(parent.get(F_REVISION));
         Timetable timetable = new Timetable(uid, uid, semester);
         timetable.setRevision(revision == null ? 0 : revision);
+        timetable.setFreeSlots(FreeCells.toSlots(readFreeCells(parent)));
         if (!noCourses) {
             for (Course c : courses) {
                 if (c != null) timetable.getCourses().add(c);
             }
         }
         return timetable;
+    }
+
+    /** 부모 문서의 공강 선택 원본. 필드가 없거나 형식이 깨졌으면 빈 선택. */
+    public static long[] readFreeCells(Map<String, Object> parent) {
+        long[] cells = parent == null ? null : FreeCells.fromList(parent.get(F_FREE_CELLS));
+        return cells == null ? FreeCells.empty() : cells;
     }
 
     /** Long/Integer만 int로 읽는다. 소수·문자열·int 범위 밖은 null. */

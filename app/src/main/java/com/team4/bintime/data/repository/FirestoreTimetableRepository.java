@@ -14,7 +14,10 @@ import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.firestore.Transaction;
 import com.team4.bintime.auth.AuthRepositories;
+import com.team4.bintime.data.availability.Availability;
+import com.team4.bintime.data.availability.FreeCells;
 import com.team4.bintime.data.model.Course;
+import com.team4.bintime.data.model.TimeSlot;
 import com.team4.bintime.data.model.Timetable;
 
 import java.util.ArrayList;
@@ -27,8 +30,9 @@ import java.util.Set;
 /**
  * [BT-015] Firestore 시간표 저장소.
  * <pre>
- * timetables/{uid}                    uid, semester?, revision, updatedAt
+ * timetables/{uid}                    uid, semester?, revision, freeCells?, updatedAt
  * timetables/{uid}/courses/{courseId} TimetableDocuments 참고
+ * availability/{uid}                  slots, sourceRevision, updatedAt (BT-016, {@link Availability})
  * </pre>
  * <ul>
  *   <li>UID는 매 호출마다 {@code AuthRepositories.get(context).getCurrentUid()}로 얻는다.</li>
@@ -185,7 +189,7 @@ public final class FirestoreTimetableRepository implements AsyncTimetableReposit
                             "course deleted concurrently"));
                 }
                 putCourse(tx, courseRef, candidate, existing.exists());
-                putParent(tx, uid, parentRef, revision + 1);
+                putParent(tx, uid, parentRef, revision + 1, null);
                 return null;
             }).addOnCompleteListener(task -> {
                 if (task.isSuccessful()) {
@@ -216,7 +220,7 @@ public final class FirestoreTimetableRepository implements AsyncTimetableReposit
             DocumentSnapshot existing = tx.get(courseRef);
             if (!existing.exists()) return null; // 멱등
             tx.delete(courseRef);
-            putParent(tx, uid, parentRef, revisionOf(parent) + 1);
+            putParent(tx, uid, parentRef, revisionOf(parent) + 1, null);
             return null;
         }).addOnCompleteListener(task -> {
             if (task.isSuccessful()) {
@@ -249,11 +253,19 @@ public final class FirestoreTimetableRepository implements AsyncTimetableReposit
                 return;
             }
             DocumentReference parentRef = parentRef(uid);
+            DocumentReference availabilityRef = availabilityRef(uid);
             Set<String> keep = new HashSet<>();
             for (Course c : candidates) keep.add(c.getCourseId());
+            List<TimeSlot> newCourseSlots = FreeSlotValidator.courseSlots(candidates);
             db.runTransaction((Transaction.Function<Void>) tx -> {
                 DocumentSnapshot parent = tx.get(parentRef);
                 int revision = requireRevision(parent, state.revision);
+                // [BT-016] 새 수업과 겹치는 선택 칸을 지우고 남은 선택으로 availability를 다시 계산한다.
+                long[] kept = FreeCells.keepSelectable(
+                        TimetableDocuments.readFreeCells(parent.exists() ? parent.getData() : null),
+                        newCourseSlots);
+                TimetableFailure tooMany = FreeSlotValidator.checkLimit(kept);
+                if (tooMany != null) throw new FirestoreFailures.Abort(tooMany);
                 for (String id : state.courseIds) {
                     if (!keep.contains(id)) tx.delete(coursesRef(uid).document(id));
                 }
@@ -261,7 +273,64 @@ public final class FirestoreTimetableRepository implements AsyncTimetableReposit
                     putCourse(tx, coursesRef(uid).document(c.getCourseId()), c,
                             state.courseIds.contains(c.getCourseId()));
                 }
-                putParent(tx, uid, parentRef, revision + 1);
+                putParent(tx, uid, parentRef, revision + 1, kept);
+                putAvailability(tx, availabilityRef, Availability.fromCells(kept, revision + 1));
+                return null;
+            }).addOnCompleteListener(task -> {
+                if (task.isSuccessful()) {
+                    if (callback != null) callback.onSuccess(null);
+                } else {
+                    fail(callback, FirestoreFailures.from(task.getException()));
+                }
+            });
+        });
+    }
+
+    @Override
+    public void saveFreeSlots(List<TimeSlot> selected, Callback<Void> callback) {
+        String uid = currentUid();
+        if (uid == null) {
+            fail(callback, notSignedIn());
+            return;
+        }
+        long[] cells = FreeSlotValidator.toCells(selected);
+        if (cells == null) {
+            fail(callback, FreeSlotValidator.validate(null, null));
+            return;
+        }
+        TimetableFailure tooMany = FreeSlotValidator.checkLimit(cells);
+        if (tooMany != null) {
+            fail(callback, tooMany);
+            return;
+        }
+        loadState(uid, (state, error) -> {
+            if (error != null) {
+                fail(callback, error);
+                return;
+            }
+            TimetableFailure invalid = FreeSlotValidator.validate(cells, state.courses);
+            if (invalid != null) {
+                fail(callback, invalid);
+                return;
+            }
+            DocumentReference parentRef = parentRef(uid);
+            DocumentReference availabilityRef = availabilityRef(uid);
+            db.runTransaction((Transaction.Function<Void>) tx -> {
+                DocumentSnapshot parent = tx.get(parentRef);
+                // 수업이 그대로일 때만 저장한다(겹침 검증이 최신 수업 기준이 되도록).
+                int revision = requireRevision(parent, state.revision);
+                Map<String, Object> doc = new LinkedHashMap<>();
+                if (!parent.exists()) {
+                    // 수업 없이 공강부터 고른 경우: 부모 문서를 revision 1로 만든다.
+                    revision = 1;
+                    doc.put(TimetableDocuments.F_UID, uid);
+                    doc.put(TimetableDocuments.F_REVISION, revision);
+                }
+                // 공강만 바뀌는 갱신: revision은 그대로, freeCells·updatedAt만 바뀐다(규칙의 별도 경로).
+                doc.put(TimetableDocuments.F_FREE_CELLS, FreeCells.toList(cells));
+                doc.put(TimetableDocuments.F_UPDATED_AT, FieldValue.serverTimestamp());
+                tx.set(parentRef, doc, SetOptions.merge());
+                putAvailability(tx, availabilityRef, Availability.fromCells(cells, revision));
                 return null;
             }).addOnCompleteListener(task -> {
                 if (task.isSuccessful()) {
@@ -331,11 +400,15 @@ public final class FirestoreTimetableRepository implements AsyncTimetableReposit
         return revision == null ? 0 : revision;
     }
 
-    /** 부모 문서: uid·revision·updatedAt만 덮어쓰고 semester 등 나머지는 유지(merge). */
-    private static void putParent(Transaction tx, String uid, DocumentReference parentRef, int revision) {
+    /**
+     * 부모 문서: uid·revision·updatedAt(과 freeCells가 있으면 그것)만 덮어쓰고 semester 등 나머지는 유지(merge).
+     */
+    private static void putParent(Transaction tx, String uid, DocumentReference parentRef, int revision,
+                                  long[] freeCells) {
         Map<String, Object> doc = new LinkedHashMap<>();
         doc.put(TimetableDocuments.F_UID, uid);
         doc.put(TimetableDocuments.F_REVISION, revision);
+        if (freeCells != null) doc.put(TimetableDocuments.F_FREE_CELLS, FreeCells.toList(freeCells));
         doc.put(TimetableDocuments.F_UPDATED_AT, FieldValue.serverTimestamp());
         tx.set(parentRef, doc, SetOptions.merge());
     }
@@ -359,6 +432,13 @@ public final class FirestoreTimetableRepository implements AsyncTimetableReposit
         tx.set(ref, doc, SetOptions.merge());
     }
 
+    /** availability 문서 전체 교체(set). 규칙: sourceRevision == 같은 쓰기 후의 부모 revision. */
+    private static void putAvailability(Transaction tx, DocumentReference ref, Availability availability) {
+        Map<String, Object> doc = availability.toDocument();
+        doc.put(Availability.F_UPDATED_AT, FieldValue.serverTimestamp());
+        tx.set(ref, doc);
+    }
+
     private static List<Course> readCourses(QuerySnapshot snapshot) {
         List<Course> courses = new ArrayList<>();
         if (snapshot == null) return courses;
@@ -375,6 +455,10 @@ public final class FirestoreTimetableRepository implements AsyncTimetableReposit
 
     private DocumentReference parentRef(String uid) {
         return db.collection(TimetableDocuments.TIMETABLES).document(uid);
+    }
+
+    private DocumentReference availabilityRef(String uid) {
+        return db.collection(Availability.COLLECTION).document(uid);
     }
 
     private CollectionReference coursesRef(String uid) {

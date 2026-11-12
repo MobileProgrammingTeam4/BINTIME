@@ -133,5 +133,48 @@ service cloud.firestore {
         allow delete: if isOwner(uid);
       }
     }
+
+    // ── BT-016 ③ 매칭 대상 공강 (C) ────────────────────────────────────
+    // availability/{uid} = { slots, sourceRevision, updatedAt } (팀 결정, A)
+    // slots: FreeTimeCalculator.matchableFreeSlots 결과(붙은 칸 병합 + 60분 이상). 본인만 읽고 쓴다.
+    // 다른 사용자는 읽을 수 없고 매칭 검색 서버 함수가 Admin SDK로 읽는다.
+    // 규칙에는 반복문이 없어 slots 원소를 상한(40개)까지 하나씩 풀어서 검사한다.
+    // 수업과의 겹침은 규칙으로 검사할 수 없으므로 서버도 slots를 다시 정규화해야 한다.
+    function validAvailSlot(s) {
+      return validSlot(s)
+          && s.startMinute % 30 == 0 && s.endMinute % 30 == 0
+          && s.endMinute - s.startMinute >= 60;
+    }
+
+    function validAvailSlotAt(slots, i) {
+      return slots.size() <= i || validAvailSlot(slots[i]);
+    }
+
+    // sourceRevision은 같은 트랜잭션에서 쓴 뒤의 부모 시간표 revision과 같아야 한다.
+    function validAvailability(uid) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['slots', 'sourceRevision', 'updatedAt'])
+          && d.slots is list && d.slots.size() <= 40
+          && validAvailSlotAt(d.slots, 0) && validAvailSlotAt(d.slots, 1) && validAvailSlotAt(d.slots, 2) && validAvailSlotAt(d.slots, 3)
+          && validAvailSlotAt(d.slots, 4) && validAvailSlotAt(d.slots, 5) && validAvailSlotAt(d.slots, 6) && validAvailSlotAt(d.slots, 7)
+          && validAvailSlotAt(d.slots, 8) && validAvailSlotAt(d.slots, 9) && validAvailSlotAt(d.slots, 10) && validAvailSlotAt(d.slots, 11)
+          && validAvailSlotAt(d.slots, 12) && validAvailSlotAt(d.slots, 13) && validAvailSlotAt(d.slots, 14) && validAvailSlotAt(d.slots, 15)
+          && validAvailSlotAt(d.slots, 16) && validAvailSlotAt(d.slots, 17) && validAvailSlotAt(d.slots, 18) && validAvailSlotAt(d.slots, 19)
+          && validAvailSlotAt(d.slots, 20) && validAvailSlotAt(d.slots, 21) && validAvailSlotAt(d.slots, 22) && validAvailSlotAt(d.slots, 23)
+          && validAvailSlotAt(d.slots, 24) && validAvailSlotAt(d.slots, 25) && validAvailSlotAt(d.slots, 26) && validAvailSlotAt(d.slots, 27)
+          && validAvailSlotAt(d.slots, 28) && validAvailSlotAt(d.slots, 29) && validAvailSlotAt(d.slots, 30) && validAvailSlotAt(d.slots, 31)
+          && validAvailSlotAt(d.slots, 32) && validAvailSlotAt(d.slots, 33) && validAvailSlotAt(d.slots, 34) && validAvailSlotAt(d.slots, 35)
+          && validAvailSlotAt(d.slots, 36) && validAvailSlotAt(d.slots, 37) && validAvailSlotAt(d.slots, 38) && validAvailSlotAt(d.slots, 39)
+          && d.sourceRevision is int
+          && existsAfter(timetablePath(uid))
+          && d.sourceRevision == getAfter(timetablePath(uid)).data.revision
+          && d.updatedAt == request.time;
+    }
+
+    match /availability/{uid} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid) && validAvailability(uid);
+      allow delete: if false; // 탈퇴는 서버에서 처리
+    }
   }
 }

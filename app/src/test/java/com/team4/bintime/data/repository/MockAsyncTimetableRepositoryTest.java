@@ -1,5 +1,6 @@
 package com.team4.bintime.data.repository;
 
+import com.team4.bintime.data.availability.Availability;
 import com.team4.bintime.data.model.Course;
 import com.team4.bintime.data.model.TimeSlot;
 import com.team4.bintime.data.model.Timetable;
@@ -357,6 +358,121 @@ public class MockAsyncTimetableRepositoryTest {
         Recorder rec = new Recorder();
         repo.observeTimetable(rec);
         assertEquals(0, rec.last().getCourseCount());
+    }
+
+    // ── BT-016 공강 선택·availability ─────────────────
+
+    private Result<Void> saveFree(TimeSlot... slots) {
+        Result<Void> r = new Result<>();
+        repo.saveFreeSlots(Arrays.asList(slots), r);
+        return r;
+    }
+
+    private Result<Void> replace(Course... courses) {
+        Result<Void> r = new Result<>();
+        repo.replaceCourses(Arrays.asList(courses), r);
+        return r;
+    }
+
+    @Test
+    public void saveFreeSlots_storesSelection_andMatchableAvailability() {
+        ok(replace(course("a", MON, 600, 690)));
+        int revision = MockTimetableRepositoryImpl.getInstance().getTimetable("uid-a").getRevision();
+        Recorder rec = new Recorder();
+        repo.observeTimetable(rec);
+
+        // 30분 단독 + 붙은 두 칸(60분) + 화 90분
+        ok(saveFree(new TimeSlot(MON, 540, 570), new TimeSlot(MON, 720, 750), new TimeSlot(MON, 750, 780),
+                new TimeSlot(TUE, 600, 690)));
+
+        // 선택 원본: 30분 단독 포함, 붙은 칸은 합쳐서 복원
+        assertEquals(Arrays.asList(new TimeSlot(MON, 540, 570), new TimeSlot(MON, 720, 780),
+                new TimeSlot(TUE, 600, 690)), rec.last().getFreeSlots());
+        // 매칭 대상: 60분 이상만, sourceRevision = 현재 revision (공강 저장은 revision을 올리지 않음)
+        Availability a = repo.getAvailability("uid-a");
+        assertEquals(Arrays.asList(new TimeSlot(MON, 720, 780), new TimeSlot(TUE, 600, 690)), a.getSlots());
+        assertEquals(revision, a.getSourceRevision());
+        assertEquals(revision, rec.last().getRevision());
+    }
+
+    @Test
+    public void saveFreeSlots_overlappingCourse_rejectedAndNotSaved() {
+        ok(replace(course("a", MON, 600, 690)));
+        assertFailure(TimetableFailure.Code.INVALID_FREE_SLOT, saveFree(new TimeSlot(MON, 660, 720)));
+        assertTrue(repo.getAvailability("uid-a").getSlots().isEmpty());
+    }
+
+    @Test
+    public void saveFreeSlots_offGrid_rejected() {
+        assertFailure(TimetableFailure.Code.INVALID_FREE_SLOT, saveFree(new TimeSlot(MON, 545, 600)));
+        assertNull(repo.getAvailability("uid-a"));
+    }
+
+    @Test
+    public void saveFreeSlots_over40Blocks_rejectedBeforeSaving() {
+        List<TimeSlot> slots = new ArrayList<>();
+        for (int day = 1; day <= 3; day++) {
+            for (int start = 0; start + 60 <= 1440 && slots.size() < Availability.MAX_SLOTS + 1; start += 90) {
+                slots.add(new TimeSlot(day, start, start + 60));
+            }
+        }
+        assertEquals(Availability.MAX_SLOTS + 1, slots.size());
+        Result<Void> r = new Result<>();
+        repo.saveFreeSlots(slots, r);
+        assertFailure(TimetableFailure.Code.TOO_MANY_FREE_SLOTS, r);
+        assertNull(repo.getAvailability("uid-a"));
+    }
+
+    @Test
+    public void saveFreeSlots_withoutTimetable_createsRevision1() {
+        ok(saveFree(new TimeSlot(MON, 600, 660)));
+        assertEquals(1, MockTimetableRepositoryImpl.getInstance().getTimetable("uid-a").getRevision());
+        assertEquals(1, repo.getAvailability("uid-a").getSourceRevision());
+    }
+
+    @Test
+    public void replaceCourses_clearsOverlappingCells_andRefreshesAvailability() {
+        ok(replace(course("a", MON, 540, 600)));
+        ok(saveFree(new TimeSlot(MON, 600, 780))); // 10:00~13:00
+        ok(replace(course("a", MON, 540, 600), course("b", MON, 660, 690))); // 11:00~11:30 수업 추가
+        int revision = MockTimetableRepositoryImpl.getInstance().getTimetable("uid-a").getRevision();
+
+        Recorder rec = new Recorder();
+        repo.observeTimetable(rec);
+        assertEquals(Arrays.asList(new TimeSlot(MON, 600, 660), new TimeSlot(MON, 690, 780)),
+                rec.last().getFreeSlots());
+        Availability a = repo.getAvailability("uid-a");
+        assertEquals(Arrays.asList(new TimeSlot(MON, 600, 660), new TimeSlot(MON, 690, 780)), a.getSlots());
+        assertEquals(revision, a.getSourceRevision());
+    }
+
+    @Test
+    public void courseChangeWithoutReplace_leavesAvailabilityStale() {
+        ok(saveFree(new TimeSlot(MON, 600, 720)));
+        ok(add(course("a", TUE, 600, 690)));
+        int revision = MockTimetableRepositoryImpl.getInstance().getTimetable("uid-a").getRevision();
+        assertTrue(repo.getAvailability("uid-a").getSourceRevision() < revision);
+    }
+
+    @Test
+    public void freeSlots_separatedByAccount() {
+        ok(saveFree(new TimeSlot(MON, 600, 720)));
+        currentUid = "uid-b";
+        Recorder rec = new Recorder();
+        repo.observeTimetable(rec);
+        assertNull(rec.last());
+        assertNull(repo.getAvailability("uid-b"));
+        ok(saveFree(new TimeSlot(TUE, 600, 660)));
+        assertEquals(Collections.singletonList(new TimeSlot(TUE, 600, 660)),
+                repo.getAvailability("uid-b").getSlots());
+        assertEquals(Collections.singletonList(new TimeSlot(MON, 600, 720)),
+                repo.getAvailability("uid-a").getSlots());
+    }
+
+    @Test
+    public void saveFreeSlots_notSignedIn() {
+        currentUid = null;
+        assertFailure(TimetableFailure.Code.NOT_SIGNED_IN, saveFree(new TimeSlot(MON, 600, 660)));
     }
 
     @Test(expected = IllegalArgumentException.class)
