@@ -76,6 +76,23 @@ public final class ProfileDocuments {
         return profile;
     }
 
+    /**
+     * publicProfiles/{uid} 문서 → 공개 프로필. 문서에 이메일이 섞여 있어도 결과에 넣지 않는다
+     * (Rules 가 막지만 앱에서도 한 번 더 걸러 다른 사용자 이메일이 화면에 나가지 않게 한다).
+     */
+    public static UserProfile fromPublicDocument(String uid, Map<String, Object> data) {
+        UserProfile profile = fromDocument(uid, data);
+        profile.setEmail(null);
+        return profile;
+    }
+
+    /** 공개용 복사본: 이메일을 지운다. Mock 저장소가 쓴다. */
+    public static UserProfile toPublicProfile(UserProfile profile) {
+        UserProfile copy = profile.copy();
+        copy.setEmail(null);
+        return copy;
+    }
+
     public static boolean isCompleted(Map<String, Object> data) {
         return data != null && Boolean.TRUE.equals(data.get(F_PROFILE_COMPLETED));
     }

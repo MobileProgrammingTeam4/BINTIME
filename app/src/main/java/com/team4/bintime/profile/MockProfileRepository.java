@@ -39,6 +39,9 @@ public class MockProfileRepository implements ProfileRepository {
     /** 시연용 업로드 사진. 경로 → JPEG 바이트. */
     private final Map<String, byte[]> photos = new HashMap<>();
 
+    /** 다른 사용자 공개 프로필(uid → 이메일 없는 복사본). publicProfiles/{uid} 를 흉내 낸다. */
+    private final Map<String, UserProfile> publicProfiles = new HashMap<>();
+
     public boolean hasCompletedProfile(String uid) {
         return uid != null && uid.equals(currentProfile.getUid());
     }
@@ -102,10 +105,34 @@ public class MockProfileRepository implements ProfileRepository {
         toSave.setDepartment(toSave.getDepartment().trim());
         if (toSave.getBio() != null) toSave.setBio(toSave.getBio().trim());
         this.currentProfile = toSave;
+        // Firebase 저장소처럼 공개 프로필도 함께 갱신한다(uid 가 있는 경우만).
+        if (toSave.getUid() != null) {
+            publicProfiles.put(toSave.getUid(), ProfileDocuments.toPublicProfile(toSave));
+        }
 
         if (callback != null) {
             callback.onSuccess(null);
         }
+    }
+
+    /** 저장되거나 {@link #putPublicProfile} 로 등록된 공개 프로필의 복사본. 없으면 null, 이메일은 항상 null. */
+    @Override
+    public void getPublicProfile(String uid, Callback<UserProfile> callback) {
+        if (uid == null || uid.isEmpty()) {
+            if (callback != null) callback.onError("사용자 정보를 찾을 수 없어요.");
+            return;
+        }
+        UserProfile found = publicProfiles.get(uid);
+        if (callback != null) callback.onSuccess(found != null ? found.copy() : null);
+    }
+
+    /**
+     * Mock 전용: 다른 사용자의 공개 프로필을 등록한다(시연·테스트용 후보, 요청 상대 등).
+     * uid 가 없으면 무시한다. 저장 시 이메일은 지운다.
+     */
+    public void putPublicProfile(UserProfile profile) {
+        if (profile == null || profile.getUid() == null) return;
+        publicProfiles.put(profile.getUid(), ProfileDocuments.toPublicProfile(profile));
     }
 
     @Override
