@@ -176,6 +176,13 @@ describe.skipIf(!emulatorHost)("BT-021 RTDB 채팅 규칙", () => {
       await assertFails(db(ME).ref(`userChatRooms/${ME}/${MATCH}/unreadCount`).set("0"));
     });
 
+    it("본인 unreadCount 도 삭제할 수 없다 (#90 리뷰 Y2)", async () => {
+      await assertFails(db(ME).ref(`userChatRooms/${ME}/${MATCH}/unreadCount`).remove());
+      await assertFails(db(ME).ref(`userChatRooms/${ME}/${MATCH}/unreadCount`).set(null));
+      await assertFails(db(ME).ref(`userChatRooms/${ME}/${MATCH}`).update({ unreadCount: null }));
+      await assertSucceeds(db(ME).ref(`userChatRooms/${ME}/${MATCH}/unreadCount`).set(0));
+    });
+
     it("남의 unreadCount, 없는 방의 unreadCount 는 쓸 수 없다", async () => {
       await assertFails(db(OUTSIDER).ref(`userChatRooms/${ME}/${MATCH}/unreadCount`).set(0));
       await assertFails(db(ME).ref(`userChatRooms/${OTHER}/${MATCH}/unreadCount`).set(0));

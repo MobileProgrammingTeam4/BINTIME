@@ -34,7 +34,7 @@
         ".read": "auth != null && auth.uid === $uid",
         "$matchId": {
           "unreadCount": {
-            ".write": "auth != null && auth.uid === $uid && data.parent().child('otherUid').exists()",
+            ".write": "auth != null && auth.uid === $uid && data.parent().child('otherUid').exists() && newData.exists()",
             ".validate": "newData.isNumber() && newData.val() === 0"
           }
         }
