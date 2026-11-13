@@ -41,5 +41,141 @@ service cloud.firestore {
           && !('email' in request.resource.data);
       allow delete: if false;
     }
+
+    // ── BT-015 시간표 (C) ─────────────────────────────────────────────
+    // 본인만 읽고 쓴다. 다른 사용자는 읽을 수 없고 매칭 검색은 서버(Admin SDK)가 한다.
+    // 같은 요일 겹침·동시 수정 보호는 규칙으로 할 수 없어 클라이언트 트랜잭션이 맡는다
+    // (부모 revision을 읽어 그대로일 때만 수업과 revision+1을 함께 쓴다, docs/BT-015.md).
+    function timetablePath(uid) {
+      return /databases/$(database)/documents/timetables/$(uid);
+    }
+
+    // Firestore 문서 ID: 1~128자, '.'·'..' 불가, '__.*__' 예약 형식 불가 ('/'는 경로에서 이미 분리됨)
+    function validDocId(id) {
+      return id.size() >= 1 && id.size() <= 128 && id != '.' && id != '..'
+          && !id.matches('^__.*__$');
+    }
+
+    function validSlot(s) {
+      return s is map && s.keys().hasOnly(['dayOfWeek', 'startMinute', 'endMinute'])
+          && s.dayOfWeek is int && s.dayOfWeek >= 1 && s.dayOfWeek <= 7
+          && s.startMinute is int && s.endMinute is int
+          && s.startMinute >= 0 && s.startMinute < s.endMinute && s.endMinute <= 1440;
+    }
+
+    // 규칙에는 반복문이 없어 목록 원소를 하나씩 풀어서 검사한다.
+    function validSlotAt(slots, i) {
+      return slots.size() <= i || validSlot(slots[i]);
+    }
+
+    function optionalText(d, key, max) {
+      return !(key in d) || d[key] == null || (d[key] is string && d[key].size() <= max);
+    }
+
+    function validCourse(courseId) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['courseId', 'name', 'professor', 'classroom',
+                               'colorCode', 'timeSlots', 'createdAt', 'updatedAt'])
+          && d.courseId == courseId
+          && d.name is string && d.name.size() >= 1 && d.name.size() <= 30
+          && optionalText(d, 'professor', 30) && optionalText(d, 'classroom', 30)
+          && (!('colorCode' in d) || d.colorCode == null
+              || (d.colorCode is string && d.colorCode.matches('^#[0-9A-Fa-f]{6}$')))
+          && d.timeSlots is list && d.timeSlots.size() >= 1 && d.timeSlots.size() <= 7
+          && validSlotAt(d.timeSlots, 0) && validSlotAt(d.timeSlots, 1)
+          && validSlotAt(d.timeSlots, 2) && validSlotAt(d.timeSlots, 3)
+          && validSlotAt(d.timeSlots, 4) && validSlotAt(d.timeSlots, 5)
+          && validSlotAt(d.timeSlots, 6)
+          && d.updatedAt == request.time;
+    }
+
+    // 공강 선택 원본: 요일별(월~일) 48칸 비트마스크 7개. 비트 i = 자정 기준 30분 칸 i.
+    function validMask(m) {
+      return m is int && m >= 0 && m < 281474976710656; // 2^48
+    }
+
+    function validFreeCells(d) {
+      return !('freeCells' in d) || (d.freeCells is list && d.freeCells.size() == 7
+          && validMask(d.freeCells[0]) && validMask(d.freeCells[1])
+          && validMask(d.freeCells[2]) && validMask(d.freeCells[3])
+          && validMask(d.freeCells[4]) && validMask(d.freeCells[5])
+          && validMask(d.freeCells[6]));
+    }
+
+    function validTimetable(uid) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['uid', 'semester', 'revision', 'freeCells', 'updatedAt'])
+          && d.uid == uid && d.revision is int
+          && (!('semester' in d) || d.semester == null
+              || (d.semester is string && d.semester.size() <= 20))
+          && validFreeCells(d)
+          && d.updatedAt == request.time;
+    }
+
+    match /timetables/{uid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && validTimetable(uid) && request.resource.data.revision == 1;
+      // 수업 변경: revision +1. 공강 선택만 변경: revision 그대로, freeCells·updatedAt만 바뀜.
+      allow update: if isOwner(uid) && validTimetable(uid) && (
+          request.resource.data.revision == resource.data.revision + 1
+          || (request.resource.data.revision == resource.data.revision
+              && request.resource.data.diff(resource.data).affectedKeys()
+                     .hasOnly(['freeCells', 'updatedAt'])));
+      allow delete: if false; // 탈퇴는 서버에서 처리
+
+      // 수업 문서: 소유자 확인과 필드 검증만 한다. 부모 revision 증가는 클라이언트 트랜잭션이 함께 쓴다.
+      match /courses/{courseId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && validDocId(courseId) && validCourse(courseId)
+            && request.resource.data.createdAt == request.time;
+        allow update: if isOwner(uid) && validCourse(courseId)
+            && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isOwner(uid);
+      }
+    }
+
+    // ── BT-016 ③ 매칭 대상 공강 (C) ────────────────────────────────────
+    // availability/{uid} = { slots, sourceRevision, updatedAt } (팀 결정, A)
+    // slots: FreeTimeCalculator.matchableFreeSlots 결과(붙은 칸 병합 + 60분 이상). 본인만 읽고 쓴다.
+    // 다른 사용자는 읽을 수 없고 매칭 검색 서버 함수가 Admin SDK로 읽는다.
+    //
+    // 규칙 식 평가 한도(요청당 1000식) 때문에 slots 원소는 "map인지"만 검사한다.
+    // 원소마다 값 범위·30분 단위·60분 이상까지 검사하면 B의 에뮬레이터 측정에서 slots 6개부터
+    // 한도를 넘어 저장이 거부됐다. 슬롯 상세 검증은 규칙이 아니라
+    //   - 클라이언트: FreeSlotValidator·FreeCells (요일 1~7, 0 <= start < end <= 1440, 30분 경계,
+    //     수업 겹침, 붙은 칸 병합 후 60분 이상만 저장, 40개 상한)
+    //   - 서버: 매칭 검색(searchMatches, A)이 slots를 읽을 때 다시 정규화
+    //     (형식·범위가 틀린 원소 제외, 30분 경계·60분 이상 확인). 규칙을 우회한 값도 여기서 걸러진다.
+    // 가 맡는다. 규칙에는 반복문이 없어 상한(40개)까지 원소를 하나씩 풀어서 검사한다.
+    function availSlotsAreMaps(slots) {
+      return (slots.size() <= 0 || slots[0] is map) && (slots.size() <= 1 || slots[1] is map) && (slots.size() <= 2 || slots[2] is map) && (slots.size() <= 3 || slots[3] is map)
+          && (slots.size() <= 4 || slots[4] is map) && (slots.size() <= 5 || slots[5] is map) && (slots.size() <= 6 || slots[6] is map) && (slots.size() <= 7 || slots[7] is map)
+          && (slots.size() <= 8 || slots[8] is map) && (slots.size() <= 9 || slots[9] is map) && (slots.size() <= 10 || slots[10] is map) && (slots.size() <= 11 || slots[11] is map)
+          && (slots.size() <= 12 || slots[12] is map) && (slots.size() <= 13 || slots[13] is map) && (slots.size() <= 14 || slots[14] is map) && (slots.size() <= 15 || slots[15] is map)
+          && (slots.size() <= 16 || slots[16] is map) && (slots.size() <= 17 || slots[17] is map) && (slots.size() <= 18 || slots[18] is map) && (slots.size() <= 19 || slots[19] is map)
+          && (slots.size() <= 20 || slots[20] is map) && (slots.size() <= 21 || slots[21] is map) && (slots.size() <= 22 || slots[22] is map) && (slots.size() <= 23 || slots[23] is map)
+          && (slots.size() <= 24 || slots[24] is map) && (slots.size() <= 25 || slots[25] is map) && (slots.size() <= 26 || slots[26] is map) && (slots.size() <= 27 || slots[27] is map)
+          && (slots.size() <= 28 || slots[28] is map) && (slots.size() <= 29 || slots[29] is map) && (slots.size() <= 30 || slots[30] is map) && (slots.size() <= 31 || slots[31] is map)
+          && (slots.size() <= 32 || slots[32] is map) && (slots.size() <= 33 || slots[33] is map) && (slots.size() <= 34 || slots[34] is map) && (slots.size() <= 35 || slots[35] is map)
+          && (slots.size() <= 36 || slots[36] is map) && (slots.size() <= 37 || slots[37] is map) && (slots.size() <= 38 || slots[38] is map) && (slots.size() <= 39 || slots[39] is map);
+    }
+
+    // sourceRevision은 같은 트랜잭션에서 쓴 뒤의 부모 시간표 revision과 같아야 한다.
+    function validAvailability(uid) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['slots', 'sourceRevision', 'updatedAt'])
+          && d.slots is list && d.slots.size() <= 40
+          && availSlotsAreMaps(d.slots)
+          && d.sourceRevision is int
+          && existsAfter(timetablePath(uid))
+          && d.sourceRevision == getAfter(timetablePath(uid)).data.revision
+          && d.updatedAt == request.time;
+    }
+
+    match /availability/{uid} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid) && validAvailability(uid);
+      allow delete: if false; // 탈퇴는 서버에서 처리
+    }
   }
 }

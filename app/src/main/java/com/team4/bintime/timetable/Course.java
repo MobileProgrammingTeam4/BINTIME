@@ -3,11 +3,21 @@ package com.team4.bintime.timetable;
 import java.io.Serializable;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * 시간표 수업 모델 (직접 입력, 이미지 인식, 수정, 주간 그리드 전달용)
+ * <p>
+ * [BT-015] 저장소({@code data.model.Course})와 연결하기 위해 courseId·professor·colorCode를 함께 들고 다닌다.
+ * 화면에는 보이지 않으며, 수정 저장 때 같은 문서를 가리키고 화면에 없는 값을 지우지 않게 한다.
+ * equals/hashCode는 화면 입력값(이름·강의실·요일·시간)만 비교한다(수정 취소 확인용).
+ * 여러 시간대를 가진 저장소 수업은 같은 courseId를 가진 여러 행으로 펼쳐진다({@link TimetableDraftMapper}).
  */
 public class Course implements Serializable {
+
+    private String courseId;
+    private String professor;
+    private String colorCode;
 
     private String name;
     private String classroom;
@@ -16,14 +26,49 @@ public class Course implements Serializable {
     private String endTime;    // 24시간제 "HH:mm" (예: "11:30")
 
     public Course() {
+        this.courseId = UUID.randomUUID().toString();
     }
 
     public Course(String name, String classroom, String day, String startTime, String endTime) {
+        this.courseId = UUID.randomUUID().toString();
         this.name = name;
         this.classroom = classroom;
         this.day = day;
         this.startTime = startTime;
         this.endTime = endTime;
+    }
+
+    /** 저장소 문서 ID. 이전 버전에서 복원된 객체는 null일 수 있다. */
+    public String getCourseId() {
+        return courseId;
+    }
+
+    public void setCourseId(String courseId) {
+        this.courseId = courseId;
+    }
+
+    public String getProfessor() {
+        return professor;
+    }
+
+    public void setProfessor(String professor) {
+        this.professor = professor;
+    }
+
+    public String getColorCode() {
+        return colorCode;
+    }
+
+    public void setColorCode(String colorCode) {
+        this.colorCode = colorCode;
+    }
+
+    /** 수정한 값에 원래 수업의 courseId·professor·colorCode를 이어 붙인다(화면에 없는 값 보존). */
+    void keepIdentityOf(Course original) {
+        if (original == null) return;
+        courseId = original.courseId;
+        professor = original.professor;
+        colorCode = original.colorCode;
     }
 
     public String getName() {

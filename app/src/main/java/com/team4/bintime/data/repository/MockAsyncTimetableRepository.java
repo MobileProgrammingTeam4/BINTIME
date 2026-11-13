@@ -1,11 +1,15 @@
 package com.team4.bintime.data.repository;
 
+import com.team4.bintime.data.availability.Availability;
+import com.team4.bintime.data.availability.FreeCells;
 import com.team4.bintime.data.model.Course;
 import com.team4.bintime.data.model.TimeSlot;
 import com.team4.bintime.data.model.Timetable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 
 /**
@@ -17,12 +21,17 @@ import java.util.function.Supplier;
  * <p>
  * UID는 생성자로 받은 {@code uidSupplier}에서 매 호출마다 얻는다. 앱에서는 PR ②의 선택 클래스가
  * {@code AuthRepositories.get(context)::getCurrentUid}를 넘긴다.
+ * <p>
+ * [BT-016] 공강 선택 원본과 매칭 대상 공강(availability)은 이 어댑터 안에 사용자별로 따로 보관한다.
+ * 동기 계약의 {@code updateFreeSlots}는 revision을 올려 Firestore 구현과 의미가 달라지므로 쓰지 않는다.
  */
 public final class MockAsyncTimetableRepository implements AsyncTimetableRepository {
 
     private final TimetableRepository delegate;
     private final Supplier<String> uidSupplier;
     private final List<Subscription> subscriptions = new ArrayList<>();
+    private final Map<String, long[]> freeCells = new HashMap<>();
+    private final Map<String, Availability> availability = new HashMap<>();
 
     public MockAsyncTimetableRepository(TimetableRepository delegate, Supplier<String> uidSupplier) {
         if (delegate == null || uidSupplier == null) throw new IllegalArgumentException("null argument");
@@ -123,6 +132,12 @@ public final class MockAsyncTimetableRepository implements AsyncTimetableReposit
             fail(callback, failure);
             return;
         }
+        long[] kept = FreeCells.keepSelectable(cellsOf(uid), FreeSlotValidator.courseSlots(candidates));
+        failure = FreeSlotValidator.checkLimit(kept);
+        if (failure != null) {
+            fail(callback, failure);
+            return;
+        }
         Timetable current = delegate.getTimetable(uid);
         Timetable next;
         if (current == null) {
@@ -133,11 +148,47 @@ public final class MockAsyncTimetableRepository implements AsyncTimetableReposit
         }
         next.setCourses(candidates);
         delegate.saveTimetable(uid, next);
+        freeCells.put(uid, kept);
+        availability.put(uid, Availability.fromCells(kept, next.getRevision()));
         notifyListeners(uid);
         if (callback != null) callback.onSuccess(null);
     }
 
+    @Override
+    public void saveFreeSlots(List<TimeSlot> selected, Callback<Void> callback) {
+        String uid = uidSupplier.get();
+        if (uid == null) {
+            fail(callback, notSignedIn());
+            return;
+        }
+        long[] cells = FreeSlotValidator.toCells(selected);
+        TimetableFailure failure = FreeSlotValidator.validate(cells, currentCourses(uid));
+        if (failure != null) {
+            fail(callback, failure);
+            return;
+        }
+        Timetable current = delegate.getTimetable(uid);
+        if (current == null) {
+            current = new Timetable(uid, uid, null); // revision 1, 수업 없음
+            delegate.saveTimetable(uid, current);
+        }
+        freeCells.put(uid, cells);
+        availability.put(uid, Availability.fromCells(cells, current.getRevision()));
+        notifyListeners(uid);
+        if (callback != null) callback.onSuccess(null);
+    }
+
+    /** 테스트·시연용: 저장된 매칭 대상 공강. 없으면 null. */
+    public Availability getAvailability(String uid) {
+        return availability.get(uid);
+    }
+
     // ── 내부 ───────────────────────────────────────────
+
+    private long[] cellsOf(String uid) {
+        long[] cells = freeCells.get(uid);
+        return cells == null ? FreeCells.empty() : cells.clone();
+    }
 
     private List<Course> currentCourses(String uid) {
         Timetable t = delegate.getTimetable(uid);
@@ -160,7 +211,10 @@ public final class MockAsyncTimetableRepository implements AsyncTimetableReposit
     /** 리스너가 저장소 내부 객체를 바꾸지 못하도록 깊은 사본을 전달한다. */
     private Timetable snapshot(String uid) {
         Timetable t = delegate.getTimetable(uid);
-        return t == null ? null : copy(t);
+        if (t == null) return null;
+        Timetable c = copy(t);
+        c.setFreeSlots(FreeCells.toSlots(cellsOf(uid))); // 공강 선택 원본
+        return c;
     }
 
     private static Timetable copy(Timetable t) {

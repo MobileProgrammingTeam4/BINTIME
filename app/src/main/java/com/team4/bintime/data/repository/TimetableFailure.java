@@ -15,6 +15,10 @@ public final class TimetableFailure {
         INVALID_COURSE,
         /** 같은 요일에 다른 수업과 시간이 겹친다. {@link #getConflictingCourseId()} 참고. */
         OVERLAP,
+        /** [BT-016] 공강 선택이 30분 칸에 맞지 않거나 수업과 겹친다. */
+        INVALID_FREE_SLOT,
+        /** [BT-016] 매칭 대상 공강 구간이 상한(Availability.MAX_SLOTS)을 넘는다. */
+        TOO_MANY_FREE_SLOTS,
         /** 수정하려는 수업이 없다. */
         NOT_FOUND,
         /** 서버 규칙이 거부했다. */
