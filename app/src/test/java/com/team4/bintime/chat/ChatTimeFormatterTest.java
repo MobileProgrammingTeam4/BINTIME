@@ -54,6 +54,12 @@ public class ChatTimeFormatterTest {
     }
 
     @Test
+    public void listTime_roomWithoutMessages_isBlank() {
+        // 서버가 막 만든 방은 lastMessageAt 이 0 이다. 1970-01-01("01/01")로 보이면 안 된다.
+        assertEquals("", ChatTimeFormatter.listTime(0L, NOW, "어제"));
+    }
+
+    @Test
     public void dateDivider_matchesFigmaFormat() {
         assertEquals("2026년 10월 7일 수요일", ChatTimeFormatter.dateDivider(NOW));
     }

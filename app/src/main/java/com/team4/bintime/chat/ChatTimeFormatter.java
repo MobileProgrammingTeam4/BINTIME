@@ -38,8 +38,9 @@ final class ChatTimeFormatter {
         return at(millis).format(MESSAGE_TIME);
     }
 
-    /** 오늘은 시각, 어제는 어제, 그 전은 날짜로 표시한다. */
+    /** 오늘은 시각, 어제는 어제, 그 전은 날짜로 표시한다. 메시지가 아직 없는 방(0)은 빈 문자열. */
     static String listTime(long millis, long nowMillis, String yesterday) {
+        if (millis <= 0) return "";
         LocalDate date = dateOf(millis);
         LocalDate now = dateOf(nowMillis);
         if (date.equals(now)) return messageTime(millis);

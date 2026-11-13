@@ -13,6 +13,7 @@ import com.team4.bintime.R;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /** 날짜 구분선과 보낸·받은 말풍선을 함께 표시한다. */
 final class ChatMessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
@@ -63,7 +64,7 @@ final class ChatMessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
     public int getItemViewType(int position) {
         ChatMessage message = rows.get(position).message;
         if (message == null) return TYPE_DATE;
-        return currentUid.equals(message.senderId) ? TYPE_OUTGOING : TYPE_INCOMING;
+        return Objects.equals(currentUid, message.senderId) ? TYPE_OUTGOING : TYPE_INCOMING;
     }
 
     @NonNull

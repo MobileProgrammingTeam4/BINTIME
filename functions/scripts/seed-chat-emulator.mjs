@@ -72,6 +72,7 @@ const room = (otherUid, status, messages, unreadCount) => ({
   status,
   lastMessage: last(messages).content,
   lastMessageAt: last(messages).createdAt,
+  lastMessageId: Object.keys(messages).at(-1),
   unreadCount,
   hidden: false,
 });
