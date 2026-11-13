@@ -2,6 +2,9 @@ package com.team4.bintime.profile;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
 
 import com.google.firebase.FirebaseNetworkException;
 import com.google.firebase.auth.FirebaseAuth;
@@ -15,11 +18,12 @@ import com.google.firebase.firestore.WriteBatch;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageException;
 import com.google.firebase.storage.StorageMetadata;
-import com.google.firebase.storage.StorageReference;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Firestore·Cloud Storage 프로필 저장소 (BT-014).
@@ -43,6 +47,32 @@ public final class FirebaseProfileRepository implements ProfileRepository {
     private final FirebaseStorage storage = FirebaseStorage.getInstance();
     /** AI 추천은 BT-041 등 후속 이슈 범위라 기존 목업 데이터를 그대로 쓴다. */
     private final MockProfileRepository suggestions = new MockProfileRepository();
+
+    /** 다른 사용자가 같은 경로에 사진을 바꿨을 때 반영되기까지의 최대 시간. */
+    static final long PHOTO_CACHE_TTL_MILLIS = 5L * 60 * 1000;
+    /** 사진 캐시 용량: 앱 최대 힙의 1/16 (512px 사진 1장 ≈ 1MB). */
+    private static final long PHOTO_CACHE_BYTES = Runtime.getRuntime().maxMemory() / 16;
+
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    /** 싱글턴 저장소와 수명이 같다(앱 프로세스 동안 유지). */
+    private final ExecutorService photoDecoder = Executors.newSingleThreadExecutor();
+    private final PhotoLoader<Bitmap> photoLoader = new PhotoLoader<>(
+            (path, cb) -> storage.getReference(path).getBytes(MAX_PHOTO_BYTES).addOnCompleteListener(task -> {
+                if (task.isSuccessful() && task.getResult() != null) cb.onSuccess(task.getResult());
+                else cb.onError(message(task.getException()));
+            }),
+            new PhotoLoader.Decoder<Bitmap>() {
+                @Override public Bitmap decode(byte[] bytes) {
+                    return BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                }
+
+                @Override public long weight(Bitmap value) {
+                    return value.getByteCount();
+                }
+            },
+            new PhotoMemoryCache<>(PHOTO_CACHE_BYTES, PHOTO_CACHE_TTL_MILLIS, SystemClock::elapsedRealtime),
+            photoDecoder,
+            mainHandler::post);
 
     private FirebaseProfileRepository() {}
 
@@ -167,6 +197,8 @@ public final class FirebaseProfileRepository implements ProfileRepository {
         StorageMetadata metadata = new StorageMetadata.Builder().setContentType("image/jpeg").build();
         storage.getReference(path).putBytes(jpegBytes, metadata).addOnCompleteListener(task -> {
             if (task.isSuccessful()) {
+                // 같은 경로에 덮어썼으므로 이전 사진이 캐시에서 나오지 않게 한다.
+                photoLoader.invalidate(path);
                 if (callback != null) callback.onSuccess(path);
             } else {
                 fail(callback, message(task.getException()));
@@ -174,23 +206,18 @@ public final class FirebaseProfileRepository implements ProfileRepository {
         });
     }
 
+    /**
+     * 캐시 → (같은 경로 요청 합치기) → Storage 다운로드 → 백그라운드 디코딩 순서로 불러온다({@link PhotoLoader}).
+     * 결과는 메인 스레드로 온다. 다른 사용자가 사진을 바꾸면 캐시 유효 시간({@link #PHOTO_CACHE_TTL_MILLIS})이
+     * 지난 뒤 반영된다. 내 사진은 업로드 직후 바로 반영된다.
+     */
     @Override
     public void loadProfilePhoto(String photoPath, Callback<Bitmap> callback) {
         if (photoPath == null || photoPath.isEmpty()) {
             fail(callback, "사진이 없어요.");
             return;
         }
-        StorageReference ref = storage.getReference(photoPath);
-        ref.getBytes(MAX_PHOTO_BYTES).addOnCompleteListener(task -> {
-            if (!task.isSuccessful() || task.getResult() == null) {
-                fail(callback, message(task.getException()));
-                return;
-            }
-            byte[] bytes = task.getResult();
-            Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-            if (bitmap == null) fail(callback, "사진을 불러오지 못했어요.");
-            else if (callback != null) callback.onSuccess(bitmap);
-        });
+        photoLoader.load(photoPath, callback);
     }
 
     @Override
