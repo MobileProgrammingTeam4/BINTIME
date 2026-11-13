@@ -20,6 +20,8 @@ import com.team4.bintime.model.MatchFilter;
 import com.team4.bintime.profile.ProfileRepositories;
 import com.team4.bintime.profile.ProfileRepository;
 
+import java.util.UUID;
+
 /** 매칭 카드와 프로필 상세가 같이 쓰는 화면 채우기·매칭 신청 처리. */
 public final class MatchSummaryBinder {
 
@@ -47,7 +49,10 @@ public final class MatchSummaryBinder {
     /** [매칭 신청] 버튼: 이미 신청했으면 '신청 완료'로 잠그고, 아니면 누를 때 신청 + 완료 팝업. */
     static void bindRequestButton(TextView button, MatchCandidate c) {
         RequestRepository repository = RequestRepositories.get(button.getContext());
-        bindRequestButton(button, c, repository.isMock() ? RequestDraft.mock(c) : null);
+        // BT-018: Firebase 모드 후보는 searchMatches 결과뿐이라 candidateId(= 상대 uid)로 보내고 서버가 재판정한다.
+        // UUID 는 바인딩마다 새로 만들고, 실패 후 재시도는 같은 리스너가 같은 UUID 를 쓴다.
+        bindRequestButton(button, c, repository.isMock() ? RequestDraft.mock(c)
+                : RequestDraft.verified(c.uid, c.uid, UUID.randomUUID().toString()));
     }
 
     /** BT-018 연결점. 실제 검색 후보는 verified draft를 공급한다. Mock 카드를 Firebase로 보내지 않는다. */
