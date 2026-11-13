@@ -475,6 +475,54 @@ public class MockAsyncTimetableRepositoryTest {
         assertFailure(TimetableFailure.Code.NOT_SIGNED_IN, saveFree(new TimeSlot(MON, 600, 660)));
     }
 
+    // ── [BT-036] 수업 변경과 공강 정리 경계 ─────────────
+
+    private static final int THU = 4;
+    private static final int SUN = 7;
+
+    @Test
+    public void replaceCourses_splittingBlockOver40_rejectedAndUnchanged() {
+        // 현재 동작 고정(docs/BT-016.md 한계): 수업이 긴 공강 블록을 둘로 쪼개 매칭 대상이 40 → 41개가 되면
+        // 수업 교체 자체가 TOO_MANY_FREE_SLOTS로 거부된다. 상한 40은 Rules·searchMatches와 묶인 팀 결정이다.
+        List<TimeSlot> free = new ArrayList<>();
+        for (int day = 1; day <= 3; day++) {
+            for (int start = 0; start + 60 <= 1440 && free.size() < Availability.MAX_SLOTS - 1; start += 90) {
+                free.add(new TimeSlot(day, start, start + 60));
+            }
+        }
+        free.add(new TimeSlot(THU, 600, 780)); // 목 10:00~13:00 한 블록
+        assertEquals(Availability.MAX_SLOTS, free.size());
+        Result<Void> saved = new Result<>();
+        repo.saveFreeSlots(free, saved);
+        ok(saved);
+        int revision = MockTimetableRepositoryImpl.getInstance().getTimetable("uid-a").getRevision();
+
+        // 목 11:00~12:00 수업 → 10:00~11:00 / 12:00~13:00 두 블록으로 쪼개져 41개
+        assertFailure(TimetableFailure.Code.TOO_MANY_FREE_SLOTS, replace(course("a", THU, 660, 720)));
+        Timetable after = MockTimetableRepositoryImpl.getInstance().getTimetable("uid-a");
+        assertEquals(revision, after.getRevision());
+        assertEquals(0, after.getCourseCount());
+        assertEquals(Availability.MAX_SLOTS, repo.getAvailability("uid-a").getSlots().size());
+
+        // 쪼개진 한쪽이 60분 미만이면 41개가 되지 않아 허용된다: 11:30~12:30 → 10:00~11:30 / 12:30~13:00(30분)
+        ok(replace(course("a", THU, 690, 750)));
+        assertEquals(Availability.MAX_SLOTS, repo.getAvailability("uid-a").getSlots().size());
+    }
+
+    @Test
+    public void addCourse_keepsOverlappingCells_resavingThemIsRejected() {
+        // 수업 개별 추가는 freeCells를 정리하지 않는다(replaceCourses만 정리). 주말 칸도 같다.
+        ok(saveFree(new TimeSlot(SUN, 600, 720)));
+        ok(add(course("a", SUN, 630, 690)));
+        Recorder rec = new Recorder();
+        repo.observeTimetable(rec);
+        assertEquals(Collections.singletonList(new TimeSlot(SUN, 600, 720)), rec.last().getFreeSlots());
+        // 겹친 칸을 지우지 않고 그대로 다시 보내면 거부된다
+        assertFailure(TimetableFailure.Code.INVALID_FREE_SLOT, saveFree(new TimeSlot(SUN, 600, 720)));
+        // 겹친 칸을 지운 선택은 저장된다
+        ok(saveFree(new TimeSlot(SUN, 600, 630), new TimeSlot(SUN, 690, 720)));
+    }
+
     @Test(expected = IllegalArgumentException.class)
     public void constructor_nullArgs_throw() {
         new MockAsyncTimetableRepository(null, () -> "x");

@@ -68,6 +68,15 @@ public class FreeSlotValidatorTest {
         assertNull(FreeSlotValidator.checkLimit(cells));
     }
 
+    @Test
+    public void limit_bridgingCellMerges41BlocksTo40_ok() {
+        // [BT-036] 41개 상태에서 두 블록 사이 30분 칸을 채우면 하나로 합쳐져 40개가 된다.
+        long[] cells = cellsWithBlocks(Availability.MAX_SLOTS + 1);
+        cells[0] |= 1L << 2; // 월 칸 0~1, 3~4 사이
+        assertEquals(Availability.MAX_SLOTS, FreeCells.matchable(cells).size());
+        assertNull(FreeSlotValidator.checkLimit(cells));
+    }
+
     /** 60분 블록 n개(하루 최대 16개, 블록 사이 30분 간격). */
     private static long[] cellsWithBlocks(int n) {
         long[] cells = FreeCells.empty();
