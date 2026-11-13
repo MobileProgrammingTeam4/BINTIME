@@ -25,8 +25,10 @@ public class ChatListFragment extends Fragment {
 
     private static final String STATE_FILTER = "chatFilter";
 
-    private final MockChatRepository mock = MockChatRepository.shared();
-    private final ChatRepository repository = mock;
+    /** Firebase 가 설정되면 RTDB, 아니면 Mock (ChatRepositories). */
+    private ChatRepository repository;
+    /** Mock 일 때만. 데모 상태 전환(정상 → 빈 상태 → 오류)에 쓴다. */
+    @Nullable private MockChatRepository mock;
 
     private ChatRoom.Filter filter = ChatRoom.Filter.ALL;
     private List<ChatRoom> rooms = Collections.emptyList();
@@ -64,14 +66,18 @@ public class ChatListFragment extends Fragment {
         tabMatched.setOnClickListener(v -> selectFilter(ChatRoom.Filter.MATCHED));
         tabEnded.setOnClickListener(v -> selectFilter(ChatRoom.Filter.ENDED));
 
-        // 데모: 제목을 길게 누르면 정상 → 빈 상태 → 오류 화면 전환 (BT-021 실연동 시 제거)
-        view.findViewById(R.id.chatListTitle).setOnLongClickListener(v -> {
-            MockChatRepository.DemoState state = mock.cycleDemoState();
-            Toast.makeText(requireContext(), getString(R.string.chat_demo_state, state.name()),
-                    Toast.LENGTH_SHORT).show();
-            subscribe();
-            return true;
-        });
+        repository = ChatRepositories.get(requireContext());
+        mock = repository instanceof MockChatRepository ? (MockChatRepository) repository : null;
+        // 데모(Mock 일 때만): 제목을 길게 누르면 정상 → 빈 상태 → 오류 화면 전환
+        if (mock != null) {
+            view.findViewById(R.id.chatListTitle).setOnLongClickListener(v -> {
+                MockChatRepository.DemoState state = mock.cycleDemoState();
+                Toast.makeText(requireContext(), getString(R.string.chat_demo_state, state.name()),
+                        Toast.LENGTH_SHORT).show();
+                subscribe();
+                return true;
+            });
+        }
 
         updateTabs();
         subscribe();
@@ -111,7 +117,7 @@ public class ChatListFragment extends Fragment {
                 list.setVisibility(View.GONE);
                 stateView.showError(getString(R.string.chat_list_error))
                         .primary(getString(R.string.chat_retry), v -> {
-                            mock.resetDemoState();
+                            if (mock != null) mock.resetDemoState();
                             subscribe();
                         });
             }

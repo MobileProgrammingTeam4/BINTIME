@@ -5,8 +5,9 @@ package com.team4.bintime.chat;
  * <pre>
  * chatRooms/{matchId}/members/{uid}:     { joinedAt }
  * chatRooms/{matchId}/messages/{pushId}: { senderId, content, createdAt }
- * userChatRooms/{uid}/{matchId}:         { otherUid, lastMessage, lastMessageAt, unreadCount, status, hidden }
+ * userChatRooms/{uid}/{matchId}:         { otherUid, lastMessage, lastMessageAt, lastMessageId, unreadCount, status, hidden }
  * </pre>
+ * lastMessageId·recentMessageIds 는 서버 트리거(BT-022)가 쓰는 값이라 앱은 읽지 않는다(recentMessageIds 는 중복 이벤트 방지용).
  * matchId 는 matches/{matchId} 문서 ID(= requestId)이고, messageId 는 push 키를 그대로 쓴다(노드 안에 저장하지 않음).
  */
 final class ChatRtdbPaths {

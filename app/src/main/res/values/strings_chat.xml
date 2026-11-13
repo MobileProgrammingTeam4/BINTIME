@@ -31,6 +31,7 @@
     <string name="chat_messages_error">메시지를 불러오지 못했어요.\n잠시 후 다시 시도해주세요.</string>
     <string name="chat_send_failed">메시지를 보내지 못했어요. 다시 시도해주세요.</string>
     <string name="chat_room_missing">채팅방을 찾을 수 없어요.</string>
+    <string name="chat_login_required">로그인 후 채팅을 이용할 수 있어요.</string>
     <string name="chat_overlap_duration">%1$s 겹침</string>
     <!-- BT-010 AI 답장 · 채팅 옵션 (Figma 120:2575) -->
     <string name="chat_ai_reply_failed">답장 추천을 불러오지 못했어요. 직접 입력해주세요.</string>

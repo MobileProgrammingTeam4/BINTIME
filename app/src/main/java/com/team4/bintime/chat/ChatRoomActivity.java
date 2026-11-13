@@ -55,7 +55,8 @@ public class ChatRoomActivity extends AppCompatActivity {
         return new Intent(context, ChatRoomActivity.class).putExtra(EXTRA_MATCH_ID, matchId);
     }
 
-    private final ChatRepository repository = MockChatRepository.shared();
+    /** Firebase 가 설정되면 RTDB, 아니면 Mock (ChatRepositories). AI 답장·후기는 아직 Mock 이다(BT-041·BT-044). */
+    private ChatRepository repository;
     private final ReplySuggestionRepository replyRepository = MockReplySuggestionRepository.shared();
     private final ReviewRepository reviewRepository = MockReviewRepository.shared();
 
@@ -72,7 +73,8 @@ public class ChatRoomActivity extends AppCompatActivity {
     private ArrayList<String> replies;
     /** null 이면 아직 확인 전 */
     private Boolean myReviewWritten;
-    private boolean actionInProgress, leaving;
+    private boolean actionInProgress, leaving, sending;
+    private View sendButton;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -80,6 +82,15 @@ public class ChatRoomActivity extends AppCompatActivity {
         matchId = getIntent().getStringExtra(EXTRA_MATCH_ID);
         if (matchId == null) {
             closeMissingRoom();
+            return;
+        }
+        repository = ChatRepositories.get(this);
+        String myUid = repository.currentUid();
+        if (myUid == null || myUid.trim().isEmpty()) {
+            // 로그인 전이면 내 메시지를 구분할 수 없다. 구독을 시작하지 않고 닫는다.
+            matchId = null;
+            Toast.makeText(this, R.string.chat_login_required, Toast.LENGTH_SHORT).show();
+            finish();
             return;
         }
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
@@ -91,7 +102,8 @@ public class ChatRoomActivity extends AppCompatActivity {
         findViewById(R.id.chatEndedBanner).setOnClickListener(v -> openReview());
         stateView = findViewById(R.id.chatRoomState);
         input = findViewById(R.id.chatInput);
-        findViewById(R.id.chatSend).setOnClickListener(v -> send());
+        sendButton = findViewById(R.id.chatSend);
+        sendButton.setOnClickListener(v -> send());
         aiButton = findViewById(R.id.chatAiReply);
         aiButton.setOnClickListener(v -> requestReplies());
         replyChips = findViewById(R.id.chatReplyChips);
@@ -100,7 +112,7 @@ public class ChatRoomActivity extends AppCompatActivity {
         getSupportFragmentManager().setFragmentResultListener(KEY_END_MATCH, this, (key, result) -> endMatch());
         getSupportFragmentManager().setFragmentResultListener(KEY_LEAVE_ROOM, this, (key, result) -> leaveRoom());
 
-        adapter = new ChatMessageAdapter(repository.currentUid());
+        adapter = new ChatMessageAdapter(myUid);
         messageList = findViewById(R.id.chatMessageList);
         messageList.setLayoutManager(new LinearLayoutManager(this));
         messageList.setAdapter(adapter);
@@ -120,6 +132,8 @@ public class ChatRoomActivity extends AppCompatActivity {
                 room = data;
                 adapter.setRoom(data);
                 bindRoom();
+                // 보고 있는 중에 서버 트리거가 내 안읽음 수를 올리면 바로 0 으로 되돌린다.
+                if (data.unreadCount > 0 && isResumedNow()) repository.markRead(matchId);
             }
 
             @Override
@@ -169,9 +183,7 @@ public class ChatRoomActivity extends AppCompatActivity {
                     stateView.hide();
                     scrollToLast();
                 }
-                if (getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.RESUMED)) {
-                    repository.markRead(matchId);
-                }
+                if (isResumedNow()) repository.markRead(matchId);
             }
 
             @Override
@@ -185,9 +197,11 @@ public class ChatRoomActivity extends AppCompatActivity {
     private void bindRoom() {
         ((TextView) findViewById(R.id.chatRoomTitle)).setText(room.otherName);
         boolean active = room.status == ChatRoom.Status.ACTIVE;
-        findViewById(R.id.chatMatchInfo).setVisibility(active ? View.VISIBLE : View.GONE);
+        // 매칭 스냅샷(matches/{matchId})을 아직 못 받으면 확정 시간이 없다(BT-034 연결 전·문서 생성 전). 시간 카드를 숨긴다.
+        boolean hasMatchTime = room.meetingDate != null;
+        findViewById(R.id.chatMatchInfo).setVisibility(active && hasMatchTime ? View.VISIBLE : View.GONE);
         findViewById(R.id.chatEndedBanner).setVisibility(active ? View.GONE : View.VISIBLE);
-        if (active) bindMatchInfo();
+        if (active && hasMatchTime) bindMatchInfo();
         else bindReviewLink();
     }
 
@@ -394,21 +408,39 @@ public class ChatRoomActivity extends AppCompatActivity {
 
     // ---- 전송 ----
 
+    /** 응답이 올 때까지 전송 버튼을 잠가 중복 전송을 막는다. */
     private void send() {
+        if (sending) return;
         String text = input.getText().toString();
         if (text.trim().isEmpty()) return;
+        setSending(true);
         repository.sendMessage(matchId, text, new ChatRepository.SendCallback() {
             @Override
             public void onSuccess() {
-                input.setText("");
+                if (isFinishing() || isDestroyed()) return;
+                setSending(false);
+                // 보내는 사이 사용자가 내용을 고쳤으면 지우지 않는다.
+                if (text.equals(input.getText().toString())) input.setText("");
             }
 
             @Override
             public void onError() {
+                if (isFinishing() || isDestroyed()) return;
+                setSending(false);
                 // 실패해도 작성한 내용은 입력창에 남겨 다시 보낼 수 있게 한다.
                 Toast.makeText(ChatRoomActivity.this, R.string.chat_send_failed, Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    private void setSending(boolean value) {
+        sending = value;
+        sendButton.setEnabled(!value);
+        sendButton.setAlpha(value ? 0.4f : 1f);
+    }
+
+    private boolean isResumedNow() {
+        return getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.RESUMED);
     }
 
     private void scrollToLast() {
