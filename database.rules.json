@@ -1,0 +1,44 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "chatRooms": {
+      "$matchId": {
+        "members": {
+          ".read": "auth != null && root.child('chatRooms').child($matchId).child('members').child(auth.uid).exists()"
+        },
+        "messages": {
+          ".read": "auth != null && root.child('chatRooms').child($matchId).child('members').child(auth.uid).exists()",
+          ".indexOn": ["createdAt"],
+          "$messageId": {
+            ".write": "auth != null && root.child('chatRooms').child($matchId).child('members').child(auth.uid).exists() && !data.exists() && newData.exists()",
+            ".validate": "newData.hasChildren(['senderId', 'content', 'createdAt'])",
+            "senderId": {
+              ".validate": "newData.isString() && newData.val() === auth.uid"
+            },
+            "content": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 1000 && newData.val().replace(' ', '').replace('\\t', '').replace('\\r', '').replace('\\n', '').length > 0"
+            },
+            "createdAt": {
+              ".validate": "newData.isNumber() && newData.val() === now"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        }
+      }
+    },
+    "userChatRooms": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$matchId": {
+          "unreadCount": {
+            ".write": "auth != null && auth.uid === $uid && data.parent().child('otherUid').exists() && newData.exists()",
+            ".validate": "newData.isNumber() && newData.val() === 0"
+          }
+        }
+      }
+    }
+  }
+}

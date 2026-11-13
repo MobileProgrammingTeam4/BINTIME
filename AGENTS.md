@@ -157,8 +157,8 @@ userChatRooms/{uid}/{matchId}
 | 요청 생성 계약 | `createMatchRequest(candidateId, clientRequestId)`, 서버 전용 `matchRequestGuards` 중복 잠금 및 BT-017 연결 경계는 `docs/BT-019.md`를 따릅니다. 실제 검색 미연결은 실패로 처리합니다. |
 | 요청 목록·취소 계약 | UID별 발신/수신 Firestore 리스너, `cancelMatchRequest(requestId)`, 두 복합 인덱스와 검증 범위는 `docs/BT-020.md`를 따릅니다. |
 | `matches` | `participantUids`, `requestId`, `status`, `meetingDate`, `startMinute`, `endMinute`, `chatReady` 등 **확정 스냅샷** |
-| `chatRooms` | `matchId`를 룸 식별자로 사용, 메시지 발신자·권한 검증 |
-| `userChatRooms` | 사용자별 목록/읽지 않음 수, 서버와 동기화 |
+| `chatRooms` | `matchId`를 룸 식별자로 사용, 메시지 발신자·권한 검증. Rules는 `database.rules.json`: 멤버만 읽기, 메시지는 새로 쓰기만(`senderId === auth.uid`, 서버 시각, 본문 1~1000자), `members`는 서버 전용. 계약은 `docs/BT-021.md` |
+| `userChatRooms` | 사용자별 목록/읽지 않음 수, 서버와 동기화. 앱은 본인 `unreadCount`를 0으로만 쓸 수 있고 `status`·`hidden`은 서버 전용 |
 | `reviews` / `reports` | 참여·공개/작성 권한, 개인정보 최소 수집 |
 | `aiUsage` | BT-024 Gemini 게이트웨이의 사용자별 하루 호출 수(`uid`, `date`, `counts.{task}`, `total`, `updatedAt`). 날짜는 `Asia/Seoul`. **서버 전용**: Admin SDK만 쓰고 Rules는 앱 읽기·쓰기 모두 거부. 계약은 `docs/BT-024.md` |
 

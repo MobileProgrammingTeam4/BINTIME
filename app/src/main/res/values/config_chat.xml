@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        BT-021: 로컬 RTDB 에뮬레이터 호스트. 비어 있으면 실제 RTDB(google-services.json 의 firebase_url)를 쓴다.
+        이 파일은 바꾸지 않는다. 에뮬레이터를 쓸 때는 app/src/debug/res/values/config_chat_local.xml 에
+        같은 이름으로 값을 넣는다(디버그 빌드에만 적용). 그 파일은 커밋하지 않도록 각자 .git/info/exclude 에
+        등록한다. 사용법은 docs/BT-021.md.
+    -->
+    <string name="chat_rtdb_emulator_host" translatable="false"></string>
+</resources>
