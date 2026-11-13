@@ -177,5 +177,31 @@ service cloud.firestore {
       allow create, update: if isOwner(uid) && validAvailability(uid);
       allow delete: if false; // 탈퇴는 서버에서 처리
     }
+    // BT-019/020: 참여자만 읽으며 모든 요청 상태 쓰기는 서버 전용이다.
+    match /matchRequests/{requestId} {
+      allow read: if request.auth != null
+        && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
+      allow write: if false;
+    }
+    match /matchRequestGuards/{guardId} {
+      allow read, write: if false;
+    }
+    // A · BT-017 매칭 설정: 본인만 읽고 쓴다. 검색 서버(Admin)가 읽어 판정하므로 다른 사용자는 읽지 않는다.
+    match /matchSettings/{uid} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid) && validMatchSettings();
+      allow delete: if false;
+    }
+
+    // 앱 MatchSearchMapper.settingsDocument 와 같은 필드 (최소 겹침 허용값은 BT-012)
+    function validMatchSettings() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['isMatching', 'minOverlapMinutes', 'purposes', 'preferredTags', 'updatedAt'])
+          && d.isMatching is bool
+          && d.minOverlapMinutes in [60, 90, 120, 150, 180]
+          && d.purposes is list && d.purposes.size() <= 5
+          && d.preferredTags is list && d.preferredTags.size() <= 20
+          && d.updatedAt == request.time;
+    }
   }
 }

@@ -32,10 +32,10 @@ import java.time.format.DateTimeFormatter;
 public final class RequestTabsController {
     private final Fragment fragment;
     private final View root;
-    private final MockRequestRepository repository;
+    private final RequestRepository repository;
     private MockRequestRepository.Tab tab = MockRequestRepository.Tab.SENT;
 
-    public RequestTabsController(Fragment fragment, View root, MockRequestRepository repository,
+    public RequestTabsController(Fragment fragment, View root, RequestRepository repository,
                                  Consumer<Intent> openAccepted) {
         this.fragment = fragment;
         this.root = root;
