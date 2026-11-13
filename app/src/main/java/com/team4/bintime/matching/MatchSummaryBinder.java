@@ -50,7 +50,7 @@ public final class MatchSummaryBinder {
     static void bindRequestButton(TextView button, MatchCandidate c) {
         RequestRepository repository = RequestRepositories.get(button.getContext());
         // BT-018: Firebase 모드 후보는 searchMatches 결과뿐이라 candidateId(= 상대 uid)로 보내고 서버가 재판정한다.
-        // UUID 는 바인딩마다 새로 만들고, 실패 후 재시도는 같은 리스너가 같은 UUID 를 쓴다.
+        // UUID 멱등은 같은 리스너 재시도까지만. 재바인딩은 새 UUID, 중복은 서버 PENDING 잠금이 막는다.
         bindRequestButton(button, c, repository.isMock() ? RequestDraft.mock(c)
                 : RequestDraft.verified(c.uid, c.uid, UUID.randomUUID().toString()));
     }
