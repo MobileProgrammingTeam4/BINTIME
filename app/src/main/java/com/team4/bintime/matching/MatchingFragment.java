@@ -29,6 +29,7 @@ import com.team4.bintime.common.StateView;
 import com.team4.bintime.common.ActionMenu;
 
 import com.team4.bintime.request.MockRequestRepository;
+import com.team4.bintime.request.RequestRepository;
 import com.team4.bintime.request.RequestTabsController;
 import com.team4.bintime.request.MatchAcceptedActivity;
 import com.team4.bintime.notification.MatchRequestDialog;
@@ -52,7 +53,7 @@ public class MatchingFragment extends Fragment {
 
     private View statusCard, matchContent;
     private TextView statusTitle, statusDesc, count;
-    private MockRequestRepository requestRepository = new MockRequestRepository();
+    private RequestRepository requestRepository;
     private RequestTabsController requestTabs;
     private View requestContent;
     private int selectedTab;
@@ -61,11 +62,18 @@ public class MatchingFragment extends Fragment {
     private MaterialSwitch switchMatching;
     private LinearLayout appliedFilters;
     private RecyclerView recycler;
+    private MatchSearchRepository searchRepository;
+    /** 마지막 검색 결과. null 이면 불러오는 중이거나 실패(searchError). */
+    private MatchSearchRepository.Result result;
+    private String searchError;
+    /** 늦게 도착한 이전 검색 응답을 버리기 위한 순번 */
+    private int searchSeq;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         requestRepository = ((MainActivity) requireActivity()).requests();
+        searchRepository = MatchSearchRepositories.get(requireContext());
         if (savedInstanceState != null) {
             filter = (MatchFilter) savedInstanceState.getSerializable(FilterActivity.EXTRA_FILTER);
             selectedTab = savedInstanceState.getInt("matchingTab", 0);
@@ -88,7 +96,7 @@ public class MatchingFragment extends Fragment {
         filterLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
             if (result.getResultCode() == android.app.Activity.RESULT_OK && result.getData() != null) {
                 filter = (MatchFilter) result.getData().getSerializableExtra(FilterActivity.EXTRA_FILTER);
-                if (getView() != null) render();
+                if (getView() != null) reload();
             }
         });
     }
@@ -107,13 +115,13 @@ public class MatchingFragment extends Fragment {
     public void onResume() {
         super.onResume();
         if (getView() != null) {
-            render();
+            reload(); // 시간표에서 공강을 바꾸고 돌아와도 서버 기준으로 다시 검색
             if (requestTabs != null) requestTabs.render();
             getView().post(() -> {
                 if (!isResumed() || isHidden() || getView() == null || getChildFragmentManager().isStateSaved()) return;
                 NotificationPreferences prefs = new NotificationPreferences(requireContext());
                 List<MockRequestRepository.Item> pending = requestRepository.list(MockRequestRepository.Tab.RECEIVED);
-                if (!pending.isEmpty() && prefs.canShowPopup() && ((MainActivity) requireActivity()).claimRequestPopup())
+                if (requestRepository.isMock() && !pending.isEmpty() && prefs.canShowPopup() && ((MainActivity) requireActivity()).claimRequestPopup())
                     MatchRequestDialog.showRequest(getChildFragmentManager(), pending.get(0).id);
             });
         }
@@ -158,13 +166,13 @@ public class MatchingFragment extends Fragment {
         v.findViewById(R.id.btnChangeSlot).setOnClickListener(b -> goTimetable());
         switchMatching.setOnCheckedChangeListener((b, checked) -> {
             ((MainActivity) requireActivity()).setMatchingOn(checked);
-            render();
+            reload();
         });
         // 데모용: 타이틀 길게 누르면 '공강 없음' 상태 토글 (시간표 연동 전 시연용)
         v.findViewById(R.id.title).setOnLongClickListener(t -> {
             MockMatchRepository.hasFreeSlot = !MockMatchRepository.hasFreeSlot;
             toast(MockMatchRepository.hasFreeSlot ? "데모: 공강 있음" : "데모: 공강 없음");
-            render();
+            reload();
             return true;
         });
         render();
@@ -179,13 +187,14 @@ public class MatchingFragment extends Fragment {
         boolean find = selectedTab == 0;
         matchContent.setVisibility(find ? View.VISIBLE : View.GONE);
         requestContent.setVisibility(find ? View.GONE : View.VISIBLE);
+        if (find) adapter.notifyDataSetChanged();
         if (!find) requestTabs.show(MockRequestRepository.Tab.values()[selectedTab - 1]);
     }
 
     @Override public void onHiddenChanged(boolean hidden) {
         super.onHiddenChanged(hidden);
         if (!hidden && getView() != null) {
-            render();
+            reload();
             if (requestTabs != null) requestTabs.render();
         }
     }
@@ -207,21 +216,47 @@ public class MatchingFragment extends Fragment {
         recycler = null;
     }
 
+    /** 스위치·필터를 저장하고 다시 검색한다. 결과가 오면 render(). */
+    private void reload() {
+        boolean matchingOn = ((MainActivity) requireActivity()).isMatchingOn();
+        int seq = ++searchSeq;
+        result = null;
+        searchError = null;
+        render();
+        searchRepository.search(matchingOn, filter.copy(), new MatchSearchRepository.Callback() {
+            @Override public void onResult(MatchSearchRepository.Result r) {
+                if (seq != searchSeq || getView() == null) return;
+                result = r;
+                MatchSearchRepositories.remember(r.candidates);
+                render();
+            }
+
+            @Override public void onError(String message) {
+                if (seq != searchSeq || getView() == null) return;
+                searchError = message;
+                render();
+            }
+        });
+    }
+
     private void render() {
         // 상태 카드
         boolean matchingOn = ((MainActivity) requireActivity()).isMatchingOn();
-        boolean hasSlot = MockMatchRepository.hasFreeSlot;
+        MatchSearchRepository.Status status = result == null ? null : result.status;
         if (switchMatching.isChecked() != matchingOn) switchMatching.setChecked(matchingOn);
         statusCard.setBackgroundResource(matchingOn ? R.drawable.bg_status_on : R.drawable.bg_status_off);
-        if (!matchingOn) {
+        if (!matchingOn || status == MatchSearchRepository.Status.MATCHING_OFF) {
             statusTitle.setText("매칭이 꺼져있어요");
             statusDesc.setText("공강시간에 함께할 공강메이트를 찾아보세요");
-        } else if (!hasSlot) {
+        } else if (status == MatchSearchRepository.Status.NO_FREE_SLOT) {
             statusTitle.setText("매칭 할 공강이 없어요");
             statusDesc.setText("시간표에서 공강시간을 선택해주세요");
-        } else {
-            statusTitle.setText(MockMatchRepository.MY_SLOT_LABEL + " 공강 매칭중");
+        } else if (status == MatchSearchRepository.Status.OK) {
+            statusTitle.setText(result.slotLabel + " 공강 매칭중");
             statusDesc.setText("가장 가까운 공강으로 매칭 중이에요");
+        } else {
+            statusTitle.setText("공강을 확인하고 있어요");
+            statusDesc.setText("잠시만 기다려 주세요");
         }
 
         // 적용된 필터
@@ -230,21 +265,26 @@ public class MatchingFragment extends Fragment {
         addAppliedChip(filter.purpose);
 
         // 결과 / 상황별 안내
-        List<MatchCandidate> results = matchingOn && hasSlot ? MockMatchRepository.search(filter) : Collections.emptyList();
+        List<MatchCandidate> results = matchingOn && status == MatchSearchRepository.Status.OK
+                ? result.candidates : Collections.emptyList();
         adapter.submit(results, filter.tags);
         count.setText(String.valueOf(results.size()));
         recycler.setVisibility(results.isEmpty() ? View.GONE : View.VISIBLE);
 
-        if (!matchingOn) {
+        if (!matchingOn || status == MatchSearchRepository.Status.MATCHING_OFF) {
             stateView.showEmpty("매칭 스위치가 꺼져있어요", "매칭 스위치를 켜고\n공강 메이트를 찾아보세요.");
-        } else if (!hasSlot) {
+        } else if (searchError != null) {
+            stateView.showError(searchError).primary("다시 시도", b -> reload());
+        } else if (status == null) {
+            stateView.showLoading();
+        } else if (status == MatchSearchRepository.Status.NO_FREE_SLOT) {
             stateView.showEmpty("매칭 할 공강시간이 없어요", "내 시간표에서 공강시간을\n선택해주세요")
                     .primary("시간표에서 공강시간 선택하기", b -> goTimetable());
         } else if (results.isEmpty()) {
             stateView.showEmpty("조건에 맞는 친구가 없어요", "공강 시간이나 목적을 바꿔\n새로운 친구를 찾아보세요.")
                     .secondary("필터 초기화", b -> {
                         filter = MatchFilter.defaults();
-                        render();
+                        reload();
                     })
                     .primary("필터 변경", b -> openFilter());
         } else {

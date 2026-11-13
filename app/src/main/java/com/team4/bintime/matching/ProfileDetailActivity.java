@@ -16,7 +16,6 @@ import androidx.core.content.ContextCompat;
 import com.team4.bintime.R;
 import com.team4.bintime.common.ChipViews;
 import com.team4.bintime.common.ActionMenu;
-import com.team4.bintime.data.MockMatchRepository;
 import com.team4.bintime.model.MatchCandidate;
 
 import java.util.ArrayList;
@@ -39,7 +38,7 @@ public class ProfileDetailActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        MatchCandidate c = MockMatchRepository.find(getIntent().getStringExtra(EXTRA_UID));
+        MatchCandidate c = MatchSearchRepositories.find(getIntent().getStringExtra(EXTRA_UID));
         if (c == null) { // 잘못된 uid 로 열리면 빈 화면 대신 닫기
             finish();
             return;

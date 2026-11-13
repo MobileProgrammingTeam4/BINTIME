@@ -103,6 +103,8 @@ overlapMinutes = max(0, min(endA, endB) - max(startA, startB))
 
 ## 4. 기술 설계와 데이터 책임
 
+**공통 데이터 계약과 시간 규칙은 [`docs/BT-012.md`](./docs/BT-012.md)를 먼저 확인합니다.** 필드 이름·UID·요청/매칭 식별자·분 단위 시간·Repository 연동을 변경할 때 이 문서의 팀 결정과 후속 확정 항목을 따릅니다.
+
 | 구성 | 용도 | 핵심 원칙 |
 |---|---|---|
 | **Android Java/XML** | 화면·상호작용·상태 표시 | Activity/Fragment에서 서버 상태 변경 로직 분리 |
@@ -142,6 +144,8 @@ userChatRooms/{uid}/{matchId}
 - `uid`는 Firebase Auth UID입니다. 영업/민감 데이터는 클라이언트 소유권 규칙과 서버 검증으로 보호합니다.
 - `dayOfWeek`: 월=1 ~ 일=7, `startMinute/endMinute`: 자정부터 지난 정수 분, **`meetingDate`: `YYYY-MM-DD`**, 시간대는 `Asia/Seoul` 기준으로 통일합니다.
 - 공강 계산의 입력 버전(`timetables.revision`)과 파생 결과(`availability.sourceRevision`)를 비교해 오래된 공강으로 매칭하지 않습니다.
+- `timetables/{uid}.freeCells`는 월~일 7개의 48비트 정수로 선택 원본을 보존합니다. 수업 변경은 `revision`을 증가시키고 공강 선택만 변경할 때는 유지합니다. `semester`는 없거나 null일 수 있습니다. `availability.slots`는 연속 칸을 병합한 60분 이상 구간이며, 서버는 원본 선택·수업·revision과 일치하는지 다시 검증합니다.
+- 요청 생성 입력은 `{candidateId, clientRequestId}`이며 `candidateId`는 상대 UID, `clientRequestId`는 재시도 동안 유지하는 UUID입니다. 서버는 검색자가 선택한 최소 겹침, 프로필 완료·공개 프로필 존재, 차단·확정 매칭 충돌을 확인한 뒤 시간·목적 스냅샷을 정합니다. 상세 계약은 [`docs/BT-019.md`](./docs/BT-019.md)를 따릅니다.
 - `matches/{matchId}`가 **매칭의 기준 데이터**입니다. 채팅 생성은 별도 RTDB 작업이므로 재시도·부분 실패를 고려해 연결 상태를 관리합니다.
 - 개인 시간표 원본을 상대방에게 통째로 반환하지 않습니다. 검색 결과에는 필요한 겹침 시간 및 공개 가능한 프로필 정보만 담습니다.
 - `aiUsage/{uid}_{YYYY-MM-DD}`(BT-024)는 Gemini 게이트웨이의 사용자별 하루 호출 수입니다. 날짜는 `Asia/Seoul` 기준이며 **서버(Cloud Functions)만 쓰고 앱은 읽기·쓰기 모두 금지**합니다. 자세한 계약은 [`docs/BT-024.md`](./docs/BT-024.md)를 참고합니다.

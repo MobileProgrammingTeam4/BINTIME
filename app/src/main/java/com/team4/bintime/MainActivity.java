@@ -19,6 +19,8 @@ import com.team4.bintime.matching.MatchingFragment;
 import com.team4.bintime.notification.NotificationListFragment;
 import com.team4.bintime.profile.MyPageFragment;
 import com.team4.bintime.request.MockRequestRepository;
+import com.team4.bintime.request.RequestRepository;
+import com.team4.bintime.request.RequestRepositories;
 import com.team4.bintime.timetable.TimetableWeekFragment;
 
 /**
@@ -30,12 +32,12 @@ public class MainActivity extends AppCompatActivity {
     private static final int[] TAB_IDS = {R.id.nav_matching, R.id.nav_chat, R.id.nav_timetable, R.id.nav_my};
 
     private BottomNavigationView bottomNav;
-    private MockRequestRepository requests = new MockRequestRepository();
+    private RequestRepository requests;
     private boolean popupShown;
     private boolean matchingOn = true;
     public boolean isMatchingOn() { return matchingOn; }
     public void setMatchingOn(boolean enabled) { matchingOn = enabled; }
-    public MockRequestRepository requests() { return requests; }
+    public RequestRepository requests() { return requests; }
     public boolean claimRequestPopup() {
         if (popupShown) return false;
         popupShown = true;
@@ -50,7 +52,7 @@ public class MainActivity extends AppCompatActivity {
                 .addToBackStack("notifications").commit();
     }
     @Override protected void onSaveInstanceState(@NonNull Bundle out) {
-        out.putSerializable("sharedRequests", requests);
+        if (requests instanceof MockRequestRepository) out.putSerializable("sharedRequests", (MockRequestRepository) requests);
         out.putBoolean("requestPopupShown", popupShown);
         out.putBoolean("matchingOn", matchingOn);
         super.onSaveInstanceState(out);
@@ -79,10 +81,11 @@ public class MainActivity extends AppCompatActivity {
         }
         if (savedInstanceState != null) {
             MockRequestRepository restored = (MockRequestRepository) savedInstanceState.getSerializable("sharedRequests");
-            if (restored != null) requests = restored;
+            if (restored != null) RequestRepositories.restoreMock(this, restored);
             popupShown = savedInstanceState.getBoolean("requestPopupShown");
             matchingOn = savedInstanceState.getBoolean("matchingOn", true);
         }
+        requests = RequestRepositories.get(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 

@@ -5,6 +5,8 @@ material = "1.10.0"
 junit = "4.13.2"
 firebaseBom = "35.1.0"
 googleServices = "4.5.0"
+androidxTestRunner = "1.7.0"
+androidxTestJunit = "1.3.0"
 [libraries]
 appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
@@ -14,6 +16,9 @@ firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
 firebase-storage = { group = "com.google.firebase", name = "firebase-storage" }
 firebase-database = { group = "com.google.firebase", name = "firebase-database" }
+firebase-functions = { group = "com.google.firebase", name = "firebase-functions" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
+androidx-test-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestJunit" }
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }

@@ -5,12 +5,15 @@ import android.content.ContextWrapper;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.fragment.app.FragmentActivity;
 
 import com.team4.bintime.R;
 import com.team4.bintime.common.FeedbackDialog;
-import com.team4.bintime.data.MockMatchRepository;
+import com.team4.bintime.request.RequestDraft;
+import com.team4.bintime.request.RequestRepositories;
+import com.team4.bintime.request.RequestRepository;
 import com.team4.bintime.model.MatchCandidate;
 import com.team4.bintime.model.MatchFilter;
 
@@ -27,8 +30,10 @@ public final class MatchSummaryBinder {
         text(summary, R.id.name, c.name);
         text(summary, R.id.info, c.department + " " + c.grade + "학년 · " + c.gender);
         text(summary, R.id.matchRate, "매칭률 " + c.matchRate + "%");
+        // AI 매칭률(BT-027/028) 연결 전 실데이터 후보는 0 이라 숨긴다
+        summary.findViewById(R.id.matchRate).setVisibility(c.matchRate > 0 ? View.VISIBLE : View.GONE);
         text(summary, R.id.matchReason, c.matchReason);
-        text(summary, R.id.time, "오늘 " + c.overlapStart + " ~ " + c.overlapEnd);
+        text(summary, R.id.time, c.dayLabel + " " + c.overlapStart + " ~ " + c.overlapEnd);
         text(summary, R.id.duration, MatchFilter.formatDuration(c.overlapMinutes()) + " 겹침");
         text(summary, R.id.reasons, String.join("\n", c.reasons));
         TextView place = summary.findViewById(R.id.aiPlace);
@@ -39,15 +44,43 @@ public final class MatchSummaryBinder {
 
     /** [매칭 신청] 버튼: 이미 신청했으면 '신청 완료'로 잠그고, 아니면 누를 때 신청 + 완료 팝업. */
     static void bindRequestButton(TextView button, MatchCandidate c) {
-        boolean requested = MockMatchRepository.isRequested(c.uid);
-        button.setText(requested ? "신청 완료" : "매칭 신청");
-        button.setEnabled(!requested);
-        button.setAlpha(requested ? 0.4f : 1f);
+        RequestRepository repository = RequestRepositories.get(button.getContext());
+        bindRequestButton(button, c, repository.isMock() ? RequestDraft.mock(c) : null);
+    }
+
+    /** BT-018 연결점. 실제 검색 후보는 verified draft를 공급한다. Mock 카드를 Firebase로 보내지 않는다. */
+    public static void bindRequestButton(TextView button, MatchCandidate c, RequestDraft draft) {
+        RequestRepository repository = RequestRepositories.get(button.getContext());
+        boolean requested = repository.hasPendingRequest(c.uid);
+        boolean submitting = repository.isSubmitting(c.uid);
+        button.setText(submitting ? "신청 중…" : requested ? "신청 완료" : "매칭 신청");
+        button.setEnabled(!requested && !submitting);
+        button.setAlpha(requested || submitting ? 0.4f : 1f);
         button.setOnClickListener(v -> {
-            if (!MockMatchRepository.requestMatch(c.uid)) return; // 연타·중복 신청 방지
-            bindRequestButton(button, c);
-            FeedbackDialog.success(activityOf(v.getContext()).getSupportFragmentManager(),
-                    "매칭 신청이 완료됐어요!", c.name + "님이 수락하면\n채팅을 시작할 수 있어요.");
+            FragmentActivity activity = activityOf(v.getContext());
+            if (draft == null || draft.mock != repository.isMock() || !c.uid.equals(draft.toUid)
+                    || (!repository.isMock() && !c.uid.equals(draft.candidateId))) {
+                Toast.makeText(activity, "매칭 검색 결과에서 상대를 다시 선택해주세요.", Toast.LENGTH_LONG).show();
+                return;
+            }
+            button.setEnabled(false);
+            repository.create(draft, new RequestRepository.Callback() {
+                @Override public void onSuccess(RequestRepository.Item item) {
+                    if (activity.isFinishing() || activity.isDestroyed() || !button.isAttachedToWindow()) return;
+                    bindRequestButton(button, c);
+                    if (!activity.getSupportFragmentManager().isStateSaved()) FeedbackDialog.success(
+                            activity.getSupportFragmentManager(), "매칭 신청이 완료됐어요!",
+                            c.name + "님이 수락하면\n채팅을 시작할 수 있어요.");
+                }
+                @Override public void onError(String message) {
+                    if (activity.isFinishing() || activity.isDestroyed() || !button.isAttachedToWindow()) return;
+                    // 네트워크 실패 후 같은 draft/UUID로 재시도할 수 있도록 리스너를 바꾸지 않는다.
+                    button.setEnabled(true);
+                    button.setText("매칭 신청");
+                    button.setAlpha(1f);
+                    Toast.makeText(activity, message, Toast.LENGTH_LONG).show();
+                }
+            });
         });
     }
 

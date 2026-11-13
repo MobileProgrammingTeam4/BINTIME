@@ -128,6 +128,17 @@ public class MockAuthRepository implements AuthRepository {
         return currentUid;
     }
 
+    /**
+     * Mock 전용 프로세스 복원. MainActivity의 저장 상태에서 복원하며 Firebase 세션에는 사용하지 않는다.
+     * 이미 다른 계정으로 로그인했다면 이전 저장 상태로 계정을 바꾸지 않는다.
+     */
+    public boolean restoreSession(String uid) {
+        if (uid == null || uid.isBlank()) return false;
+        if (currentUid != null) return currentUid.equals(uid);
+        currentUid = uid;
+        return true;
+    }
+
     @Override
     public void signOut() {
         currentUid = null;

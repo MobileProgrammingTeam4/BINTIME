@@ -11,14 +11,19 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-/** Shared mock timetable data for manual entry, review, registration, and weekly view. */
+/**
+ * Shared timetable data for manual entry, review, registration, and weekly view.
+ * [BT-015/016] 저장소와는 {@link TimetableDraftMapper}로 변환한다. 공강 선택은 요일(월~일)별 48칸
+ * 비트마스크이며 화면은 월~금만 보여 주고 토·일 값은 저장할 때 그대로 돌려준다.
+ */
 final class TimetableDraft implements Serializable {
     private static final String EXTRA_DRAFT = "timetable_draft";
     static final int SLOT_MINUTES = 30;
     static final String[] DAYS = {"월", "화", "수", "목", "금"};
 
     final ArrayList<Course> courses;
-    private final long[] freeSlots = new long[DAYS.length];
+    /** 요일(월~일)별 선택 칸. 비트 i = 자정 기준 30분 칸 i. 화면은 앞의 5개(월~금)만 쓴다. */
+    private final long[] freeSlots = new long[7];
     private boolean suggested;
 
     TimetableDraft(List<Course> courses) {
@@ -27,7 +32,7 @@ final class TimetableDraft implements Serializable {
 
     TimetableDraft copy() {
         TimetableDraft copy = new TimetableDraft(courses);
-        System.arraycopy(freeSlots, 0, copy.freeSlots, 0, freeSlots.length);
+        System.arraycopy(freeSlots, 0, copy.freeSlots, 0, Math.min(freeSlots.length, copy.freeSlots.length));
         copy.suggested = suggested;
         return copy;
     }
@@ -71,8 +76,26 @@ final class TimetableDraft implements Serializable {
         if (courseAt(day, slot) == null) freeSlots[day] ^= 1L << slot;
     }
 
+    /** 저장용 선택 칸 사본(길이 7). */
+    long[] freeCells() {
+        long[] cells = new long[7];
+        System.arraycopy(freeSlots, 0, cells, 0, Math.min(freeSlots.length, cells.length));
+        return cells;
+    }
+
+    void setFreeCells(long[] cells) {
+        Arrays.fill(freeSlots, 0L);
+        if (cells != null) System.arraycopy(cells, 0, freeSlots, 0, Math.min(cells.length, freeSlots.length));
+    }
+
+    /** 이미 저장된 시간표는 빈 시간을 공강으로 다시 자동 추가하지 않는다. */
+    void markSuggested() {
+        suggested = true;
+    }
+
     void discardOccupiedFreeSlots() {
         for (Course course : courses) {
+            if (course.getDayIndex() < 0) continue; // 토·일 수업은 화면 칸이 없다
             for (int slot = course.getStartSlotIndex(0); slot < course.getEndSlotIndex(0); slot++) {
                 freeSlots[course.getDayIndex()] &= ~(1L << slot);
             }

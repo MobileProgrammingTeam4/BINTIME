@@ -25,6 +25,8 @@ public final class CourseValidator {
     public static final int MINUTES_PER_DAY = 1440;
 
     private static final Pattern COLOR = Pattern.compile("^#[0-9A-Fa-f]{6}$");
+    /** Firestore 예약 문서 ID ("__name__" 등). */
+    private static final Pattern RESERVED_ID = Pattern.compile("^__.*__$", Pattern.DOTALL);
 
     private CourseValidator() {
     }
@@ -49,14 +51,16 @@ public final class CourseValidator {
                 slots);
     }
 
-    /** 필드 형식만 검사한다. 통과하면 null. */
+    /**
+     * 필드 형식만 검사한다. 통과하면 null.
+     * <p>
+     * <b>{@link #sanitize}를 거친 입력을 전제한다.</b> 이름만 trim 후 길이를 보고, 교수·강의실·색상은
+     * 앞뒤 공백이 이미 지워지고 빈 값이 null로 바뀌었다고 보고 그대로 검사한다. 저장소는 항상
+     * sanitize한 사본을 넘긴다.
+     */
     public static TimetableFailure validateFields(Course course) {
         if (course == null) return invalid("course is null");
-        String id = course.getCourseId();
-        if (id == null || id.trim().isEmpty() || id.contains("/") || id.length() > MAX_COURSE_ID_LENGTH
-                || id.equals(".") || id.equals("..")) {
-            return invalid("invalid courseId");
-        }
+        if (!isValidDocumentId(course.getCourseId())) return invalid("invalid courseId");
         String name = course.getName();
         if (name == null || name.trim().isEmpty() || name.trim().length() > MAX_NAME_LENGTH) {
             return invalid("name must be 1.." + MAX_NAME_LENGTH + " chars");
@@ -120,6 +124,15 @@ public final class CourseValidator {
             checked.add(c);
         }
         return null;
+    }
+
+    /**
+     * Firestore 문서 ID로 쓸 수 있는지. 비어 있지 않고 '/' 없음, 128자 이하, "."·".." 아님,
+     * "__.*__" 형태(Firestore 예약 ID) 아님. 규칙의 validDocId와 같은 조건이다.
+     */
+    public static boolean isValidDocumentId(String id) {
+        return id != null && !id.trim().isEmpty() && !id.contains("/") && id.length() <= MAX_COURSE_ID_LENGTH
+                && !id.equals(".") && !id.equals("..") && !RESERVED_ID.matcher(id).matches();
     }
 
     /** 요일 1..7, 0 <= start < end <= 1440. 30분 단위가 아니어도 된다. */

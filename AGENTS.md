@@ -13,7 +13,7 @@
 ## 1. 매 작업 시작 시 실행할 프리플라이트
 
 1. `pwd`, `git status`, `git branch --show-current`, 폴더 구조를 확인합니다. 기존 사용자 변경 사항을 덮어쓰지 않습니다.
-2. 루트의 `README.md`와 `AGENTS.md`, 관련 BT Issue와 선행 이슈를 읽습니다. **BT-###은 계획 ID이며 실제 GitHub #번호가 아님**에 유의합니다.
+2. 루트의 `README.md`와 `AGENTS.md`, 공통 계약·시간 규칙 문서 [`docs/BT-012.md`](./docs/BT-012.md), 관련 BT Issue와 선행 이슈를 읽습니다. **BT-###은 계획 ID이며 실제 GitHub #번호가 아님**에 유의합니다.
 3. Android 프로젝트 위치(루트 또는 `android/`), `build.gradle(.kts)`, `settings.gradle(.kts)`, `gradlew` 및 `functions/`, `firebase.json`, Rules 파일의 실제 존재 여부를 확인합니다.
 4. 변경할 화면·경로·함수·데이터 필드, 담당 영역(A~E), 보안 영향, 검증 명령을 먼저 정리합니다.
 5. 필요한 **최소 범위로만 수정**합니다. 요청되지 않은 SDK 업그레이드·패키지 이동·의존성 추가·일괄 리팩터링을 하지 않습니다.
@@ -120,6 +120,8 @@ firebase.json
 
 ## 5. Firestore·RTDB 공통 계약
 
+필드 이름·UID 출처·요청/매칭 식별자·분 단위 시간 규칙·Repository 연결은 [`docs/BT-012.md`](./docs/BT-012.md)의 팀 결정을 우선 확인합니다. 합의와 실제 구현 상태, 후속 이슈에서 확정할 제안을 구분하고 미구현 계약을 동작 완료로 보고하지 않습니다.
+
 아래 이름은 팀의 **설계 기준**입니다. 실제 구현이 다르면 독자적으로 바꾸지 말고 담당자와 상의 후 스키마와 문서를 동기화합니다.
 
 ```text
@@ -146,10 +148,14 @@ userChatRooms/{uid}/{matchId}
 | 데이터 | 필수 계약 또는 검증 |
 |---|---|
 | `Auth UID` | 문서 소유자와 참가자 판별에 사용. 클라이언트 입력만 신뢰 금지 |
-| `timetables/{uid}.revision` | 수정마다 증가, `availability.sourceRevision`과 비교 |
-| `availability` | 선택/계산된 공강 슬롯, 분 단위 정수 시간 및 요일 |
+| `timetables/{uid}.revision` | 수업 변경마다 증가, 공강 선택만 바꾸면 유지. `availability.sourceRevision`과 비교 |
+| `timetables/{uid}.freeCells` | 월~일 7개의 48비트 정수로 선택 원본 보존. `semester`는 생략/null 허용 |
+| `availability` | 선택 원본을 병합한 60분 이상 슬롯과 `sourceRevision`. 서버가 30분 경계·원본·수업 비겹침·revision을 재검증 |
 | `matchSettings` | `isMatching`, `minOverlapMinutes`, `purposes`, `preferredTags` 등 |
 | `matchRequests` | `fromUid`, `toUid`, `status`, `meetingDate`, `startMinute`, `endMinute`, `overlapMinutes` 등 **시간 스냅샷** |
+| 요청 생성 계약 | `createMatchRequest({candidateId, clientRequestId})`: 상대 UID와 재시도 UUID만 입력. 검색자가 선택한 최소 겹침, 프로필·차단·시간표·확정 매칭 충돌을 같은 서버 트랜잭션에서 검증. 계약은 `docs/BT-019.md` |
+| 요청 생성 계약 | `createMatchRequest(candidateId, clientRequestId)`, 서버 전용 `matchRequestGuards` 중복 잠금 및 BT-017 연결 경계는 `docs/BT-019.md`를 따릅니다. 실제 검색 미연결은 실패로 처리합니다. |
+| 요청 목록·취소 계약 | UID별 발신/수신 Firestore 리스너, `cancelMatchRequest(requestId)`, 두 복합 인덱스와 검증 범위는 `docs/BT-020.md`를 따릅니다. |
 | `matches` | `participantUids`, `requestId`, `status`, `meetingDate`, `startMinute`, `endMinute`, `chatReady` 등 **확정 스냅샷** |
 | `chatRooms` | `matchId`를 룸 식별자로 사용, 메시지 발신자·권한 검증. Rules는 `database.rules.json`: 멤버만 읽기, 메시지는 새로 쓰기만(`senderId === auth.uid`, 서버 시각, 본문 1~1000자), `members`는 서버 전용. 계약은 `docs/BT-021.md` |
 | `userChatRooms` | 사용자별 목록/읽지 않음 수, 서버와 동기화. 앱은 본인 `unreadCount`를 0으로만 쓸 수 있고 `status`·`hidden`은 서버 전용 |

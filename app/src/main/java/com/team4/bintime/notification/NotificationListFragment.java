@@ -17,6 +17,7 @@ import com.team4.bintime.MainActivity;
 import com.team4.bintime.R;
 import com.team4.bintime.request.MatchAcceptedActivity;
 import com.team4.bintime.request.MockRequestRepository;
+import com.team4.bintime.request.RequestRepository;
 import com.team4.bintime.request.RequestTabsController;
 import com.team4.bintime.data.MockMatchRepository;
 import java.time.LocalDate;
@@ -38,7 +39,7 @@ public class NotificationListFragment extends Fragment {
             }
         });
         getChildFragmentManager().setFragmentResultListener(MatchRequestDialog.RESULT,this,(key,data)->{
-            MockRequestRepository repo=((MainActivity)requireActivity()).requests();
+            RequestRepository repo=((MainActivity)requireActivity()).requests();
             boolean changed=repo.respond(data.getString("id"),MockRequestRepository.Status.valueOf(data.getString("status")));
             render();
             if(changed && "ACCEPTED".equals(data.getString("status"))) accepted.launch(MatchAcceptedActivity.intent(requireContext(),repo.find(data.getString("id"))));
@@ -64,7 +65,7 @@ public class NotificationListFragment extends Fragment {
         View root=requireView();
         ((TextView)root.findViewById(R.id.notificationDate)).setText(LocalDate.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("오늘 · M월 d일 (E)",Locale.KOREAN)));
         LinearLayout rows=root.findViewById(R.id.notificationRows); rows.removeAllViews();
-        MockRequestRepository repo=((MainActivity)requireActivity()).requests();
+        RequestRepository repo=((MainActivity)requireActivity()).requests();
         String[] titles=getResources().getStringArray(R.array.notification_titles);
         com.team4.bintime.common.StateView empty = root.findViewById(R.id.notificationEmpty);
         if (demoEmpty) empty.showEmpty(getString(R.string.notification_empty), getString(R.string.notification_empty_message));

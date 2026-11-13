@@ -27,6 +27,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1-week1"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // 이메일 링크가 돌아오는 Firebase Hosting 기본 도메인 (App Link intent-filter host)
         manifestPlaceholders["authLinkHost"] =
             if (firebaseProjectId != null) "$firebaseProjectId.firebaseapp.com" else "auth.invalid"
@@ -48,5 +49,8 @@ dependencies {
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.storage)
     implementation(libs.firebase.database)
+    implementation(libs.firebase.functions)
     testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.junit)
 }
