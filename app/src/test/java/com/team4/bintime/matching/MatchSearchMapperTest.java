@@ -66,6 +66,7 @@ public class MatchSearchMapperTest {
         p.setGender("여성");
         p.setBio("안녕");
         p.setInterestTags(Arrays.asList("카페", "#산책"));
+        p.setPhotoPath("profileImages/u9/profile.jpg");
         MatchCandidate c = MatchSearchMapper.toCandidate(raw, p, 2, "2026-11-16");
         assertEquals("u9", c.uid);
         assertEquals(2, c.grade);
@@ -73,6 +74,7 @@ public class MatchSearchMapperTest {
         assertEquals("11/17(화)", c.dayLabel);
         assertEquals(Arrays.asList("#카페", "#산책"), c.tags);
         assertEquals(0, c.matchRate);
+        assertEquals("profileImages/u9/profile.jpg", c.photoPath);
     }
 
     @Test

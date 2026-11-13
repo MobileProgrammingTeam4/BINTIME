@@ -81,6 +81,7 @@ final class MatchSearchMapper {
                 hhmm(num(raw.get("startMinute"))), hhmm(num(raw.get("endMinute"))), (String) raw.get("purpose"),
                 tags, Collections.emptyList(), profile.getBio());
         c.dayLabel = dayLabel((String) raw.get("meetingDate"), dayOfWeek, today);
+        c.photoPath = profile.getPhotoPath();
         return c;
     }
 
