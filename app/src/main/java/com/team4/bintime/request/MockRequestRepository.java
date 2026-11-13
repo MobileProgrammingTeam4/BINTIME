@@ -76,6 +76,16 @@ public final class MockRequestRepository implements RequestRepository, Serializa
     }
     @Override public boolean isSubmitting(String toUid) { return false; }
     @Override public boolean isMock() { return true; }
+    @Override public boolean isLoading() { return false; }
+    @Override public String error() { return null; }
+    @Override public void retry() { changed(); }
+    @Override public boolean isUpdating(String requestId) { return false; }
+    @Override public void cancel(String requestId, Callback callback) {
+        Item item = find(requestId);
+        if (item != null && item.sent && item.status == Status.CANCELED) { callback.onSuccess(item); return; }
+        if (respond(requestId, Status.CANCELED)) callback.onSuccess(item);
+        else callback.onError("이미 처리되었거나 취소할 수 없는 요청이에요.");
+    }
     @Override public Registration observe(Runnable listener) {
         if (listeners == null) listeners = new ArrayList<>();
         listeners.add(listener);

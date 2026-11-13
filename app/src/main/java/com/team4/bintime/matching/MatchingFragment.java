@@ -121,7 +121,7 @@ public class MatchingFragment extends Fragment {
                 if (!isResumed() || isHidden() || getView() == null || getChildFragmentManager().isStateSaved()) return;
                 NotificationPreferences prefs = new NotificationPreferences(requireContext());
                 List<MockRequestRepository.Item> pending = requestRepository.list(MockRequestRepository.Tab.RECEIVED);
-                if (!pending.isEmpty() && prefs.canShowPopup() && ((MainActivity) requireActivity()).claimRequestPopup())
+                if (requestRepository.isMock() && !pending.isEmpty() && prefs.canShowPopup() && ((MainActivity) requireActivity()).claimRequestPopup())
                     MatchRequestDialog.showRequest(getChildFragmentManager(), pending.get(0).id);
             });
         }
@@ -187,6 +187,7 @@ public class MatchingFragment extends Fragment {
         boolean find = selectedTab == 0;
         matchContent.setVisibility(find ? View.VISIBLE : View.GONE);
         requestContent.setVisibility(find ? View.GONE : View.VISIBLE);
+        if (find) adapter.notifyDataSetChanged();
         if (!find) requestTabs.show(MockRequestRepository.Tab.values()[selectedTab - 1]);
     }
 

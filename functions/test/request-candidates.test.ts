@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { verifiedSlots } from "../src/requests/candidates";
-import { createRequestCallable } from "../src/requests/callable";
+import { cancelRequestCallable, createRequestCallable } from "../src/requests/callable";
 import type { RequestService } from "../src/requests/service";
 
 const mask = (start: number, end: number) => 2 ** (end / 30) - 2 ** (start / 30);
@@ -57,4 +57,14 @@ describe("BT-019 학교 이메일 자격", () => {
     const data = { candidateId: "peer", clientRequestId: "c441f472-1d6c-4ba3-87ee-f0554b87da22" };
     expect(await callable.run({ auth: { uid: "me", token: school }, data } as never)).toEqual({ fromUid: "me" });
   });
+});
+
+describe("BT-020 취소 Callable 자격", () => {
+  it.each([undefined, { uid: "me", token: {} }, { uid: "me", token: { email: "me@school.ac.kr", email_verified: false } }])(
+    "미로그인·학교 이메일 미확인은 저장소 전에 거절한다", async auth => {
+      const callable = cancelRequestCallable(() => { throw Error("must not access database"); }, () => [".ac.kr"]);
+      await expect(callable.run({ auth, data: { requestId: "request" } } as never)).rejects.toMatchObject({
+        code: auth ? "permission-denied" : "unauthenticated",
+      });
+    });
 });

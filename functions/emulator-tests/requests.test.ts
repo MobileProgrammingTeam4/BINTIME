@@ -6,7 +6,7 @@ import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestE
 import { collection, doc, getDoc, getDocs, onSnapshot, query, setDoc, updateDoc, where } from "firebase/firestore";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { RequestService } from "../src/requests/service";
-import { createRequestCallable } from "../src/requests/callable";
+import { cancelRequestCallable, createRequestCallable } from "../src/requests/callable";
 import { type CandidateResolver } from "../src/requests/contracts";
 
 // 실제 Callable에는 주입하지 않는다. BT-017 검증 완료 후보를 대신하는 테스트 전용 어댑터.
@@ -83,5 +83,64 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)("BT-019 Firestore 에뮬�
     const result = await callable.run({ auth: { uid: "sender", token: { email: "test@school.ac.kr", email_verified: true } },
       data: { candidateId: "candidate-1", clientRequestId: randomUUID() } } as never);
     expect(await Promise.all(waits)).toEqual([result.id, result.id]);
+  });
+
+  it("발신자 취소가 양측 리스너에 반영되고 스냅샷은 보존된다", async () => {
+    const original = await service.create("sender", { candidateId: "candidate-1", clientRequestId: randomUUID() });
+    const waits = ["sender", "receiver"].map((uid, i) => new Promise<string>((resolve, reject) => {
+      const db = env.authenticatedContext(uid).firestore();
+      const q = query(collection(db, "matchRequests"), where(i === 0 ? "fromUid" : "toUid", "==", uid));
+      const timer = setTimeout(() => { stop(); reject(new Error("cancel snapshot timeout")); }, 10_000);
+      const stop = onSnapshot(q, (s) => {
+        const canceled = s.docs.find((d) => d.id === original.id && d.data().status === "CANCELED");
+        if (canceled) { clearTimeout(timer); stop(); resolve(canceled.id); }
+      }, reject);
+    }));
+    const callable = cancelRequestCallable(() => service, () => [".ac.kr"]);
+    const canceled = await callable.run({ auth: { uid: "sender", token: { email: "test@school.ac.kr", email_verified: true } }, data: { requestId: original.id } } as never);
+    expect(canceled).toMatchObject({ ...snapshot, status: "CANCELED", overlapMinutes: 90 });
+    expect(await Promise.all(waits)).toEqual([original.id, original.id]);
+    expect(await service.cancel("sender", original.id)).toEqual(canceled);
+    expect((await admin.collection("matchRequests").doc(original.id).get()).data()).toMatchObject(snapshot);
+    const replacement = await service.create("sender", { candidateId: "candidate-1", clientRequestId: randomUUID() });
+    expect(replacement.id).not.toBe(original.id);
+    expect((await admin.collection("matchRequests").get()).size).toBe(2);
+  });
+
+  it("수신자·제3자는 취소할 수 없고 처리된 요청도 바꿀 수 없다", async () => {
+    const original = await service.create("sender", { candidateId: "candidate-1", clientRequestId: randomUUID() });
+    for (const uid of ["receiver", "outsider"]) {
+      await expect(service.cancel(uid, original.id)).rejects.toMatchObject({ code: "permission-denied" });
+    }
+    for (const status of ["ACCEPTED", "REJECTED"]) {
+      await admin.collection("matchRequests").doc(original.id).update({ status });
+      await expect(service.cancel("sender", original.id)).rejects.toMatchObject({
+        code: "failed-precondition", details: { reason: "REQUEST_NOT_PENDING" },
+      });
+      expect((await admin.collection("matchRequests").doc(original.id).get()).get("status")).toBe(status);
+    }
+    await expect(service.cancel("sender", "f".repeat(64))).rejects.toMatchObject({ code: "not-found" });
+  });
+
+  it("동시 취소는 멱등이며 수락/취소 경합도 한 상태로 직렬화된다", async () => {
+    const original = await service.create("sender", { candidateId: "candidate-1", clientRequestId: randomUUID() });
+    const canceled = await Promise.all(Array.from({ length: 4 }, () => service.cancel("sender", original.id)));
+    expect(new Set(canceled.map((c) => JSON.stringify(c))).size).toBe(1);
+    const next = await service.create("sender", { candidateId: "candidate-2", clientRequestId: randomUUID() });
+    const ref = admin.collection("matchRequests").doc(next.id);
+    // BT-031의 수락 구현 대신 동일 문서에서 PENDING을 확인하는 테스트 트랜잭션만 사용한다.
+    const accept = admin.runTransaction(async (tx) => {
+      const before = await tx.get(ref);
+      if (before.get("status") === "PENDING") tx.update(ref, { status: "ACCEPTED" });
+    });
+    const outcomes = await Promise.allSettled([accept, service.cancel("sender", next.id)]);
+    const status = (await ref.get()).get("status");
+    expect(["ACCEPTED", "CANCELED"]).toContain(status);
+    const cancelResult = outcomes[1];
+    if (status === "ACCEPTED") {
+      expect(cancelResult.status).toBe("rejected");
+    } else {
+      expect(cancelResult.status).toBe("fulfilled");
+    }
   });
 });

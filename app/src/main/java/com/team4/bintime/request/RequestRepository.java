@@ -53,10 +53,15 @@ public interface RequestRepository {
     List<Item> list(Tab tab);
     Item find(String id);
     void create(RequestDraft draft, Callback callback);
+    void cancel(String requestId, Callback callback);
     boolean hasPendingRequest(String toUid);
     boolean isSubmitting(String toUid);
     boolean isMock();
     Registration observe(Runnable listener);
+    boolean isLoading();
+    String error();
+    void retry();
+    boolean isUpdating(String requestId);
 
     /** 기존 BT-007 수락/거절 시연용. 실제 상태 변경은 BT-031 서버 API에서 연결한다. */
     boolean respond(String id, Status next);
