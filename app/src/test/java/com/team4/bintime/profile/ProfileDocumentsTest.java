@@ -60,6 +60,44 @@ public class ProfileDocumentsTest {
     }
 
     @Test
+    public void fromPublicDocument_readsPublicFields() {
+        UserProfile back = ProfileDocuments.fromPublicDocument("uidA",
+                ProfileDocuments.toPublicDocument(sample()));
+        assertEquals("uidA", back.getUid());
+        assertNull(back.getEmail());
+        assertEquals("지민", back.getNickname());
+        assertEquals("소프트웨어학부", back.getDepartment());
+        assertEquals(Arrays.asList("카페", "산책"), back.getInterestTags());
+        assertEquals("profileImages/uidA/profile.jpg", back.getPhotoPath());
+    }
+
+    /** Rules 가 막지만, 공개 문서에 이메일이 섞여 있어도 앱 결과에는 넣지 않는다. */
+    @Test
+    public void fromPublicDocument_dropsEmailEvenIfPresent() {
+        Map<String, Object> doc = ProfileDocuments.toUserDocument(sample());
+        assertNull(ProfileDocuments.fromPublicDocument("uidA", doc).getEmail());
+    }
+
+    /** #91 리뷰(E): 공개 문서에 닉네임 등이 빠져 있으면 null 이 아니라 빈 문자열이다. */
+    @Test
+    public void fromPublicDocument_missingFields_areEmptyStrings() {
+        UserProfile back = ProfileDocuments.fromPublicDocument("uidX", new HashMap<>());
+        assertEquals("", back.getNickname());
+        assertEquals("", back.getDepartment());
+        assertNull(back.getPhotoPath());
+        assertTrue(back.getInterestTags().isEmpty());
+    }
+
+    @Test
+    public void toPublicProfile_isCopyWithoutEmail() {
+        UserProfile original = sample();
+        UserProfile pub = ProfileDocuments.toPublicProfile(original);
+        assertNull(pub.getEmail());
+        assertEquals("a@kookmin.ac.kr", original.getEmail());
+        assertEquals("지민", pub.getNickname());
+    }
+
+    @Test
     public void fromDocument_missingFields_doNotInjectDemoValues() {
         UserProfile back = ProfileDocuments.fromDocument("uidB", new HashMap<>());
         assertEquals("uidB", back.getUid());

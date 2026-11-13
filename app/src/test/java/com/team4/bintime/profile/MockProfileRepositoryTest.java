@@ -356,4 +356,79 @@ public class MockProfileRepositoryTest {
         p.setPhotoPath("profileImages/u/profile.jpg");
         assertEquals("profileImages/u/profile.jpg", p.copy().getPhotoPath());
     }
+
+    // ---- 공개 프로필 (다른 사용자 표시용) ----
+
+    private static final class Holder<T> implements ProfileRepository.Callback<T> {
+        boolean called;
+        T result;
+        String error;
+
+        @Override public void onSuccess(T value) { called = true; result = value; }
+        @Override public void onError(String message) { called = true; error = message; }
+    }
+
+    private static Holder<UserProfile> loadPublic(ProfileRepository repo, String uid) {
+        Holder<UserProfile> holder = new Holder<>();
+        repo.getPublicProfile(uid, holder);
+        return holder;
+    }
+
+    @Test
+    public void getPublicProfile_afterSave_returnsCopyWithoutEmail() {
+        UserProfile mine = UserProfile.empty();
+        mine.setUid("uidPub");
+        mine.setEmail("pub@kookmin.ac.kr");
+        mine.setNickname("공개닉");
+        mine.setDepartment("소프트웨어학부");
+        mine.setInterestTags(Arrays.asList("카페"));
+        assertTrue(save(repository, mine).success);
+
+        Holder<UserProfile> shown = loadPublic(repository, "uidPub");
+        assertNull(shown.error);
+        assertEquals("공개닉", shown.result.getNickname());
+        assertEquals(Arrays.asList("카페"), shown.result.getInterestTags());
+        assertNull(shown.result.getEmail());
+
+        // 받은 객체를 고쳐도 저장소 값은 그대로다.
+        shown.result.setNickname("바뀜");
+        assertEquals("공개닉", loadPublic(repository, "uidPub").result.getNickname());
+    }
+
+    @Test
+    public void getPublicProfile_unknownUid_returnsNull() {
+        Holder<UserProfile> shown = loadPublic(repository, "nobody");
+        assertTrue(shown.called);
+        assertNull(shown.error);
+        assertNull(shown.result);
+    }
+
+    @Test
+    public void getPublicProfile_nullOrEmptyUid_fails() {
+        assertNotNull(loadPublic(repository, null).error);
+        assertNotNull(loadPublic(repository, "").error);
+    }
+
+    @Test
+    public void putPublicProfile_registersOtherUserWithoutEmail() {
+        MockProfileRepository repo = new MockProfileRepository();
+        UserProfile other = UserProfile.empty();
+        other.setUid("candidate1");
+        other.setEmail("leak@kookmin.ac.kr");
+        other.setNickname("후보");
+        other.setDepartment("경영학부");
+        repo.putPublicProfile(other);
+        repo.putPublicProfile(UserProfile.empty()); // uid 없음 → 무시
+
+        Holder<UserProfile> shown = loadPublic(repo, "candidate1");
+        assertEquals("후보", shown.result.getNickname());
+        assertNull(shown.result.getEmail());
+        assertEquals("leak@kookmin.ac.kr", other.getEmail()); // 원본은 건드리지 않는다
+    }
+
+    /** 공개 프로필은 다른 사용자 조회용이라 내 전체 프로필(getProfile)과 섞이지 않는다. */
+    @Test
+    public void getPublicProfile_doesNotExposeOwnFullProfileForOtherUid() {
+        assertNull(loadPublic(repository, "u1").result); // 저장 안 한 시연 프로필은 공개 목록에 없음
+    }
 }
