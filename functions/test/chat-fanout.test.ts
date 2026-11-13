@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { applyMessage, fanOutMessage, parseMessage, RECENT_MESSAGE_LIMIT, type RoomEntry, type RootRef } from "../src/chat/fanout";
-import { CHAT_TRIGGER_REGION, chatTriggerRegion } from "../src/chat/trigger";
+import {
+  CHAT_TRIGGER_REGION, chatTriggerRegion, createMessageTrigger, handleMessageEvent, MAX_EVENT_AGE_MS,
+} from "../src/chat/trigger";
 
 const MATCH = "a".repeat(64);
 const message = (senderId = "me", createdAt = 200, content = "안녕") => ({ senderId, content, createdAt });
@@ -173,5 +175,66 @@ describe("BT-022 fanOutMessage", () => {
     expect(chatTriggerRegion({})).toBe("asia-southeast1");
     expect(chatTriggerRegion({ FUNCTIONS_EMULATOR: "false" })).toBe("asia-southeast1");
     expect(chatTriggerRegion({ FUNCTIONS_EMULATOR: "true" })).toBe("us-central1");
+  });
+});
+
+describe("BT-022 트리거 재처리 정책 (PR #96 재검토 P2)", () => {
+  const NOW = Date.parse("2026-11-13T12:00:00Z");
+  const silent = { warn: vi.fn(), error: vi.fn() };
+  const seed = () => memoryRoot({
+    [`chatRooms/${MATCH}/members`]: { me: { joinedAt: 1 }, other: { joinedAt: 1 } },
+    [`userChatRooms/me/${MATCH}`]: entry(),
+    [`userChatRooms/other/${MATCH}`]: entry({ otherUid: "me" }),
+  });
+  const event = (root: RootRef, ageMs: number, value: unknown = message()) => ({
+    time: new Date(NOW - ageMs).toISOString(), matchId: MATCH, messageId: "-b", root, value,
+  });
+
+  it("배포 설정: 실패 재시도(retry)가 켜져 있고 지역은 asia-southeast1 이다", () => {
+    const endpoint = (createMessageTrigger() as unknown as {
+      __endpoint: { region: string[]; eventTrigger: { retry: boolean; eventFilterPathPatterns: { ref: string } } };
+    }).__endpoint;
+    expect(endpoint.eventTrigger.retry).toBe(true);
+    expect(endpoint.region).toEqual(["asia-southeast1"]);
+    expect(endpoint.eventTrigger.eventFilterPathPatterns.ref).toBe("chatRooms/{matchId}/messages/{messageId}");
+  });
+
+  it.each(["me", "other"])("일시 오류(%s 쪽 실패)는 예외를 다시 던져 재시도되고, 재시도에서 한 번만 반영된다", async (failed) => {
+    const root = seed();
+    root.failOnce.add(`userChatRooms/${failed}/${MATCH}`);
+    // 1차 시도: 한쪽 트랜잭션 실패 → 예외가 그대로 올라가야 플랫폼이 재시도한다
+    await expect(handleMessageEvent(event(root, 5_000), NOW, fanOutMessage, silent)).rejects.toThrow("transaction failed");
+    // 플랫폼 재시도(같은 이벤트, 발생 시각 그대로) 두 번
+    await expect(handleMessageEvent(event(root, 60_000), NOW, fanOutMessage, silent)).resolves.toBe("applied");
+    await expect(handleMessageEvent(event(root, 120_000), NOW, fanOutMessage, silent)).resolves.toBe("applied");
+    expect(root.data[`userChatRooms/me/${MATCH}`]).toMatchObject({ lastMessage: "안녕", unreadCount: 0 });
+    expect(root.data[`userChatRooms/other/${MATCH}`]).toMatchObject({ lastMessage: "안녕", unreadCount: 1 });
+  });
+
+  it("발생 후 1시간이 지난 이벤트는 처리하지 않고 정상 종료해 재시도를 멈춘다", async () => {
+    const root = seed();
+    const fanOut = vi.fn(fanOutMessage);
+    const logger = { warn: vi.fn(), error: vi.fn() };
+    await expect(handleMessageEvent(event(root, MAX_EVENT_AGE_MS + 1), NOW, fanOut, logger)).resolves.toBe("expired");
+    expect(fanOut).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledOnce();
+    expect(root.data[`userChatRooms/other/${MATCH}`]).toEqual(entry({ otherUid: "me" }));
+    // 1시간 직전까지는 처리한다
+    await expect(handleMessageEvent(event(root, MAX_EVENT_AGE_MS - 1), NOW, fanOut, logger)).resolves.toBe("applied");
+  });
+
+  it("발생 시각을 읽을 수 없는 이벤트도 재시도하지 않는다", async () => {
+    const fanOut = vi.fn(fanOutMessage);
+    await expect(handleMessageEvent({ ...event(seed(), 0), time: "not-a-date" }, NOW, fanOut, silent))
+      .resolves.toBe("expired");
+    expect(fanOut).not.toHaveBeenCalled();
+  });
+
+  it("영구 결과(형식 오류·비멤버 발신자)는 예외 없이 끝나 재시도하지 않는다", async () => {
+    const root = seed();
+    await expect(handleMessageEvent(event(root, 0, { senderId: "me" }), NOW, fanOutMessage, silent))
+      .resolves.toBe("invalid-message");
+    await expect(handleMessageEvent(event(root, 0, message("outsider")), NOW, fanOutMessage, silent))
+      .resolves.toBe("not-member");
   });
 });
