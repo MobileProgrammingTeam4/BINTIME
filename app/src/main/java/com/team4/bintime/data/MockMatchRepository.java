@@ -6,9 +6,7 @@ import com.team4.bintime.model.MatchFilter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * 1주차 목업 데이터 소스.
@@ -65,22 +63,10 @@ public final class MockMatchRepository {
     private MockMatchRepository() {
     }
 
-    /** 내가 매칭 신청을 보낸 상대 uid (D 담당 요청 기능 연동 전 목업, 같은 상대에게 중복 신청 방지). */
-    private static final Set<String> REQUESTED = new HashSet<>();
-
     /** uid 로 후보 찾기 (프로필 상세 화면용). 없으면 null. */
     public static MatchCandidate find(String uid) {
         for (MatchCandidate c : CANDIDATES) if (c.uid.equals(uid)) return c;
         return null;
-    }
-
-    /** 매칭 신청. 이미 신청한 상대면 false. shortcut: 메모리 저장, 2주차에 matchRequests 생성(D 담당)으로 교체 */
-    public static boolean requestMatch(String uid) {
-        return REQUESTED.add(uid);
-    }
-
-    public static boolean isRequested(String uid) {
-        return REQUESTED.contains(uid);
     }
 
     /** 최소 겹침 시간·목적 조건을 만족하는 후보를 AI 매칭률 높은 순으로 반환. 태그는 거르지 않고 카드에서 강조만 한다. */

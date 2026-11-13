@@ -49,6 +49,19 @@ public class MockAuthRepositoryTest {
         repository = new MockAuthRepository(now::get);
     }
 
+    @Test public void restoreMockSessionKeepsAuthAndRequestOwnerTogether() {
+        assertFalse(repository.restoreSession(null));
+        assertFalse(repository.restoreSession(" "));
+        assertTrue(repository.restoreSession("mock_uid_saved"));
+        assertTrue(repository.isSignedIn());
+        assertEquals("mock_uid_saved", repository.getCurrentUid());
+        assertTrue(repository.restoreSession("mock_uid_saved"));
+        assertFalse(repository.restoreSession("mock_uid_other"));
+        assertEquals("mock_uid_saved", repository.getCurrentUid());
+        repository.signOut();
+        assertFalse(repository.isSignedIn());
+    }
+
     private String sendLink(String email) {
         Recorder<Void> sent = new Recorder<>();
         repository.sendSignInLink(email, sent);

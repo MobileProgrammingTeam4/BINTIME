@@ -49,4 +49,6 @@
     <string name="chat_leave_blocked_title">채팅방을 나갈 수 없어요</string>
     <string name="chat_leave_blocked_message">현재 진행중인 매칭을 먼저 종료해주세요</string>
     <string name="chat_close">닫기</string>
+    <!-- BT-021: 상대 공개 프로필을 아직 읽지 못했을 때 표시할 이름 -->
+    <string name="chat_partner_fallback_name">상대</string>
 </resources>

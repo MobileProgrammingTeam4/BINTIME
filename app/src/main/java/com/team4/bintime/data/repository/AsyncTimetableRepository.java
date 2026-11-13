@@ -1,6 +1,7 @@
 package com.team4.bintime.data.repository;
 
 import com.team4.bintime.data.model.Course;
+import com.team4.bintime.data.model.TimeSlot;
 import com.team4.bintime.data.model.Timetable;
 
 import java.util.List;
@@ -39,7 +40,11 @@ public interface AsyncTimetableRepository {
         void onError(TimetableFailure failure);
     }
 
-    /** 현재 로그인 사용자의 시간표. 등록 직후 현재 값을 한 번 전달하고, 바뀔 때마다 다시 전달한다. 미등록이면 onData(null). */
+    /**
+     * 현재 로그인 사용자의 시간표. 등록 직후 현재 값을 한 번 전달하고, 바뀔 때마다 다시 전달한다. 미등록이면 onData(null).
+     * [BT-016] {@link Timetable#getFreeSlots()}는 사용자가 고른 공강 선택 원본(30분 칸을 이어 붙인 구간,
+     * 60분 미만 포함)이다. 화면 재진입 때 이 값으로 선택을 복원한다.
+     */
     Registration observeTimetable(Listener<Timetable> listener);
 
     /** 수업 추가. 같은 요일에 겹치면 OVERLAP, 같은 courseId가 이미 있으면 INVALID_COURSE. 성공 시 저장된 사본을 전달한다. */
@@ -51,6 +56,22 @@ public interface AsyncTimetableRepository {
     /** 수업 삭제. 이미 없으면 성공으로 처리한다(멱등). */
     void deleteCourse(String courseId, Callback<Void> callback);
 
-    /** 전체 수업을 한 번에 교체한다(이미지 인식 검수 결과 등). 기존 saveTimetable에 대응. */
+    /**
+     * 전체 수업을 한 번에 교체한다(이미지 인식 검수 결과 등). 기존 saveTimetable에 대응.
+     * [BT-016] 같은 쓰기에서 새 수업과 겹치는 공강 선택 칸을 지우고, 남은 선택으로 매칭 대상 공강
+     * ({@code availability/{uid}}, sourceRevision = 새 revision)을 다시 저장한다.
+     * 남은 선택의 매칭 대상 구간이 상한을 넘으면 TOO_MANY_FREE_SLOTS.
+     */
     void replaceCourses(List<Course> courses, Callback<Void> callback);
+
+    /**
+     * [BT-016] 공강 선택 원본을 저장하고 매칭 대상 공강({@code availability/{uid}})을 함께 갱신한다.
+     * <ul>
+     *   <li>selected는 30분 칸 경계 구간이며 수업과 겹치면 INVALID_FREE_SLOT.</li>
+     *   <li>availability.slots = matchableFreeSlots(selected) (병합 + 60분 이상), 40개 초과면
+     *       TOO_MANY_FREE_SLOTS로 저장하지 않는다.</li>
+     *   <li>시간표 revision은 바꾸지 않는다. sourceRevision = 현재 revision.</li>
+     * </ul>
+     */
+    void saveFreeSlots(List<TimeSlot> selected, Callback<Void> callback);
 }
