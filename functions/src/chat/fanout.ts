@@ -1,7 +1,7 @@
 /**
  * E · BT-022 새 메시지 → userChatRooms 갱신(서버 전용). 경로·필드는 docs/BT-021.md.
  *   chatRooms/{matchId}/messages/{messageId}: { senderId, content, createdAt }
- *   userChatRooms/{uid}/{matchId}: { otherUid, lastMessage, lastMessageAt, lastMessageId, unreadCount, status, hidden }
+ *   userChatRooms/{uid}/{matchId}: { otherUid, lastMessage, lastMessageAt, lastMessageId, recentMessageIds, unreadCount, status, hidden }
  *
  * 앱은 Rules 때문에 userChatRooms 를 쓸 수 없으므로(본인 unreadCount = 0 제외) 이 트리거가
  * 두 멤버의 마지막 메시지와 상대의 안읽음 수를 갱신한다. Admin SDK 는 Rules 를 우회하므로 여기서 멤버를 직접 확인한다.
@@ -28,10 +28,54 @@ export function parseMessage(value: unknown): ChatMessageValue | null {
 }
 
 /**
+ * 멤버별로 기억하는 최근 처리 메시지 수. userChatRooms/{uid}/{matchId}.recentMessageIds = { messageId: createdAt }.
+ * 안읽음 증가와 같은 트랜잭션에서 기록해, 이벤트가 다시 와도(at-least-once) 같은 메시지를 두 번 세지 않는다(PR #96 리뷰 2).
+ */
+export const RECENT_MESSAGE_LIMIT = 50;
+
+type RecentIds = Record<string, number>;
+
+function readRecent(value: unknown): RecentIds {
+  const recent: RecentIds = {};
+  if (typeof value !== "object" || value === null) return recent;
+  for (const [id, at] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof at === "number" && Number.isFinite(at)) recent[id] = at;
+  }
+  return recent;
+}
+
+/** 생성 시각, 같으면 push 키 순서. */
+function compare(a: [string, number], b: [string, number]): number {
+  if (a[1] !== b[1]) return a[1] - b[1];
+  return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0;
+}
+
+/**
+ * 이미 반영한 메시지인지.
+ * - lastMessageId 와 같거나(이 필드 도입 전 항목 호환) recentMessageIds 에 있으면 반영한 것이다.
+ * - 목록이 가득 찼는데 그중 가장 오래된 것보다도 오래된 메시지면, 목록에서 밀려난 메시지의 재전달로 보고 건너뛴다.
+ *   (새 메시지가 그만큼 늦게 도착하는 경우는 사실상 없다. 있으면 안읽음이 1 덜 세어질 뿐 늘지는 않는다.)
+ */
+function alreadyApplied(current: RoomEntry, recent: RecentIds, messageId: string, createdAt: number): boolean {
+  if (current.lastMessageId === messageId) return true;
+  if (Object.prototype.hasOwnProperty.call(recent, messageId)) return true;
+  const entries = Object.entries(recent);
+  if (entries.length < RECENT_MESSAGE_LIMIT) return false;
+  const oldest = entries.sort(compare)[0];
+  return compare([messageId, createdAt], oldest) < 0;
+}
+
+/** 최근 RECENT_MESSAGE_LIMIT 개만 남긴다. */
+function prune(recent: RecentIds): RecentIds {
+  return Object.fromEntries(Object.entries(recent).sort(compare).slice(-RECENT_MESSAGE_LIMIT));
+}
+
+/**
  * 한 멤버의 userChatRooms 항목에 메시지를 반영한 새 값. 바꿀 것이 없으면 undefined(트랜잭션 중단).
  * - 항목이 없으면(null) null 을 돌려 만들지 않는다. 항목 생성은 채팅방 생성 함수(BT-034) 몫이다.
  *   RTDB 트랜잭션은 처음에 로컬 캐시 값(null)으로 호출될 수 있어, 여기서 중단(undefined)하면 서버 값으로 다시 시도하지 않는다.
- * - 같은 메시지를 두 번 받으면(at-least-once) lastMessageId 로 건너뛴다.
+ * - 이미 반영한 메시지(alreadyApplied)는 건너뛴다. 처리 기록은 안읽음 증가와 같은 값에 함께 쓰므로 원자적이다.
+ *   멤버마다 따로 기록하므로 한쪽만 반영된 뒤 다시 처리해도 반영된 쪽은 그대로다.
  * - 늦게 도착한 오래된 메시지는 마지막 메시지를 덮지 않고 상대 안읽음 수만 올린다.
  * - hidden(나간 방)은 건드리지 않는다. 새 메시지로 다시 보일지는 BT-043 에서 정한다.
  */
@@ -39,7 +83,8 @@ export function applyMessage(current: RoomEntry | null, uid: string, messageId: 
   message: ChatMessageValue): RoomEntry | null | undefined {
   if (current === null || current === undefined) return null;
   if (typeof current !== "object") return undefined;
-  if (current.lastMessageId === messageId) return undefined;
+  const recent = readRecent(current.recentMessageIds);
+  if (alreadyApplied(current, recent, messageId, message.createdAt)) return undefined;
 
   const next: RoomEntry = { ...current };
   const lastAt = typeof current.lastMessageAt === "number" ? current.lastMessageAt : 0;
@@ -54,7 +99,8 @@ export function applyMessage(current: RoomEntry | null, uid: string, messageId: 
     const unread = typeof current.unreadCount === "number" && current.unreadCount >= 0 ? current.unreadCount : 0;
     next.unreadCount = unread + 1;
   }
-  if (!newer && uid === message.senderId) return undefined;
+  recent[messageId] = message.createdAt;
+  next.recentMessageIds = prune(recent);
   return next;
 }
 
