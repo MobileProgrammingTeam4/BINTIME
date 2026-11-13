@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="request_profile">프로필 보기</string>
+    <string name="request_create">매칭 신청</string>
+    <string name="request_submitting">신청 중…</string>
+    <string name="request_submitted">신청 완료</string>
+    <string name="request_create_success_title">매칭 신청이 완료됐어요!</string>
+    <string name="request_create_success_message">%1$s님이 수락하면\n채팅을 시작할 수 있어요.</string>
+    <string name="request_already_accepted">이미 수락된 요청이에요. 완료된 매칭에서 확인해주세요.</string>
+    <string name="request_already_rejected">이미 거절된 요청이에요.</string>
+    <string name="request_already_canceled">이미 취소된 요청이에요. 다시 신청할 수 있어요.</string>
     <string name="request_sent">보낸 매칭 요청</string>
     <string name="request_received">받은 매칭 요청</string>
     <string name="request_completed">완료된 매칭</string>
