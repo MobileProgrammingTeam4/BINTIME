@@ -60,6 +60,34 @@ public class ProfileDocumentsTest {
     }
 
     @Test
+    public void fromPublicDocument_readsPublicFields() {
+        UserProfile back = ProfileDocuments.fromPublicDocument("uidA",
+                ProfileDocuments.toPublicDocument(sample()));
+        assertEquals("uidA", back.getUid());
+        assertNull(back.getEmail());
+        assertEquals("지민", back.getNickname());
+        assertEquals("소프트웨어학부", back.getDepartment());
+        assertEquals(Arrays.asList("카페", "산책"), back.getInterestTags());
+        assertEquals("profileImages/uidA/profile.jpg", back.getPhotoPath());
+    }
+
+    /** Rules 가 막지만, 공개 문서에 이메일이 섞여 있어도 앱 결과에는 넣지 않는다. */
+    @Test
+    public void fromPublicDocument_dropsEmailEvenIfPresent() {
+        Map<String, Object> doc = ProfileDocuments.toUserDocument(sample());
+        assertNull(ProfileDocuments.fromPublicDocument("uidA", doc).getEmail());
+    }
+
+    @Test
+    public void toPublicProfile_isCopyWithoutEmail() {
+        UserProfile original = sample();
+        UserProfile pub = ProfileDocuments.toPublicProfile(original);
+        assertNull(pub.getEmail());
+        assertEquals("a@kookmin.ac.kr", original.getEmail());
+        assertEquals("지민", pub.getNickname());
+    }
+
+    @Test
     public void fromDocument_missingFields_doNotInjectDemoValues() {
         UserProfile back = ProfileDocuments.fromDocument("uidB", new HashMap<>());
         assertEquals("uidB", back.getUid());

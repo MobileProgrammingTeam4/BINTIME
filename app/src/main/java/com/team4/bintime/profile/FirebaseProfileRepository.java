@@ -66,6 +66,30 @@ public final class FirebaseProfileRepository implements ProfileRepository {
     }
 
     @Override
+    public void getPublicProfile(String uid, Callback<UserProfile> callback) {
+        if (uid == null || uid.isEmpty()) {
+            fail(callback, "사용자 정보를 찾을 수 없어요.");
+            return;
+        }
+        if (auth.getCurrentUser() == null) {
+            // Rules 상 로그인 사용자만 공개 프로필을 읽을 수 있다.
+            fail(callback, "로그인이 필요해요.");
+            return;
+        }
+        db.collection(ProfileDocuments.PUBLIC_PROFILES).document(uid).get().addOnCompleteListener(task -> {
+            if (!task.isSuccessful()) {
+                fail(callback, message(task.getException()));
+                return;
+            }
+            DocumentSnapshot snapshot = task.getResult();
+            if (callback == null) return;
+            callback.onSuccess(snapshot != null && snapshot.exists()
+                    ? ProfileDocuments.fromPublicDocument(uid, snapshot.getData())
+                    : null);
+        });
+    }
+
+    @Override
     public void saveProfile(UserProfile profile, Callback<Void> callback) {
         ProfileValidator.Error error = ProfileValidator.validate(profile);
         if (error != null) {

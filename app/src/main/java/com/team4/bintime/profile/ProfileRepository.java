@@ -16,8 +16,15 @@ public interface ProfileRepository {
         void onError(String message);
     }
 
-    /** uid 의 프로필. 아직 만든 적이 없으면 onSuccess(null). */
+    /** uid 의 프로필. 아직 만든 적이 없으면 onSuccess(null). 본인 전용(users/{uid})이라 다른 사용자에게는 쓰지 않는다. */
     void getProfile(String uid, Callback<UserProfile> callback);
+
+    /**
+     * 다른 사용자에게 보여 줄 공개 프로필(publicProfiles/{uid}). 매칭 카드·요청 카드·채팅 상대 표시용.
+     * 결과의 이메일은 항상 null 이다. 공개 프로필이 없으면(가입 미완료 등) onSuccess(null).
+     * 사진은 {@link UserProfile#getPhotoPath()} 를 {@link #loadProfilePhoto} 로 불러온다.
+     */
+    void getPublicProfile(String uid, Callback<UserProfile> callback);
 
     /** 필수값 검증 후 저장. 로그인한 본인 UID 의 프로필만 저장할 수 있다. */
     void saveProfile(UserProfile profile, Callback<Void> callback);
