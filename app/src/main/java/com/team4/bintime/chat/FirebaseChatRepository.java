@@ -182,7 +182,8 @@ final class FirebaseChatRepository implements ChatRepository {
      * <ul>
      *   <li>오프라인이면 쓰지 않고 바로 실패한다. RTDB 는 오프라인 쓰기를 대기열에 넣고 실패를 알리지 않아,
      *       사용자가 실패로 알고 있는 메시지가 나중에 전송되는 일을 막는다.</li>
-     *   <li>연결돼 있어도 {@link #SEND_TIMEOUT_MILLIS} 안에 서버 응답이 없으면 실패로 알린다.</li>
+     *   <li>연결돼 있어도 {@link #SEND_TIMEOUT_MILLIS} 안에 서버 응답이 없으면 실패로 알린다.
+     *       그 뒤 늦게 온 성공 응답은 재전송 키를 지우지 않는다({@link ChatSendAttempt}).</li>
      *   <li>같은 내용으로 다시 보내면 같은 키를 쓴다({@link ChatSendPolicy}). 규칙이 덮어쓰기를 거부하면
      *       그 키의 값을 읽어 내 메시지면 성공으로 본다.</li>
      *   <li>방마다 한 번에 하나만 보낸다. 보내는 중 다시 호출하면 실패로 알린다.</li>
@@ -202,22 +203,15 @@ final class FirebaseChatRepository implements ChatRepository {
         DatabaseReference target = messages.child(key);
         sending.add(matchId);
 
-        final boolean[] done = {false};
+        ChatSendAttempt attempt = new ChatSendAttempt(sendPolicy, matchId, key,
+                () -> sending.remove(matchId), callback);
         Runnable timeout = () -> {
-            if (done[0]) return;
-            done[0] = true;
-            sending.remove(matchId);
             Log.w(TAG, "send timed out");
-            callback.onError();
+            attempt.timeout();
         };
         Consumer<Boolean> finish = success -> {
-            if (success) sendPolicy.confirmed(matchId, key);
-            if (done[0]) return;
-            done[0] = true;
             main.removeCallbacks(timeout);
-            sending.remove(matchId);
-            if (success) callback.onSuccess();
-            else callback.onError();
+            attempt.finish(success);
         };
         main.postDelayed(timeout, SEND_TIMEOUT_MILLIS);
 
