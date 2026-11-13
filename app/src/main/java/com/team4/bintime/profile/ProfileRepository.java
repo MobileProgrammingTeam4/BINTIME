@@ -22,7 +22,16 @@ public interface ProfileRepository {
     /**
      * 다른 사용자에게 보여 줄 공개 프로필(publicProfiles/{uid}). 매칭 카드·요청 카드·채팅 상대 표시용.
      * 결과의 이메일은 항상 null 이다. 공개 프로필이 없으면(가입 미완료 등) onSuccess(null).
+     * 문서에 빠진 문자열 필드는 null 이 아니라 빈 문자열("")로 채운다(닉네임이 비면 화면에서 대체 이름을 쓴다).
      * 사진은 {@link UserProfile#getPhotoPath()} 를 {@link #loadProfilePhoto} 로 불러온다.
+     * <p>
+     * 콜백 계약: onSuccess/onError 중 하나가 <b>정확히 한 번</b> 호출된다. Firebase 구현의 조회 결과는
+     * 메인 스레드로 온다. uid 가 비어 있거나 로그인 전이면, 그리고 Mock 구현은 호출한 스레드에서 바로 콜백한다.
+     * 화면에서 메인 스레드로 호출하면 결과도 항상 메인 스레드다. 취소 API 는 없으므로 화면이 닫힌 뒤 온 결과는
+     * 호출한 쪽에서 무시한다. 한 번 읽기(get)라 상대가 프로필을 바꿔도 다시 조회해야 반영된다.
+     * <p>
+     * Mock: 저장한 프로필과 {@link MockProfileRepository#putPublicProfile} 로 등록한 사용자만 조회된다.
+     * Mock 후보·요청 상대를 보여 주려면 사용하는 쪽에서 먼저 등록한다(등록하지 않으면 null).
      */
     void getPublicProfile(String uid, Callback<UserProfile> callback);
 

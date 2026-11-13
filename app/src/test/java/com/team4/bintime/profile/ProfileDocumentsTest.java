@@ -78,6 +78,16 @@ public class ProfileDocumentsTest {
         assertNull(ProfileDocuments.fromPublicDocument("uidA", doc).getEmail());
     }
 
+    /** #91 리뷰(E): 공개 문서에 닉네임 등이 빠져 있으면 null 이 아니라 빈 문자열이다. */
+    @Test
+    public void fromPublicDocument_missingFields_areEmptyStrings() {
+        UserProfile back = ProfileDocuments.fromPublicDocument("uidX", new HashMap<>());
+        assertEquals("", back.getNickname());
+        assertEquals("", back.getDepartment());
+        assertNull(back.getPhotoPath());
+        assertTrue(back.getInterestTags().isEmpty());
+    }
+
     @Test
     public void toPublicProfile_isCopyWithoutEmail() {
         UserProfile original = sample();
