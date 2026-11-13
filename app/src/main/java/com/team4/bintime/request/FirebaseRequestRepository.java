@@ -22,10 +22,9 @@ import java.util.Set;
 final class FirebaseRequestRepository implements RequestRepository {
     private final String uid;
     private final FirebaseFunctions functions = FirebaseFunctions.getInstance("asia-northeast3");
-    private final Map<String, Item> items = new HashMap<>();
+    private final RequestItemCache items = new RequestItemCache();
     private final Set<String> submitting = new HashSet<>();
     private final List<Runnable> listeners = new ArrayList<>();
-    private final Map<String, Item> sentItems = new HashMap<>(), receivedItems = new HashMap<>();
     private final Set<String> updating = new HashSet<>();
     private final Handler handler = new Handler(Looper.getMainLooper());
     private ListenerRegistration sentListener, receivedListener;
@@ -77,8 +76,7 @@ final class FirebaseRequestRepository implements RequestRepository {
             if (!task.isSuccessful()) { changed(); callback.onError(errorMessage(task.getException())); return; }
             try {
                 Item item = decode((Map<?, ?>) task.getResult().getData());
-                items.put(item.id, item);
-                sentItems.put(item.id, item);
+                item = items.applyResponse(item);
                 changed(); callback.onSuccess(item);
             } catch (RuntimeException invalid) {
                 changed(); callback.onError("요청 결과를 확인하지 못했어요. 다시 시도해주세요.");
@@ -107,8 +105,7 @@ final class FirebaseRequestRepository implements RequestRepository {
                 Object data = task.getResult().getData();
                 if (!(data instanceof Map)) throw new IllegalArgumentException();
                 Item item = decode((Map<?, ?>) data);
-                items.put(item.id, item);
-                sentItems.put(item.id, item);
+                item = items.applyResponse(item);
                 changed(); callback.onSuccess(item);
             } catch (RuntimeException invalid) {
                 changed(); callback.onError("요청 결과를 확인하지 못했어요. 다시 시도해주세요.");
@@ -169,7 +166,7 @@ final class FirebaseRequestRepository implements RequestRepository {
         final int current = generation;
         authListener = auth -> {
             if (current == generation && !signedIn()) {
-                stopListening(); items.clear(); sentItems.clear(); receivedItems.clear();
+                stopListening(); items.clear();
                 loadError = "다시 로그인해주세요."; changed();
             }
         };
@@ -201,9 +198,7 @@ final class FirebaseRequestRepository implements RequestRepository {
                     Item item = decode(data);
                     next.put(item.id, item);
                 }
-                Map<String, Item> target = sent ? sentItems : receivedItems;
-                target.clear(); target.putAll(next);
-                items.clear(); items.putAll(sentItems); items.putAll(receivedItems);
+                items.replaceSnapshot(sent, next);
                 if (!snapshot.getMetadata().isFromCache()) {
                     if (sent) sentReady = true; else receivedReady = true;
                 }
