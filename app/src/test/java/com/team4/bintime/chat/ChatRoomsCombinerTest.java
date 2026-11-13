@@ -147,6 +147,41 @@ public class ChatRoomsCombinerTest {
         assertEquals(before, emitted.size());
     }
 
+    /** #90 리뷰 Y1: ACTIVE 구독 → 방 제거 → 같은 방 ENDED 재구독 → 옛 구독의 ACTIVE 콜백 도착. */
+    @Test
+    public void lateCallbackFromReleasedMatchSubscriptionDoesNotOverwriteResubscribedRoom() {
+        combiner.update(Collections.singletonList(entry("m1", "u1", 100L, false)));
+        ChatRepository.Listener<MatchInfo> stale = matches.active.get("m1");
+
+        combiner.update(Collections.emptyList());
+        combiner.update(Collections.singletonList(entry("m1", "u1", 200L, false)));
+        matches.push("m1", new MatchInfo("m1", Arrays.asList(ME, "u1"), ChatRoom.Status.ENDED,
+                "2026-11-12", 600, 690, true));
+        assertEquals(ChatRoom.Status.ENDED, last().get(0).status);
+
+        int before = emitted.size();
+        stale.onData(new MatchInfo("m1", Arrays.asList(ME, "u1"), ChatRoom.Status.ACTIVE,
+                "2026-11-12", 600, 690, true));
+        stale.onError();
+        assertEquals(before, emitted.size());
+        assertEquals(ChatRoom.Status.ENDED, last().get(0).status);
+        assertEquals("2026-11-12", last().get(0).meetingDate);
+    }
+
+    @Test
+    public void lateCallbackFromReleasedPartnerSubscriptionIsIgnored() {
+        combiner.update(Collections.singletonList(entry("m1", "u1", 100L, false)));
+        ChatRepository.Listener<PartnerInfo> stale = partners.active.get("u1");
+
+        combiner.update(Collections.singletonList(entry("m2", "u2", 200L, false)));
+        combiner.update(Arrays.asList(entry("m2", "u2", 200L, false), entry("m3", "u1", 300L, false)));
+        partners.push("u1", new PartnerInfo("u1", "새이름", null, false));
+
+        stale.onData(new PartnerInfo("u1", "옛이름", null, false));
+        assertEquals("새이름", last().get(0).otherName);
+        assertEquals(Arrays.asList("u1", "u1", "u2"), sorted(partners.subscribed));
+    }
+
     private static List<String> sorted(List<String> values) {
         List<String> copy = new ArrayList<>(values);
         Collections.sort(copy);
