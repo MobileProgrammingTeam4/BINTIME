@@ -151,7 +151,8 @@ userChatRooms/{uid}/{matchId}
 | `timetables/{uid}.revision` | 수업 변경마다 증가, 공강 선택만 바꾸면 유지. `availability.sourceRevision`과 비교 |
 | `timetables/{uid}.freeCells` | 월~일 7개의 48비트 정수로 선택 원본 보존. `semester`는 생략/null 허용 |
 | `availability` | 선택 원본을 병합한 60분 이상 슬롯과 `sourceRevision`. 서버가 30분 경계·원본·수업 비겹침·revision을 재검증 |
-| `matchSettings` | `isMatching`, `minOverlapMinutes`, `purposes`, `preferredTags` 등 |
+| `matchSettings` | `isMatching`, `minOverlapMinutes`(60·90·120·150·180), `purposes`(빈 목록 = 전체, 최대 5), `preferredTags`(`#` 없이, 최대 20), `updatedAt`(서버 시간). 본인만 읽기·쓰기, 다른 사용자는 검색 서버만 읽음. 계약은 `docs/BT-017.md` |
+| 매칭 검색 계약 | `searchMatches()`(입력 없음): 토큰 UID·학교 이메일 확인 → 지금/가장 가까운 내 공강 하나 기준으로 양측 ON·검색자 최소 겹침·목적 AND·양방향 차단을 판정. 결과 `MATCHING_OFF`/`NO_FREE_SLOT`/`OK{reference, candidates}`, 후보는 `candidateId`(= 상대 UID)와 겹침·목적만 반환. availability는 revision 일치·30분 경계·병합 후 60분 이상만 사용. 계약은 `docs/BT-017.md` |
 | `matchRequests` | `fromUid`, `toUid`, `status`, `meetingDate`, `startMinute`, `endMinute`, `overlapMinutes` 등 **시간 스냅샷** |
 | 요청 생성 계약 | `createMatchRequest({candidateId, clientRequestId})`: 상대 UID와 재시도 UUID만 입력. 검색자가 선택한 최소 겹침, 프로필·차단·시간표·확정 매칭 충돌을 같은 서버 트랜잭션에서 검증. 계약은 `docs/BT-019.md` |
 | 요청 생성 계약 | `createMatchRequest(candidateId, clientRequestId)`, 서버 전용 `matchRequestGuards` 중복 잠금 및 BT-017 연결 경계는 `docs/BT-019.md`를 따릅니다. 실제 검색 미연결은 실패로 처리합니다. |
