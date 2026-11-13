@@ -254,6 +254,10 @@ public class MatchingFragment extends Fragment {
         } else if (status == MatchSearchRepository.Status.OK) {
             statusTitle.setText(result.slotLabel + " 공강 매칭중");
             statusDesc.setText("가장 가까운 공강으로 매칭 중이에요");
+        } else if (searchError != null) {
+            // 검색 실패 시 아래 오류 화면과 맞춘다(로딩 문구로 남지 않게).
+            statusTitle.setText("공강을 확인하지 못했어요");
+            statusDesc.setText("아래 다시 시도를 눌러주세요");
         } else {
             statusTitle.setText("공강을 확인하고 있어요");
             statusDesc.setText("잠시만 기다려 주세요");
