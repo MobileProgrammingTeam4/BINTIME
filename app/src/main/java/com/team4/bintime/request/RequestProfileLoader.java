@@ -13,34 +13,36 @@ final class RequestProfileLoader {
     private final Source source;
     private final Runnable changed;
     private final Map<String, UserProfile> profiles = new HashMap<>();
-    private final Set<String> loading = new HashSet<>(), failed = new HashSet<>();
+    private final Set<String> loading = new HashSet<>(), failed = new HashSet<>(), missing = new HashSet<>();
     private boolean active = true;
 
     RequestProfileLoader(Source source, Runnable changed) { this.source = source; this.changed = changed; }
     UserProfile get(String uid) { return profiles.get(uid); }
     boolean failed(String uid) { return failed.contains(uid); }
+    boolean missing(String uid) { return missing.contains(uid); }
 
     void load(String uid) {
-        if (!active || profiles.containsKey(uid) || failed.contains(uid) || !loading.add(uid)) return;
+        if (!active || profiles.containsKey(uid) || failed.contains(uid) || missing.contains(uid) || !loading.add(uid)) return;
         source.load(uid, new ProfileRepository.Callback<UserProfile>() {
-            @Override public void onSuccess(UserProfile result) { complete(uid, result); }
-            @Override public void onError(String message) { complete(uid, null); }
+            @Override public void onSuccess(UserProfile result) { complete(uid, result, false); }
+            @Override public void onError(String message) { complete(uid, null, true); }
         });
     }
 
-    private void complete(String uid, UserProfile result) {
+    private void complete(String uid, UserProfile result, boolean error) {
         if (!active || !loading.remove(uid)) return;
-        if (result == null) failed.add(uid);
+        if (error) failed.add(uid);
+        else if (result == null) missing.add(uid);
         else profiles.put(uid, result.copy());
         changed.run();
     }
 
     void retry(String uid) {
-        if (!active || loading.contains(uid)) return;
+        if (!active || loading.contains(uid) || missing.contains(uid)) return;
         failed.remove(uid);
         load(uid);
         changed.run();
     }
 
-    void close() { active = false; profiles.clear(); loading.clear(); failed.clear(); }
+    void close() { active = false; profiles.clear(); loading.clear(); failed.clear(); missing.clear(); }
 }

@@ -108,10 +108,11 @@ public final class RequestTabsController {
         if (!repository.isMock()) profiles.load(item.profileUid);
         UserProfile actual = profiles.get(item.profileUid);
         boolean profileFailed = profiles.failed(item.profileUid);
+        boolean profileMissing = profiles.missing(item.profileUid);
         text(card, R.id.requestName, actual != null ? publicName(actual) : profile == null
-                ? fragment.getString(profileFailed ? R.string.request_profile_error : R.string.request_profile_pending) : profile.name);
+                ? fragment.getString(profileMissing ? R.string.request_profile_missing : profileFailed ? R.string.request_profile_error : R.string.request_profile_pending) : profile.name);
         text(card, R.id.requestInfo, actual != null ? actual.getDepartment() + " " + actual.getGrade() + " · " + actual.getGender()
-                : profile == null ? fragment.getString(profileFailed ? R.string.request_profile_retry_message : R.string.request_profile_pending_message)
+                : profile == null ? fragment.getString(profileMissing ? R.string.request_profile_missing_message : profileFailed ? R.string.request_profile_retry_message : R.string.request_profile_pending_message)
                 : profile.department + " " + profile.grade + "학년 · " + profile.gender);
         boolean completed = item.status() == MockRequestRepository.Status.ACCEPTED;
         boolean ended = item.matchStatus() == MockRequestRepository.MatchStatus.ENDED;

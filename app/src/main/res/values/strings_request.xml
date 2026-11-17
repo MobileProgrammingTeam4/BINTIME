@@ -2,6 +2,8 @@
 <resources>
     <string name="request_profile">프로필 보기</string>
     <string name="request_profile_error">프로필을 불러오지 못했어요</string>
+    <string name="request_profile_missing">프로필을 찾을 수 없어요</string>
+    <string name="request_profile_missing_message">공개된 프로필 정보가 없어요.</string>
     <string name="request_profile_retry_message">다시 시도를 눌러 프로필을 확인해주세요.</string>
     <string name="request_accept_message">%1$s\n%2$s\n수락하면 이 시간으로 매칭이 확정돼요.</string>
     <string name="request_reject_message">%1$s\n%2$s\n거절하면 양쪽 요청 목록에서 사라져요.</string>
