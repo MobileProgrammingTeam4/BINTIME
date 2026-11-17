@@ -409,6 +409,12 @@ public class ProfileSetupActivity extends AppCompatActivity {
             return;
         }
 
+        // BT-030: 오프라인이면 저장을 시작하지 않는다(Firestore 가 연결될 때까지 끝내지 않아 버튼이 눌린 채 멈춤).
+        if (!NetworkStatus.isOnline(this)) {
+            Toast.makeText(this, R.string.profile_save_offline, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         UserProfile draft = profile.copy();
         draft.setNickname(nickname);
         draft.setDepartment(department);
