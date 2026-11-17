@@ -483,7 +483,8 @@ public class MockAsyncTimetableRepositoryTest {
     @Test
     public void replaceCourses_splittingBlockOver40_rejectedAndUnchanged() {
         // 현재 동작 고정(docs/BT-016.md 한계): 수업이 긴 공강 블록을 둘로 쪼개 매칭 대상이 40 → 41개가 되면
-        // 수업 교체 자체가 TOO_MANY_FREE_SLOTS로 거부된다. 상한 40은 Rules·searchMatches와 묶인 팀 결정이다.
+        // 수업 교체 자체가 TOO_MANY_FREE_SLOTS로 거부된다. 상한 40은 Rules·앱 검증(요청 생성 서버의 availability 재검증 포함)과 묶인
+        // 팀 결정이다. 검색 서버(searchMatches)는 slots를 최대 200개까지 읽고 40개 검사는 하지 않는다.
         List<TimeSlot> free = new ArrayList<>();
         for (int day = 1; day <= 3; day++) {
             for (int start = 0; start + 60 <= 1440 && free.size() < Availability.MAX_SLOTS - 1; start += 90) {
