@@ -136,9 +136,10 @@ reports/{reportId}
 aiUsage/{uid}_{YYYY-MM-DD}
 
 Realtime Database
-chatRooms/{matchId}/members/{uid}
-chatRooms/{matchId}/messages/{messageId}
-userChatRooms/{uid}/{matchId}
+chatRooms/{chatRoomId}/members/{uid}
+chatRooms/{chatRoomId}/messages/{messageId}
+chatRooms/{chatRoomId}/control: {chatReady, writable, archived}
+userChatRooms/{uid}/{chatRoomId}: {..., chatReady, archived, hidden}
 ```
 
 - `uid`는 Firebase Auth UID입니다. 영업/민감 데이터는 클라이언트 소유권 규칙과 서버 검증으로 보호합니다.
@@ -150,10 +151,12 @@ userChatRooms/{uid}/{matchId}
 - 요청 정책은 보낸 대기 3개·받은 대기 5개, 직접 취소 후 모든 상대에 신규 신청 60초 제한, 역방향 대기 요청 차단입니다. 기존 초과 요청은 보존합니다. 실제 수락·거절은 `respondToMatchRequest({requestId, action})`로 처리하며 수락과 확정 매칭 생성을 같은 트랜잭션으로 보호합니다. 상세는 [`docs/BT-031.md`](./docs/BT-031.md)를 따릅니다.
 - 수락 시 양측의 겹치는 대기 요청을 정리하고 종료 시각이 지난 요청은 만료 취소합니다. 자동 정리의 서버 전용 작업·5분 예약 코드·운영 활성화 조건은 [`docs/BT-032.md`](./docs/BT-032.md)를 따릅니다.
 - 확정 약속의 `matchId`와 실제 방 키 `chatRoomId`를 구분합니다. 방 재사용·기록 보관·연결 실패 복구·담당자 연동 계약은 [`docs/BT-034.md`](./docs/BT-034.md), 여러 약속의 표시·선택 정책은 [`docs/BT-035.md`](./docs/BT-035.md)를 따릅니다.
+- 둘 다 나간 방은 사용자 목록과 대화 접근을 차단한 채 서버에만 보관합니다. 보관 기간·최종 삭제 시점은 신고 담당·SM의 후속 합의 대상이며 자동 삭제하지 않습니다. 한 명만 나간 방은 남은 사람에게 이전 대화로 표시합니다.
 - `matches/{matchId}`가 **매칭의 기준 데이터**입니다. 채팅 생성은 별도 RTDB 작업이므로 재시도·부분 실패를 고려해 연결 상태를 관리합니다.
 - 개인 시간표 원본을 상대방에게 통째로 반환하지 않습니다. 검색 결과에는 필요한 겹침 시간 및 공개 가능한 프로필 정보만 담습니다.
 - `aiUsage/{uid}_{YYYY-MM-DD}`(BT-024)는 Gemini 게이트웨이의 사용자별 하루 호출 수입니다. 날짜는 `Asia/Seoul` 기준이며 **서버(Cloud Functions)만 쓰고 앱은 읽기·쓰기 모두 금지**합니다. 자세한 계약은 [`docs/BT-024.md`](./docs/BT-024.md)를 참고합니다.
 - RTDB 채팅(`chatRooms`, `userChatRooms`)의 접근 규칙은 `database.rules.json`(BT-021)입니다. 메시지는 방 멤버만 읽고 새로 쓸 수 있으며(`senderId === auth.uid`, 서버 시각, 본문 1~1000자, 수정·삭제 금지), 멤버·목록·나가기 상태는 서버만 씁니다. 자세한 계약과 에뮬레이터 사용법은 [`docs/BT-021.md`](./docs/BT-021.md)를 참고합니다.
+- `control`은 서버 전용 읽기·쓰기이며 Rules가 `writable/archived`로 전송을 판정합니다. 앱은 본인의 `userChatRooms.chatReady/archived`와 현재 참여자용 `chatRoomLinks`를 표시 상태로 사용합니다. 매칭이 ENDED여도 보관되지 않은 준비된 방은 계속 전송할 수 있습니다.
 
 더 구체적인 역할별 데이터·상태 변경 경계 및 AI 에이전트 작업 규칙은 [`AGENTS.md`](./AGENTS.md)를 참고하세요.
 

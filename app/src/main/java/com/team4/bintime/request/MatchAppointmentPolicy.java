@@ -27,6 +27,12 @@ public final class MatchAppointmentPolicy {
 
     public static int additionalCount(List<MatchAppointment> all, long now) { return Math.max(0, unfinished(all, now).size() - 1); }
 
+    /** 후기 제외 약속은 집계하지 않으며, 대상 전부 작성 전까지 방의 버튼은 남기기다. */
+    public static boolean allReviewsWritten(List<MatchAppointment> all) {
+        List<MatchAppointment> eligible = targets(all, Action.REVIEW);
+        return !eligible.isEmpty() && eligible.stream().allMatch(item -> item.reviewWritten);
+    }
+
     private static List<MatchAppointment> unfinished(List<MatchAppointment> all, long now) {
         List<MatchAppointment> result = targets(all, Action.END);
         result.removeIf(item -> item.endAtMillis() <= now);

@@ -11,7 +11,9 @@ import java.util.List;
 /** BT-033 방 참조로 불변 약속을 읽는다. BT-034/035에서 페이지·서버 시각 보정 확장 시 재사용한다. */
 final class FirestoreMatchInfoSource implements MatchInfoSource {
     private final String uid;
+    private java.util.function.LongSupplier now = System::currentTimeMillis;
     FirestoreMatchInfoSource(String uid) { this.uid = uid; }
+    @Override public void useClock(java.util.function.LongSupplier now) { this.now = now; }
     @Override public ChatRepository.Registration observe(String roomId, ChatRepository.Listener<MatchInfo> listener) {
         boolean[] active = { true };
         com.google.firebase.firestore.ListenerRegistration registration = FirebaseFirestore.getInstance().collection("matches")
@@ -36,11 +38,12 @@ final class FirestoreMatchInfoSource implements MatchInfoSource {
                     if (participants != null && !new java.util.HashSet<>(participants).equals(new java.util.HashSet<>(uids))) throw new IllegalArgumentException();
                     participants = new ArrayList<>(uids);
                 }
-                MatchAppointment representative = MatchAppointmentPolicy.representative(items, System.currentTimeMillis());
+                MatchAppointment representative = MatchAppointmentPolicy.representative(items, now.getAsLong());
                 if (representative == null) representative = items.stream().max(Comparator.comparingLong(MatchAppointment::endAtMillis)).get();
                 boolean hasActive = items.stream().anyMatch(a -> a.status == MatchAppointment.Status.ACTIVE);
+                boolean hasReadyLink = snapshot.getDocuments().stream().anyMatch(doc -> Boolean.TRUE.equals(doc.getBoolean("chatReady")));
                 listener.onData(new MatchInfo(roomId, participants, hasActive ? ChatRoom.Status.ACTIVE : ChatRoom.Status.ENDED,
-                        representative.meetingDate, representative.startMinute, representative.endMinute, true, items));
+                        representative.meetingDate, representative.startMinute, representative.endMinute, hasReadyLink, items));
             } catch (RuntimeException invalid) { listener.onError(); }
         });
         return () -> { active[0] = false; registration.remove(); };

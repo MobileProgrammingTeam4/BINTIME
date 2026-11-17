@@ -32,4 +32,18 @@ public class MatchAppointmentPolicyTest {
         assertEquals(Instant.parse("2026-11-17T15:00:00Z").toEpochMilli(), midnight.endAtMillis());
         assertNull(MatchAppointmentPolicy.representative(Arrays.asList(midnight), midnight.endAtMillis()));
     }
+    @Test public void reviewButtonStaysWriteUntilEveryEligibleAppointmentIsWritten() {
+        MatchAppointment first = new MatchAppointment("a", "room", "2026-11-16", 600, 690, "스터디", MatchAppointment.Status.ENDED, true, true);
+        MatchAppointment second = new MatchAppointment("b", "room", "2026-11-16", 720, 810, "스터디", MatchAppointment.Status.ENDED, true, false);
+        assertFalse(MatchAppointmentPolicy.allReviewsWritten(Arrays.asList(first, second)));
+        MatchAppointment completed = new MatchAppointment("b", "room", "2026-11-16", 720, 810, "스터디", MatchAppointment.Status.ENDED, true, true);
+        assertTrue(MatchAppointmentPolicy.allReviewsWritten(Arrays.asList(first, completed)));
+    }
+    @Test public void earlyEndedAndUnknownEligibilityDoNotKeepWrittenButtonInWriteState() {
+        MatchAppointment written = new MatchAppointment("a", "room", "2026-11-16", 600, 690, "스터디", MatchAppointment.Status.ENDED, true, true);
+        MatchAppointment early = item("early", "2026-11-16", 720, 810, MatchAppointment.Status.ENDED, false);
+        MatchAppointment unknown = item("unknown", "2026-11-16", 840, 930, MatchAppointment.Status.ENDED, null);
+        assertTrue(MatchAppointmentPolicy.allReviewsWritten(Arrays.asList(written, early, unknown)));
+        assertFalse(MatchAppointmentPolicy.allReviewsWritten(Arrays.asList(early, unknown)));
+    }
 }

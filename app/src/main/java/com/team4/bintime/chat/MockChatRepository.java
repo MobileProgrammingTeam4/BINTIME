@@ -61,8 +61,11 @@ public final class MockChatRepository implements ChatRepository {
 
     /** 약속 선택·이전 대화 UI의 Mock 검증 주입점. Firebase 저장소에는 영향을 주지 않는다. */
     public void setAppointmentsForDemo(String roomId, List<com.team4.bintime.request.MatchAppointment> appointments, boolean archived) {
+        setAppointmentsForDemo(roomId, appointments, archived, !archived);
+    }
+    public void setAppointmentsForDemo(String roomId, List<com.team4.bintime.request.MatchAppointment> appointments, boolean archived, boolean ready) {
         ChatRoom room = rooms.get(roomId);
-        if (room != null) { rooms.put(roomId, room.withAppointments(appointments, archived)); notifyRoomChanged(roomId); }
+        if (room != null) { rooms.put(roomId, room.withAppointments(appointments, archived).withChatReady(ready)); notifyRoomChanged(roomId); }
     }
 
     private static final class Subscription<T> {

@@ -97,6 +97,11 @@ public final class ChatRoom {
                 chatReady && !archived, otherUid, otherName, otherInfo, otherHasPhoto, lastMessage, lastMessageAt,
                 unreadCount, recommendedPlace, items, archived);
     }
+    ChatRoom withChatReady(boolean ready) {
+        return new ChatRoom(matchId, participantUids, status, meetingDate, startMinute, endMinute,
+                ready && !archived, otherUid, otherName, otherInfo, otherHasPhoto, lastMessage, lastMessageAt,
+                unreadCount, recommendedPlace, appointments, archived);
+    }
     ChatRoom withDisplayAppointment(MatchAppointment item) {
         return new ChatRoom(matchId, participantUids, status, item.meetingDate, item.startMinute, item.endMinute, chatReady,
                 otherUid, otherName, otherInfo, otherHasPhoto, lastMessage, lastMessageAt, unreadCount, recommendedPlace, appointments, archived);

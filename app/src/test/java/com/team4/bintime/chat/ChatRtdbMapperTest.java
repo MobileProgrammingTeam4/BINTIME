@@ -171,6 +171,23 @@ public class ChatRtdbMapperTest {
 
     // ---- ChatRoom 조립 ----
 
+    @Test public void roomLevelNotReadyOverridesPreviouslyReadyMatchAndRecovers() {
+        MatchInfo oldReady = new MatchInfo(MATCH, Arrays.asList(ME, OTHER), ChatRoom.Status.ACTIVE, "2026-11-17", 600, 690, true);
+        Map<String, Object> node = roomNode(OTHER, "ACTIVE"); node.put("chatReady", false);
+        assertFalse(ChatRtdbMapper.room(ME, ChatRtdbMapper.userChatRoom(MATCH, node), oldReady, null, "상대").chatReady);
+        node.put("chatReady", true);
+        assertTrue(ChatRtdbMapper.room(ME, ChatRtdbMapper.userChatRoom(MATCH, node), oldReady, null, "상대").chatReady);
+        node.put("archived", true);
+        assertFalse(ChatRtdbMapper.room(ME, ChatRtdbMapper.userChatRoom(MATCH, node), oldReady, null, "상대").chatReady);
+    }
+    @Test public void malformedReadinessFailsClosedWhileLegacyMissingFieldUsesMatch() {
+        MatchInfo ready = new MatchInfo(MATCH, Arrays.asList(ME, OTHER), ChatRoom.Status.ACTIVE, "2026-11-17", 600, 690, true);
+        Map<String, Object> node = roomNode(OTHER, "ACTIVE"); node.put("chatReady", "true");
+        assertFalse(ChatRtdbMapper.room(ME, ChatRtdbMapper.userChatRoom(MATCH, node), ready, null, "상대").chatReady);
+        node.remove("chatReady");
+        assertTrue(ChatRtdbMapper.room(ME, ChatRtdbMapper.userChatRoom(MATCH, node), ready, null, "상대").chatReady);
+    }
+
     @Test
     public void room_usesMatchSnapshotAsSourceOfStatusAndTime() {
         UserChatRoomEntry entry = new UserChatRoomEntry(MATCH, OTHER, "hi", 100L, 2, ChatRoom.Status.ACTIVE, false);

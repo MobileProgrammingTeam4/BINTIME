@@ -81,6 +81,7 @@ final class FirebaseChatRepository implements ChatRepository {
         this.uid = uid;
         this.database = database;
         this.matches = matches;
+        this.matches.useClock(this::nowMillis);
         this.partners = partners;
         this.fallbackName = fallbackName;
         // .info/connected: 서버와 연결됐는지. 오프라인 전송을 대기열에 넣지 않으려고 본다.

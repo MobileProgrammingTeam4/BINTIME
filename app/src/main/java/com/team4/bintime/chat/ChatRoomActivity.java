@@ -115,6 +115,8 @@ public class ChatRoomActivity extends AppCompatActivity {
         sendButton.setOnClickListener(v -> send());
         aiButton = findViewById(R.id.chatAiReply);
         aiButton.setOnClickListener(v -> requestReplies());
+        ChatComposer.bind(findViewById(R.id.chatComposer), false, false, false);
+        setAiButtonEnabled(false);
         replyChips = findViewById(R.id.chatReplyChips);
 
         // 확인 다이얼로그 결과는 화면 회전 뒤에도 받도록 매번 등록한다.
@@ -214,7 +216,8 @@ public class ChatRoomActivity extends AppCompatActivity {
     private void bindRoom() {
         ((TextView) findViewById(R.id.chatRoomTitle)).setText(room.otherName);
         boolean active = room.status == ChatRoom.Status.ACTIVE;
-        ChatComposer.bind(findViewById(R.id.chatComposer), room.archived, sending);
+        ChatComposer.bind(findViewById(R.id.chatComposer), room.archived, room.chatReady, sending);
+        setAiButtonEnabled(replyRequest == null);
         findViewById(R.id.chatAiRow).setVisibility(room.archived ? View.GONE : View.VISIBLE);
         // 매칭 스냅샷(matches/{matchId})을 아직 못 받으면 확정 시간이 없다(BT-034 연결 전·문서 생성 전). 시간 카드를 숨긴다.
         boolean hasMatchTime = room.meetingDate != null && (room.appointments.isEmpty() || MatchAppointmentPolicy.representative(room.appointments, repository.nowMillis()) != null);
@@ -265,8 +268,8 @@ public class ChatRoomActivity extends AppCompatActivity {
     private void bindReviewLink() {
         TextView link = findViewById(R.id.chatReviewLink);
         List<MatchAppointment> targets = MatchAppointmentPolicy.targets(reviewAppointments(), MatchAppointmentPolicy.Action.REVIEW);
-        link.setVisibility(room.archived || !targets.isEmpty() ? View.VISIBLE : View.GONE);
-        link.setText(room.archived || targets.size() == 1 && targets.get(0).reviewWritten ? R.string.chat_review_view : R.string.chat_review_write);
+        link.setVisibility(!targets.isEmpty() ? View.VISIBLE : View.GONE);
+        link.setText(MatchAppointmentPolicy.allReviewsWritten(reviewAppointments()) ? R.string.chat_review_view : R.string.chat_review_write);
     }
 
     private void openReview() {
@@ -405,7 +408,7 @@ public class ChatRoomActivity extends AppCompatActivity {
 
     /** 버튼을 눌렀을 때만 요청한다. 요청 중에는 버튼을 잠가 중복 호출을 막는다. */
     private void requestReplies() {
-        if (replyRequest != null || room == null || room.archived) return;
+        if (replyRequest != null || room == null || room.archived || !room.chatReady) return;
         setAiButtonEnabled(false);
         replyRequest = replyRepository.requestReplies(matchId, new ReplySuggestionRepository.Callback() {
             @Override
@@ -426,6 +429,7 @@ public class ChatRoomActivity extends AppCompatActivity {
     }
 
     private void setAiButtonEnabled(boolean enabled) {
+        enabled = enabled && room != null && !room.archived && room.chatReady;
         aiButton.setEnabled(enabled);
         aiButton.setAlpha(enabled ? 1f : 0.4f);
     }
@@ -451,6 +455,7 @@ public class ChatRoomActivity extends AppCompatActivity {
 
     /** 칩 문구를 입력창에만 넣는다. 전송은 사용자가 직접 한다(자동 전송 금지). */
     private void fillInput(String reply) {
+        if (room == null || room.archived || !room.chatReady) return;
         input.setText(reply);
         input.setSelection(input.length());
         input.requestFocus();
@@ -460,7 +465,7 @@ public class ChatRoomActivity extends AppCompatActivity {
 
     /** 응답이 올 때까지 전송 버튼을 잠가 중복 전송을 막는다. */
     private void send() {
-        if (sending || room == null || room.archived) return;
+        if (sending || room == null || room.archived || !room.chatReady) return;
         String text = input.getText().toString();
         if (text.trim().isEmpty()) return;
         setSending(true);
@@ -485,7 +490,7 @@ public class ChatRoomActivity extends AppCompatActivity {
 
     private void setSending(boolean value) {
         sending = value;
-        ChatComposer.bind(findViewById(R.id.chatComposer), room != null && room.archived, value);
+        ChatComposer.bind(findViewById(R.id.chatComposer), room != null && room.archived, room != null && room.chatReady, value);
     }
 
     private boolean isResumedNow() {

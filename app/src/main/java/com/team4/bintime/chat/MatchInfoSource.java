@@ -6,6 +6,9 @@ package com.team4.bintime.chat;
  */
 public interface MatchInfoSource {
 
+    /** 표시용 시각은 채팅 Repository와 동일한 보정 시각을 사용한다. 상태 전환 권한은 부여하지 않는다. */
+    default void useClock(java.util.function.LongSupplier now) {}
+
     /** 매칭 문서가 아직 없거나 읽을 수 없으면 null 을 전달한다. 콜백은 메인 스레드. */
     ChatRepository.Registration observe(String matchId, ChatRepository.Listener<MatchInfo> listener);
 

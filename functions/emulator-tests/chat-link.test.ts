@@ -68,11 +68,18 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_DA
     expect((await db.doc(`chatRoomLinks/${first}`).get()).get("chatReady")).toBe(false);
     expect((await linker().link(first)).chatReady).toBe(false); // 오래된 이벤트로 재입장시키지 않는다.
   });
-  it("둘 다 이탈한 방만 삭제하고 새 방은 보존한다", async () => {
+  it("둘 다 이탈한 방은 서버에만 보관하고 양측의 목록·과거 대화 접근을 막는다", async () => {
     await linker().link(first); await rtdb.ref(`chatRooms/${first}/members`).remove();
     await rtdb.ref(`chatRooms/${first}/messages/old`).set({ senderId: "u0", content: "기록", createdAt: 1 });
     await seed(second); await linker().link(second);
-    expect((await rtdb.ref(`chatRooms/${first}`).get()).exists()).toBe(false);
+    expect((await rtdb.ref(`chatRooms/${first}/messages/old/content`).get()).val()).toBe("기록");
+    expect((await rtdb.ref(`chatRooms/${first}/control`).get()).val()).toMatchObject({ archived: true, writable: false, chatReady: false });
+    for (const uid of ["u0", "u1"]) {
+      expect((await rtdb.ref(`userChatRooms/${uid}/${first}/hidden`).get()).val()).toBe(true);
+      await assertFails(env.authenticatedContext(uid).database().ref(`chatRooms/${first}/messages`).get());
+      await assertFails(env.authenticatedContext(uid).database().ref(`chatRooms/${first}/messages/new`).set(message(uid)));
+      await assertFails(getDoc(doc(env.authenticatedContext(uid).firestore(), "chatRoomLinks", first)));
+    }
     expect((await rtdb.ref(`chatRooms/${second}/members`).get()).numChildren()).toBe(2);
   });
   it("한쪽 목록 생성 실패 후 같은 계획으로 복구하고 준비 전 전송은 거부한다", async () => {
@@ -83,6 +90,21 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_DA
     await assertFails(env.authenticatedContext("u0").database().ref(`chatRooms/${first}/messages/early`).set(message("u0")));
     await expect(linker().link(first)).rejects.toMatchObject({ details: { reason: "CHAT_RETRY_LATER" } });
     clock += 10_000; expect((await linker().link(first)).chatReady).toBe(true);
+    expect((await rtdb.ref("chatRooms").get()).numChildren()).toBe(1);
+  });
+  it.each(["control", "members"])("초기 %s 생성 실패 시 전송 권한을 남기지 않고 재시도로 복구한다", async phase => {
+    let fail = true;
+    const partial = { ref(path?: string) {
+      if (path === `chatRooms/${first}/${phase}` && fail) { fail = false; throw new Error("injected initial failure"); }
+      return rtdb.ref(path);
+    } } as Database;
+    await expect(new ChatLinkService(db, partial, () => new Date(clock)).link(first)).rejects.toThrow("injected initial failure");
+    expect((await db.doc(`matches/${first}`).get()).get("chatReady")).toBe(false);
+    expect((await db.doc(`chatLinkJobs/${first}`).get()).get("status")).toBe("FAILED");
+    expect((await rtdb.ref(`chatRooms/${first}/members`).get()).exists()).toBe(false);
+    await assertFails(env.authenticatedContext("u0").database().ref(`chatRooms/${first}/messages/early`).set(message("u0")));
+    clock += 10_000;
+    expect((await linker().link(first)).chatReady).toBe(true);
     expect((await rtdb.ref("chatRooms").get()).numChildren()).toBe(1);
   });
   it("RTDB 성공 후 Firestore 완료 실패를 재시도해도 메시지·안읽음 수를 보존한다", async () => {
@@ -104,10 +126,21 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_DA
     await db.doc(`chatLinkJobs/${first}`).set({ status: "PREPARING", workerId: "terminated", leaseUntil: Timestamp.fromMillis(clock + 120_000) });
     await seed(second);
     await expect(linker().link(first)).rejects.toMatchObject({ details: { reason: "CHAT_LINK_BUSY" } });
-    await expect(linker().link(second)).rejects.toMatchObject({ details: { reason: "CHAT_PAIR_BUSY" } });
+    await expect(linker().link(second)).rejects.toMatchObject({ details: { reason: "CHAT_PAIR_BUSY", blockingMatchId: first } });
     clock += 120_000;
     expect((await linker().link(first)).chatReady).toBe(true);
     expect((await linker().link(second)).chatRoomId).toBe(first);
     expect((await db.doc(`chatPairs/${pairId}`).get()).get("pendingMatchId")).toBeNull();
+  });
+  it("실패 작업이 막은 다음 매칭에는 복구할 ID를 제공하고 기존 작업 복구 후 연결한다", async () => {
+    const pairId = chatPairKey(["u0", "u1"]);
+    await db.doc(`chatPairs/${pairId}`).set({ participantUids: ["u0", "u1"], pendingMatchId: first });
+    await db.doc(`chatLinkJobs/${first}`).set({ status: "FAILED", nextAttemptAt: Timestamp.fromMillis(clock - 1) });
+    await seed(second);
+    await expect(linker().link(second, "outsider")).rejects.toMatchObject({ code: "permission-denied" });
+    await expect(linker().link(second, "u0")).rejects.toMatchObject({ details: { reason: "CHAT_PAIR_BUSY", blockingMatchId: first } });
+    expect((await db.doc(`chatPairs/${pairId}`).get()).get("pendingMatchId")).toBe(first);
+    await linker().link(first, "u0");
+    expect((await linker().link(second, "u0")).chatRoomId).toBe(first);
   });
 });

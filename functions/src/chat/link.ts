@@ -5,7 +5,7 @@ import { HttpsError } from "firebase-functions/v2/https";
 
 /** BT-043도 같은 pair 문서에서 pendingMatchId와 미종료 약속을 확인해야 한다. */
 export const chatPairKey = (uids: readonly string[]) => createHash("sha256").update(JSON.stringify([...uids].sort())).digest("hex");
-const failure = (reason: string) => new HttpsError("failed-precondition", "채팅방을 준비하지 못했어요. 잠시 후 다시 시도해주세요.", { reason });
+const failure = (reason: string, details: Record<string, unknown> = {}) => new HttpsError("failed-precondition", "채팅방을 준비하지 못했어요. 잠시 후 다시 시도해주세요.", { reason, ...details });
 
 interface Plan { roomId: string; previousRoomId: string | null; archive: boolean }
 export interface ChatLinkResult { matchId: string; chatRoomId: string | null; chatReady: boolean }
@@ -33,11 +33,11 @@ export class ChatLinkService {
         return { participants, pairId, ready: { matchId, chatRoomId: roomId, chatReady: room.get("chatReady") === true }, plan: null };
       }
       const owner = pair.get("pendingMatchId");
-      if (owner && owner !== matchId) throw failure("CHAT_PAIR_BUSY");
+      if (owner && owner !== matchId) throw failure("CHAT_PAIR_BUSY", { blockingMatchId: owner });
       const lease = job.get("leaseUntil");
-      if (lease instanceof Timestamp && lease.toMillis() > this.now().getTime()) throw failure("CHAT_LINK_BUSY");
+      if (lease instanceof Timestamp && lease.toMillis() > this.now().getTime()) throw failure("CHAT_LINK_BUSY", { retryAfterMillis: lease.toMillis() - this.now().getTime() });
       const nextAttempt = job.get("nextAttemptAt");
-      if (nextAttempt instanceof Timestamp && nextAttempt.toMillis() > this.now().getTime()) throw failure("CHAT_RETRY_LATER");
+      if (nextAttempt instanceof Timestamp && nextAttempt.toMillis() > this.now().getTime()) throw failure("CHAT_RETRY_LATER", { retryAfterMillis: nextAttempt.toMillis() - this.now().getTime() });
       tx.set(pairRef, { participantUids: participants, pendingMatchId: matchId }, { merge: true });
       // Callable/trigger 최대 실행 60초보다 긴 120초 lease. 프로세스 종료 후 같은 계획으로 복구한다.
       tx.set(jobRef, { matchId, pairId, status: "PREPARING", workerId,
@@ -68,6 +68,12 @@ export class ChatLinkService {
       }
       if (plan.archive && plan.previousRoomId) await this.archive(plan.previousRoomId, participants);
       const roomId = plan.roomId;
+      // 기존 control 없는 방은 Rules 호환을 유지한다. 새 방은 쓰기 차단을 먼저 저장한 뒤 멤버 권한을 부여한다.
+      const controlResult = await this.rtdb.ref(`chatRooms/${roomId}/control`).transaction(current => {
+        if (current?.archived === true) return undefined;
+        return current ?? { chatReady: false, writable: false, archived: false };
+      });
+      if (!controlResult.committed) throw failure("ROOM_ARCHIVED");
       const membersRef = this.rtdb.ref(`chatRooms/${roomId}/members`);
       const membersResult = await membersRef.transaction(current => {
         if (current === null) return Object.fromEntries(participants.map(u => [u, { joinedAt: this.now().getTime() }]));
@@ -76,11 +82,6 @@ export class ChatLinkService {
         return current;
       });
       if (!membersResult.committed) throw failure("ROOM_MEMBERS_CHANGED");
-      const controlResult = await this.rtdb.ref(`chatRooms/${roomId}/control`).transaction(current => {
-        if (current?.archived === true) return undefined;
-        return current ?? { chatReady: false, writable: false, archived: false };
-      });
-      if (!controlResult.committed) throw failure("ROOM_ARCHIVED");
       for (const uid of participants) {
         const otherUid = participants.find(u => u !== uid)!;
         const entryResult = await this.rtdb.ref(`userChatRooms/${uid}/${roomId}`).transaction(current => {
@@ -124,15 +125,16 @@ export class ChatLinkService {
     const members = (await this.rtdb.ref(`chatRooms/${roomId}/members`).get()).val() ?? {};
     const remaining = Object.keys(members);
     if (remaining.some(u => !participants.includes(u)) || remaining.length > 1) throw failure("ROOM_MEMBERS_CHANGED");
-    const patch: Record<string, unknown> = {};
-    if (!remaining.length) patch[`chatRooms/${roomId}`] = null;
-    else {
-      patch[`chatRooms/${roomId}/control`] = { archived: true, writable: false, chatReady: false };
-      for (const uid of remaining) {
-        patch[`userChatRooms/${uid}/${roomId}/archived`] = true;
-        patch[`userChatRooms/${uid}/${roomId}/chatReady`] = false;
-        patch[`userChatRooms/${uid}/${roomId}/status`] = "ENDED";
-      }
+    // 양측 이탈 기록도 서버에만 보관한다. 신고 보존 기간·최종 삭제는 별도 합의하며 여기서 메시지를 지우지 않는다.
+    const patch: Record<string, unknown> = { [`chatRooms/${roomId}/control`]: { archived: true, writable: false, chatReady: false } };
+    for (const uid of participants) {
+      const entry = (await this.rtdb.ref(`userChatRooms/${uid}/${roomId}`).get()).val();
+      if (entry === null) continue; // 이미 지워진 사용자 목록을 부분 필드만으로 재생성하지 않는다.
+      if (entry.otherUid !== participants.find(u => u !== uid)) throw failure("INVALID_ROOM");
+      patch[`userChatRooms/${uid}/${roomId}/archived`] = true;
+      patch[`userChatRooms/${uid}/${roomId}/chatReady`] = false;
+      patch[`userChatRooms/${uid}/${roomId}/status`] = "ENDED";
+      if (!remaining.includes(uid)) patch[`userChatRooms/${uid}/${roomId}/hidden`] = true;
     }
     await this.rtdb.ref().update(patch);
     await this.db.doc(`chatRoomLinks/${roomId}`).set({ participantUids: remaining, archived: true, chatReady: false,

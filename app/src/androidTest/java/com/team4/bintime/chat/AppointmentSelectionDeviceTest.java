@@ -48,7 +48,7 @@ public class AppointmentSelectionDeviceTest {
     }
     @Test public void selectFutureThenConfirmOnlyThatAppointmentEndsAfterRecreation() throws Exception {
         try (ActivityScenario<ChatRoomActivity> scenario = ActivityScenario.launch(ChatRoomActivity.intent(context, "match-jimin"))) {
-            idle(); scenario.onActivity(activity -> {
+            showWindow(scenario); scenario.onActivity(activity -> {
                 assertTrue(((TextView) activity.findViewById(R.id.chatMatchTime)).getText().toString().contains("외 1건"));
                 assertTrue(MatchSelectionSheet.show(activity.getSupportFragmentManager(), "chat.selectEnd", MatchAppointmentPolicy.Action.END, appointments, System.currentTimeMillis()));
             }); idle(); screenshot("01-end-selection");
@@ -80,14 +80,14 @@ public class AppointmentSelectionDeviceTest {
     @Test public void archivedConversationShowsRecordOnlyAndHidesInput() throws Exception {
         InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> MockChatRepository.shared().setAppointmentsForDemo("match-jimin", appointments, true));
         try (ActivityScenario<ChatRoomActivity> scenario = ActivityScenario.launch(ChatRoomActivity.intent(context, "match-jimin"))) {
-            idle(); scenario.onActivity(activity -> {
+            showWindow(scenario); scenario.onActivity(activity -> {
                 assertTrue(activity.findViewById(R.id.chatInput).isShown());
                 assertFalse(activity.findViewById(R.id.chatInput).isEnabled());
                 assertEquals(activity.getString(R.string.chat_archive_read_only), ((TextView) activity.findViewById(R.id.chatInput)).getHint().toString());
                 assertFalse(activity.findViewById(R.id.chatSend).isEnabled());
                 assertFalse(activity.findViewById(R.id.chatMatchInfo).isShown());
                 assertTrue(activity.findViewById(R.id.chatEndedBanner).isShown());
-                assertEquals(activity.getString(R.string.chat_review_view), ((TextView) activity.findViewById(R.id.chatReviewLink)).getText().toString());
+                assertEquals(activity.getString(R.string.chat_review_write), ((TextView) activity.findViewById(R.id.chatReviewLink)).getText().toString());
                 androidx.recyclerview.widget.RecyclerView messages = activity.findViewById(R.id.chatMessageList);
                 androidx.recyclerview.widget.RecyclerView.ViewHolder last = messages.findViewHolderForAdapterPosition(messages.getAdapter().getItemCount() - 1);
                 assertNotNull(last);
@@ -95,9 +95,76 @@ public class AppointmentSelectionDeviceTest {
             }); screenshot("04-archived-conversation");
         }
     }
+    @Test public void roomPreparationDisablesComposerUntilReadyWithoutLosingDraft() throws Exception {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> MockChatRepository.shared().setAppointmentsForDemo("match-jimin", appointments, false, false));
+        try (ActivityScenario<ChatRoomActivity> scenario = ActivityScenario.launch(ChatRoomActivity.intent(context, "match-jimin"))) {
+            showWindow(scenario); screenshot("05-chat-preparing"); scenario.onActivity(activity -> {
+                assertFalse(activity.findViewById(R.id.chatInput).isEnabled());
+                assertFalse(activity.findViewById(R.id.chatSend).isEnabled());
+                assertFalse(activity.findViewById(R.id.chatAiReply).isEnabled());
+                TextView input = activity.findViewById(R.id.chatInput);
+                assertEquals(activity.getString(R.string.chat_link_preparing), input.getHint().toString());
+                input.setText("준비 후 보낼 초안");
+                MockChatRepository.shared().setAppointmentsForDemo("match-jimin", appointments, false, true);
+            }); idle(); screenshot("05-chat-ready");
+            scenario.onActivity(activity -> {
+                assertTrue(activity.findViewById(R.id.chatInput).isEnabled());
+                assertTrue(activity.findViewById(R.id.chatSend).isEnabled());
+                assertTrue(activity.findViewById(R.id.chatAiReply).isEnabled());
+                assertEquals("준비 후 보낼 초안", ((TextView) activity.findViewById(R.id.chatInput)).getText().toString());
+            });
+        }
+    }
+    @Test public void archivedRoomShowsViewOnlyAfterBothAppointmentReviewsAreWritten() throws Exception {
+        String first = "review-one-" + java.util.UUID.randomUUID(), second = "review-two-" + java.util.UUID.randomUUID();
+        String day = LocalDate.now(ZoneId.of("Asia/Seoul")).minusDays(1).toString();
+        List<MatchAppointment> two = Arrays.asList(
+                new MatchAppointment(first, "match-jimin", day, 600, 690, "스터디", MatchAppointment.Status.ENDED, true, false),
+                new MatchAppointment(second, "match-jimin", day, 720, 810, "스터디", MatchAppointment.Status.ENDED, true, false));
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
+            writeReview(first); MockChatRepository.shared().setAppointmentsForDemo("match-jimin", two, true);
+        });
+        try (ActivityScenario<ChatRoomActivity> scenario = ActivityScenario.launch(ChatRoomActivity.intent(context, "match-jimin"))) {
+            showWindow(scenario); scenario.onActivity(activity -> assertEquals(activity.getString(R.string.chat_review_write),
+                    ((TextView) activity.findViewById(R.id.chatReviewLink)).getText().toString()));
+            screenshot("06-reviews-incomplete");
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> writeReview(second));
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED);
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED); idle();
+            scenario.onActivity(activity -> assertEquals(activity.getString(R.string.chat_review_view),
+                    ((TextView) activity.findViewById(R.id.chatReviewLink)).getText().toString()));
+            screenshot("07-reviews-complete");
+        }
+    }
+    private static void writeReview(String id) {
+        com.team4.bintime.review.MockReviewRepository.shared().submitReview(id, "u1", com.team4.bintime.review.Satisfaction.GREAT,
+                java.util.Collections.emptySet(), null, new com.team4.bintime.review.ReviewRepository.SubmitCallback() {
+                    @Override public void onSuccess() {}
+                    @Override public void onError() { fail("로컬 후기 작성 실패"); }
+                });
+    }
+    private static void showWindow(ActivityScenario<ChatRoomActivity> scenario) throws Exception {
+        // 비런처 Activity 직접 시작 시 AVD가 빈 전환 표면을 유지하는 경우 정상 화면 복귀와 같은 수명주기를 거친다.
+        scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED);
+        scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED);
+        idle();
+    }
     private static void idle() throws Exception { InstrumentationRegistry.getInstrumentation().waitForIdleSync(); Thread.sleep(900); }
     private void screenshot(String name) throws Exception {
-        Bitmap bitmap = InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();
+        Bitmap bitmap = null;
+        // AVD 전환 프레임이 검게 촬영되면 실제 화면이 그려질 때까지 짧게 기다린다.
+        for (int attempt = 0; attempt < 12; attempt++) {
+            bitmap = InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();
+            assertNotNull(bitmap);
+            int visible = 0;
+            for (int x = 1; x <= 3; x++) for (int y = 1; y <= 3; y++) {
+                int pixel = bitmap.getPixel(bitmap.getWidth() * x / 4, bitmap.getHeight() * y / 4);
+                if (android.graphics.Color.red(pixel) > 180 && android.graphics.Color.green(pixel) > 180 && android.graphics.Color.blue(pixel) > 180) visible++;
+            }
+            if (visible >= 3) break;
+            bitmap.recycle(); bitmap = null; Thread.sleep(500);
+        }
+        assertNotNull("검은 전환 화면은 UI 증거로 저장하지 않는다", bitmap);
         File dir = new File(context.getExternalFilesDir(null), "appointment-qa"); assertTrue(dir.isDirectory() || dir.mkdirs());
         try (FileOutputStream output = new FileOutputStream(new File(dir, name + ".png"))) { bitmap.compress(Bitmap.CompressFormat.PNG, 100, output); }
         bitmap.recycle();

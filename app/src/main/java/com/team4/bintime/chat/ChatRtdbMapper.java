@@ -54,7 +54,8 @@ final class ChatRtdbMapper {
                 lastMessageAt == null ? 0L : lastMessageAt,
                 unread == null ? 0 : (int) Math.min(unread, Integer.MAX_VALUE),
                 status,
-                Boolean.TRUE.equals(hidden), Boolean.TRUE.equals(map.get("archived")));
+                Boolean.TRUE.equals(hidden), Boolean.TRUE.equals(map.get("archived")),
+                map.containsKey("chatReady") ? Boolean.TRUE.equals(map.get("chatReady")) : null);
     }
 
     /**
@@ -71,7 +72,7 @@ final class ChatRtdbMapper {
 
     /**
      * 화면용 ChatRoom 을 만든다. 상태·시간은 매칭 스냅샷(match)이 원본이고, 없으면 목록 미러 상태를 쓴다.
-     * match 가 없으면(BT-034 전, 또는 매칭 문서 아직 없음) meetingDate 는 null, 시간은 0, chatReady 는 false 다.
+     * match 가 없으면 meetingDate 는 null, 시간은 0이다. 준비 상태는 명시적 방 상태가 우선이며 이전 방만 match로 보완한다.
      * partner 가 없으면(#79 전) fallbackName 을 이름으로 쓴다.
      */
     static ChatRoom room(String myUid, UserChatRoomEntry entry, @Nullable MatchInfo match,
@@ -85,7 +86,7 @@ final class ChatRtdbMapper {
                 match != null ? match.meetingDate : null,
                 match != null ? match.startMinute : 0,
                 match != null ? match.endMinute : 0,
-                match != null && match.chatReady,
+                entry.chatReady != null ? entry.chatReady : match != null && match.chatReady,
                 entry.otherUid,
                 samePartner ? partner.name : fallbackName,
                 samePartner ? partner.info : null,
