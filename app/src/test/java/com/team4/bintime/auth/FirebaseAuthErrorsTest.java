@@ -48,6 +48,18 @@ public class FirebaseAuthErrorsTest {
         }
     }
 
+    /** BT-030(#101 실기기 확인): 사용 중지는 "만료"가 아니라 따로 안내한다. 로그인 시도·세션 확인 모두. */
+    @Test
+    public void userDisabled_isAccountDisabled_notExpired() {
+        assertEquals(AuthRepository.Failure.ACCOUNT_DISABLED, FirebaseAuthErrors.fromCode("ERROR_USER_DISABLED"));
+        assertTrue(FirebaseAuthErrors.message(AuthRepository.Failure.ACCOUNT_DISABLED).contains("사용이 중지된 계정"));
+        assertEquals(AuthRepository.SessionState.DISABLED, FirebaseAuthErrors.sessionStateFor("ERROR_USER_DISABLED"));
+        assertEquals(AuthRepository.SessionState.EXPIRED, FirebaseAuthErrors.sessionStateFor("ERROR_USER_NOT_FOUND"));
+        assertEquals(AuthRepository.SessionState.EXPIRED, FirebaseAuthErrors.sessionStateFor("ERROR_INVALID_USER_TOKEN"));
+        assertEquals(AuthRepository.SessionState.UNKNOWN, FirebaseAuthErrors.sessionStateFor("ERROR_NETWORK_REQUEST_FAILED"));
+        assertEquals(AuthRepository.SessionState.UNKNOWN, FirebaseAuthErrors.sessionStateFor(null));
+    }
+
     @Test
     public void everyFailure_hasMessage() {
         for (AuthRepository.Failure failure : AuthRepository.Failure.values()) {

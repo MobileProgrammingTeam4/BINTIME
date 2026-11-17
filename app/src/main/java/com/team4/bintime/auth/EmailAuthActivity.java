@@ -398,6 +398,11 @@ public class EmailAuthActivity extends AppCompatActivity {
                     showEmailHelper(message);
                 }
                 break;
+            case ACCOUNT_DISABLED:
+                // BT-030: 사용 중지된 계정은 다시 시도해도 막히므로 "만료"가 아니라 사유를 그대로 알리고 입력 화면으로 돌린다.
+                Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                updateUiForState(EmailVerificationState.Status.INPUT);
+                break;
             case NETWORK:
             case TOO_MANY_REQUESTS:
             case UNKNOWN:

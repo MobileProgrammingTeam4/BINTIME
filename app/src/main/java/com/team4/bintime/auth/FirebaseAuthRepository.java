@@ -130,12 +130,9 @@ public final class FirebaseAuthRepository implements AuthRepository {
             } else {
                 Exception e = task.getException();
                 String code = e instanceof FirebaseAuthException ? ((FirebaseAuthException) e).getErrorCode() : null;
-                if (FirebaseAuthErrors.isSessionInvalid(code)) {
-                    signOut();
-                    state = SessionState.EXPIRED;
-                } else {
-                    state = SessionState.UNKNOWN;
-                }
+                state = FirebaseAuthErrors.sessionStateFor(code);
+                // 삭제·토큰 무효·사용 중지면 기기의 로그인을 지운다(무한 루프 방지). 네트워크 등은 그대로 둔다.
+                if (state != SessionState.UNKNOWN) signOut();
             }
             if (callback != null) callback.onSuccess(state);
         });

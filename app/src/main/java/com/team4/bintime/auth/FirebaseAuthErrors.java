@@ -21,6 +21,8 @@ public final class FirebaseAuthErrors {
                 return AuthRepository.Failure.EMAIL_MISMATCH;
             case "ERROR_TOO_MANY_REQUESTS":
                 return AuthRepository.Failure.TOO_MANY_REQUESTS;
+            case "ERROR_USER_DISABLED":
+                return AuthRepository.Failure.ACCOUNT_DISABLED;
             default:
                 return AuthRepository.Failure.UNKNOWN;
         }
@@ -43,6 +45,16 @@ public final class FirebaseAuthErrors {
         }
     }
 
+    /**
+     * BT-030: 세션 확인 실패 코드 → 세션 상태. 사용 중지는 DISABLED("만료"가 아님), 삭제·토큰 무효는 EXPIRED,
+     * 그 밖(네트워크 등)은 UNKNOWN(로그아웃시키지 않음).
+     */
+    public static AuthRepository.SessionState sessionStateFor(String errorCode) {
+        if ("ERROR_USER_DISABLED".equals(errorCode)) return AuthRepository.SessionState.DISABLED;
+        if (isSessionInvalid(errorCode)) return AuthRepository.SessionState.EXPIRED;
+        return AuthRepository.SessionState.UNKNOWN;
+    }
+
     public static String message(AuthRepository.Failure failure) {
         switch (failure) {
             case LINK_EXPIRED: return "인증 링크가 만료되었어요.";
@@ -52,6 +64,7 @@ public final class FirebaseAuthErrors {
             case INVALID_EMAIL: return "허용된 대학교 이메일 도메인이 아닙니다.";
             case LINK_NOT_SENT: return "먼저 인증 링크를 발송해 주세요.";
             case TOO_MANY_REQUESTS: return "요청이 너무 많아요. 잠시 후 다시 시도해 주세요.";
+            case ACCOUNT_DISABLED: return "사용이 중지된 계정이에요. 관리자에게 문의해 주세요.";
             case NETWORK: return "네트워크 연결을 확인해 주세요.";
             default: return "인증에 실패했어요. 다시 시도해 주세요.";
         }

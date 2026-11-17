@@ -77,6 +77,11 @@ public class OnboardingActivity extends AppCompatActivity {
             @Override
             public void onSuccess(AuthRepository.SessionState state) {
                 if (isFinishing() || isDestroyed()) return;
+                if (state == AuthRepository.SessionState.DISABLED) {
+                    showSignedOut(false);
+                    Toast.makeText(OnboardingActivity.this, R.string.account_disabled, Toast.LENGTH_LONG).show();
+                    return;
+                }
                 if (state == AuthRepository.SessionState.EXPIRED || !auth.isSignedIn()) {
                     showSignedOut(true);
                     return;

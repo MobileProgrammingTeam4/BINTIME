@@ -10,6 +10,7 @@
     <string name="onboarding_retry_button">다시 시도</string>
     <!-- BT-030: 계정 삭제·비활성화·토큰 만료로 로그인이 끊겼을 때 -->
     <string name="session_expired">로그인이 만료됐어요. 다시 로그인해 주세요</string>
+    <string name="account_disabled">사용이 중지된 계정이에요. 관리자에게 문의해 주세요</string>
 
     <!-- 학생 인증 공통 -->
     <string name="auth_header_title">학생 인증</string>
