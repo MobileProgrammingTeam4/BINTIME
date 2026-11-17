@@ -13,7 +13,7 @@
     <string name="appointment_additional">%1$s 외 %2$d건</string>
     <string name="chat_archive_badge">이전 대화</string>
     <string name="chat_archive_preview">상대가 나간 대화방이에요</string>
-    <string name="chat_archive_notice">상대가 나간 대화방이에요. 이전 메시지만 확인할 수 있어요.</string>
+    <string name="chat_partner_left">%1$s님이 채팅방을 나갔어요.</string>
     <string name="chat_archive_read_only">기록 열람만 가능해요</string>
     <string name="chat_link_wait">채팅방을 준비하고 있어요. 잠시 후 다시 눌러주세요.</string>
     <string name="chat_link_preparing">채팅방 준비 중…</string>

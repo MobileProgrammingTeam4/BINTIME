@@ -56,7 +56,10 @@ public class AppointmentSelectionDeviceTest {
             scenario.onActivity(activity -> {
                 DialogFragment sheet = (DialogFragment) activity.getSupportFragmentManager().findFragmentByTag("chat.selectEnd");
                 assertNotNull(sheet); LinearLayout rows = sheet.requireView().findViewById(R.id.matchSelectionRows);
-                assertEquals(2, rows.getChildCount()); rows.getChildAt(1).performClick();
+                assertEquals(2, rows.getChildCount());
+                assertNotNull(rows.getChildAt(0).findViewById(R.id.appointmentTimeMatch));
+                assertEquals(android.view.View.GONE, rows.getChildAt(0).findViewById(R.id.timeOverlapDivider).getVisibility());
+                rows.getChildAt(1).performClick();
             }); idle(); screenshot("02-selected-end-confirm");
             scenario.onActivity(activity -> {
                 DialogFragment confirm = (DialogFragment) activity.getSupportFragmentManager().findFragmentByTag("chat.endMatch");
@@ -83,6 +86,12 @@ public class AppointmentSelectionDeviceTest {
                 assertEquals(activity.getString(R.string.chat_archive_read_only), ((TextView) activity.findViewById(R.id.chatInput)).getHint().toString());
                 assertFalse(activity.findViewById(R.id.chatSend).isEnabled());
                 assertFalse(activity.findViewById(R.id.chatMatchInfo).isShown());
+                assertTrue(activity.findViewById(R.id.chatEndedBanner).isShown());
+                assertEquals(activity.getString(R.string.chat_review_view), ((TextView) activity.findViewById(R.id.chatReviewLink)).getText().toString());
+                androidx.recyclerview.widget.RecyclerView messages = activity.findViewById(R.id.chatMessageList);
+                androidx.recyclerview.widget.RecyclerView.ViewHolder last = messages.findViewHolderForAdapterPosition(messages.getAdapter().getItemCount() - 1);
+                assertNotNull(last);
+                assertTrue(last.itemView.findViewById(R.id.chatPartnerLeftNotice).isShown());
             }); screenshot("04-archived-conversation");
         }
     }

@@ -12,6 +12,8 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 import com.team4.bintime.R;
+import com.team4.bintime.common.TimeMatchViews;
+import com.team4.bintime.model.MatchFilter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -47,9 +49,9 @@ public class MatchSelectionSheet extends BottomSheetDialogFragment {
         if (items != null) for (MatchAppointment item : items) {
             View row = inflater.inflate(R.layout.item_match_selection, rows, false);
             ((TextView) row.findViewById(R.id.appointmentDate)).setText(item.meetingDate.replace('-', '.'));
-            ((TextView) row.findViewById(R.id.appointmentTime)).setText(String.format(Locale.KOREA, "%02d:%02d ~ %02d:%02d",
-                    item.startMinute / 60, item.startMinute % 60, item.endMinute / 60, item.endMinute % 60));
-            ((TextView) row.findViewById(R.id.appointmentPurpose)).setText(item.purpose);
+            TimeMatchViews.bindCompact(row.findViewById(R.id.appointmentTimeMatch), String.format(Locale.KOREA, "%02d:%02d ~ %02d:%02d",
+                    item.startMinute / 60, item.startMinute % 60, item.endMinute / 60, item.endMinute % 60),
+                    getString(R.string.chat_overlap_duration, MatchFilter.formatDuration(item.endMinute - item.startMinute)));
             boolean ongoing = item.startAtMillis() <= requireArguments().getLong(NOW) && item.endAtMillis() > requireArguments().getLong(NOW);
             ((TextView) row.findViewById(R.id.appointmentStatus)).setText(action == MatchAppointmentPolicy.Action.REVIEW
                     ? item.reviewWritten ? R.string.appointment_review_written : R.string.appointment_review_available
@@ -62,7 +64,7 @@ public class MatchSelectionSheet extends BottomSheetDialogFragment {
         view.findViewById(R.id.matchSelectionClose).setOnClickListener(v -> dismiss());
         View scroll = view.findViewById(R.id.matchSelectionScroll);
         ViewGroup.LayoutParams params = scroll.getLayoutParams();
-        params.height = Math.min(com.team4.bintime.common.ChipViews.dp(requireContext(), Math.max(1, rows.getChildCount()) * 124),
+        params.height = Math.min(com.team4.bintime.common.ChipViews.dp(requireContext(), Math.max(1, rows.getChildCount()) * 96),
                 (int) (getResources().getDisplayMetrics().heightPixels * 0.45f)); scroll.setLayoutParams(params);
         return view;
     }

@@ -82,6 +82,7 @@ public class ChatRoomActivity extends AppCompatActivity {
     private LinearLayout replyChips;
     private ArrayList<String> replies;
     private boolean actionInProgress, leaving, sending;
+    private boolean messagesLoaded, messagesEmpty;
     private View sendButton;
 
     @Override
@@ -142,6 +143,7 @@ public class ChatRoomActivity extends AppCompatActivity {
                 room = data;
                 adapter.setRoom(data);
                 bindRoom();
+                if (data.archived) messageList.post(ChatRoomActivity.this::scrollToLast);
                 refreshReviewStatus();
                 // 보고 있는 중에 서버 트리거가 내 안읽음 수를 올리면 바로 0 으로 되돌린다.
                 if (data.unreadCount > 0 && isResumedNow()) repository.markRead(matchId);
@@ -189,8 +191,9 @@ public class ChatRoomActivity extends AppCompatActivity {
         messageRegistration = repository.observeMessages(matchId, new ChatRepository.Listener<List<ChatMessage>>() {
             @Override
             public void onData(List<ChatMessage> data) {
+                messagesLoaded = true; messagesEmpty = data.isEmpty();
                 adapter.submit(data);
-                if (data.isEmpty()) {
+                if (data.isEmpty() && (room == null || !room.archived)) {
                     stateView.showEmpty(getString(R.string.chat_messages_empty_title),
                             getString(R.string.chat_messages_empty_message));
                 } else {
@@ -211,14 +214,13 @@ public class ChatRoomActivity extends AppCompatActivity {
     private void bindRoom() {
         ((TextView) findViewById(R.id.chatRoomTitle)).setText(room.otherName);
         boolean active = room.status == ChatRoom.Status.ACTIVE;
-        TextView archivedNotice = findViewById(R.id.chatArchivedNotice);
-        archivedNotice.setVisibility(room.archived ? View.VISIBLE : View.GONE);
         ChatComposer.bind(findViewById(R.id.chatComposer), room.archived, sending);
         findViewById(R.id.chatAiRow).setVisibility(room.archived ? View.GONE : View.VISIBLE);
         // 매칭 스냅샷(matches/{matchId})을 아직 못 받으면 확정 시간이 없다(BT-034 연결 전·문서 생성 전). 시간 카드를 숨긴다.
         boolean hasMatchTime = room.meetingDate != null && (room.appointments.isEmpty() || MatchAppointmentPolicy.representative(room.appointments, repository.nowMillis()) != null);
         findViewById(R.id.chatMatchInfo).setVisibility(active && hasMatchTime ? View.VISIBLE : View.GONE);
-        findViewById(R.id.chatEndedBanner).setVisibility(room.archived || active ? View.GONE : View.VISIBLE);
+        findViewById(R.id.chatEndedBanner).setVisibility(active ? View.GONE : View.VISIBLE);
+        if (room.archived && messagesLoaded && messagesEmpty) stateView.hide();
         if (active && hasMatchTime) bindMatchInfo();
         else bindReviewLink();
     }
@@ -263,12 +265,12 @@ public class ChatRoomActivity extends AppCompatActivity {
     private void bindReviewLink() {
         TextView link = findViewById(R.id.chatReviewLink);
         List<MatchAppointment> targets = MatchAppointmentPolicy.targets(reviewAppointments(), MatchAppointmentPolicy.Action.REVIEW);
-        link.setVisibility(targets.isEmpty() ? View.GONE : View.VISIBLE);
-        link.setText(targets.size() == 1 && targets.get(0).reviewWritten ? R.string.chat_review_view : R.string.chat_review_write);
+        link.setVisibility(room.archived || !targets.isEmpty() ? View.VISIBLE : View.GONE);
+        link.setText(room.archived || targets.size() == 1 && targets.get(0).reviewWritten ? R.string.chat_review_view : R.string.chat_review_write);
     }
 
     private void openReview() {
-        if (room == null || room.archived) return;
+        if (room == null) return;
         if (!MatchSelectionSheet.show(getSupportFragmentManager(), KEY_SELECT_REVIEW, MatchAppointmentPolicy.Action.REVIEW,
                 reviewAppointments(), repository.nowMillis())) Toast.makeText(this, R.string.appointment_no_target, Toast.LENGTH_SHORT).show();
     }
@@ -280,7 +282,7 @@ public class ChatRoomActivity extends AppCompatActivity {
         return result;
     }
     private void openSelectedReview(String id) {
-        if (room == null || room.archived || isFinishing() || isDestroyed()) return;
+        if (room == null || isFinishing() || isDestroyed()) return;
         MatchAppointment selected = MatchAppointmentPolicy.targets(reviewAppointments(), MatchAppointmentPolicy.Action.REVIEW).stream().filter(a -> a.matchId.equals(id)).findFirst().orElse(null);
         if (selected == null) return;
         if (AuthRepositories.isFirebaseEnabled(this)) { Toast.makeText(this, R.string.request_review_pending, Toast.LENGTH_SHORT).show(); return; }

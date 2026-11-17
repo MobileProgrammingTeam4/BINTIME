@@ -45,10 +45,6 @@
             android:src="@drawable/ic_more" />
     </LinearLayout>
 
-    <TextView android:id="@+id/chatArchivedNotice" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:layout_marginHorizontal="20dp" android:padding="16dp" android:background="@drawable/bg_timematch"
-        android:text="@string/chat_archive_notice" android:textAppearance="@style/TextAppearance.BinTime.BodyM" android:visibility="gone" />
-
     <!-- 진행 중 매칭: 시간 · 남은 시간 · 추천 장소 -->
     <LinearLayout
         android:id="@+id/chatMatchInfo"
