@@ -158,6 +158,13 @@ describe("searchMatches Callable", () => {
   it("학교 계정은 검색 결과", async () => {
     expect(await call({ uid: "me", token: school })).toMatchObject({ status: "OK", candidates: [] });
   });
+  it("OK 결과 후보에 점수기를 적용한다(BT-027)", async () => {
+    const two = new MemoryStore({ me: { settings: on(), slots: [s(1, 840, 960)] }, you: { settings: on(), slots: [s(1, 840, 960)] } });
+    const scored = createSearchCallable(() => two, () => MON_1410, () => [".ac.kr"],
+      async (_uid, candidates) => candidates.map((c) => ({ ...c, score: 70 })));
+    const res = await scored.run({ data: {}, auth: { uid: "me", token: school }, rawRequest: {} } as never);
+    expect(res).toMatchObject({ status: "OK", candidates: [{ candidateId: "you", score: 70 }] });
+  });
 });
 
 describe("resolveCandidate (요청 생성 재검증)", () => {

@@ -123,6 +123,18 @@ describe("evaluateMatch (서버 내부)", () => {
     await expectReason(evaluateMatch(me, { ...input, overlapMinutes: 59 }, makeDeps()), "INVALID_INPUT");
   });
 
+  it("live 프롬프트는 입력 JSON 만 보내고 결정적(temperature 0)이다", async () => {
+    const ok = '{"score":82,"reasons":["공강이 길게 겹쳐요"],"suggestedActivity":"카페"}';
+    const deps = makeDeps({ mode: "live", steps: [{ text: ok }] });
+    const res = await evaluateMatch(me, input, deps);
+    expect(res.data.score).toBe(82);
+    const call = deps.client.calls[0];
+    expect(call.temperature).toBe(0);
+    expect(JSON.parse(call.contents as string)).toMatchObject({ overlapMinutes: input.overlapMinutes });
+    expect(call.contents as string).not.toContain(me);
+    expect(call.systemInstruction).toContain("건물 이름을 쓰지 않는다");
+  });
+
   it("범위 밖 점수는 형식 오류", async () => {
     const live = { ...evaluateMatchTask, buildRequest: async () => ({ contents: "test" }) };
     const bad = '{"score":120,"reasons":["a"],"suggestedActivity":"카페"}';

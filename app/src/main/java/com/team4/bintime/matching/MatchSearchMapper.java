@@ -72,14 +72,20 @@ final class MatchSearchMapper {
                 + " " + hhmm(num(r.get("startMinute"))) + " ~ " + hhmm(num(r.get("endMinute")));
     }
 
-    /** 서버 후보 1건 + 공개 프로필 → 카드. AI 매칭률·추천 이유는 BT-027/028 전까지 비운다. */
+    /**
+     * 서버 후보 1건 + 공개 프로필 → 카드. BT-027: 서버가 붙인 AI score·reasons·suggestedActivity 를 쓴다.
+     * 점수가 없으면(상위 5명 밖·AI 실패) 0 이라 카드에서 매칭률을 숨긴다.
+     */
     static MatchCandidate toCandidate(Map<String, Object> raw, UserProfile profile, int dayOfWeek, String today) {
         List<String> tags = new ArrayList<>();
         if (profile.getInterestTags() != null) for (String t : profile.getInterestTags()) tags.add(t.startsWith("#") ? t : "#" + t);
+        int score = Math.max(0, Math.min(100, num(raw.get("score"))));
+        Object activity = raw.get("suggestedActivity");
+        String reason = activity instanceof String && !((String) activity).isEmpty() ? "추천 활동: " + activity : "";
         MatchCandidate c = new MatchCandidate((String) raw.get("candidateId"), profile.getNickname(),
-                profile.getDepartment(), gradeNumber(profile.getGrade()), profile.getGender(), 0, "",
+                profile.getDepartment(), gradeNumber(profile.getGrade()), profile.getGender(), score, reason,
                 hhmm(num(raw.get("startMinute"))), hhmm(num(raw.get("endMinute"))), (String) raw.get("purpose"),
-                tags, Collections.emptyList(), profile.getBio());
+                tags, strings(raw.get("reasons")), profile.getBio());
         c.dayLabel = dayLabel((String) raw.get("meetingDate"), dayOfWeek, today);
         c.photoPath = profile.getPhotoPath();
         return c;
@@ -89,6 +95,13 @@ final class MatchSearchMapper {
     static int gradeNumber(String grade) {
         String digits = grade == null ? "" : grade.replaceAll("\\D", "");
         return digits.isEmpty() ? 0 : Integer.parseInt(digits);
+    }
+
+    static List<String> strings(Object value) {
+        if (!(value instanceof List)) return Collections.emptyList();
+        List<String> out = new ArrayList<>();
+        for (Object item : (List<?>) value) if (item instanceof String && !((String) item).isEmpty()) out.add((String) item);
+        return out;
     }
 
     /** Callable 응답 숫자는 Integer/Long/Double 중 하나로 온다. */
