@@ -50,9 +50,10 @@ final class ChatListAdapter extends RecyclerView.Adapter<ChatListAdapter.Holder>
         ChatRoom room = items.get(position);
         bindAvatar(h.photo, h.initials, room);
         h.name.setText(room.otherName);
+        h.itemView.findViewById(R.id.chatArchiveBadge).setVisibility(room.archived ? View.VISIBLE : View.GONE);
         h.time.setText(ChatTimeFormatter.listTime(room.lastMessageAt, System.currentTimeMillis(),
                 h.itemView.getContext().getString(R.string.chat_yesterday)));
-        h.preview.setText(room.lastMessage);
+        h.preview.setText(room.archived ? h.itemView.getContext().getString(R.string.chat_archive_preview) : room.lastMessage);
         h.unread.setVisibility(room.unreadCount > 0 ? View.VISIBLE : View.GONE);
         h.unread.setText(String.valueOf(room.unreadCount));
         h.itemView.setOnClickListener(v -> onClick.accept(room));

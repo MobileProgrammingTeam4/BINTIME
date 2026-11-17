@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:background="@drawable/bg_bottom_sheet" android:gravity="center_horizontal"
+    android:orientation="vertical" android:paddingHorizontal="20dp" android:paddingTop="10dp" android:paddingBottom="20dp">
+    <View android:layout_width="36dp" android:layout_height="4dp" android:background="@drawable/bg_handle_bar" />
+    <TextView android:id="@+id/matchSelectionTitle" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="20dp" android:textAppearance="@style/TextAppearance.BinTime.H1" />
+    <TextView android:id="@+id/matchSelectionHint" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" android:textAppearance="@style/TextAppearance.BinTime.BodyM" android:textColor="@color/text_secondary" />
+    <ScrollView android:id="@+id/matchSelectionScroll" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="20dp"
+        android:fillViewport="true" android:scrollbars="none">
+        <LinearLayout android:id="@+id/matchSelectionRows" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
+    </ScrollView>
+    <TextView android:id="@+id/matchSelectionClose" style="@style/Widget.BinTime.ButtonOutline"
+        android:layout_width="match_parent" android:layout_height="52dp"
+        android:layout_marginTop="16dp" android:text="@string/chat_close" />
+</LinearLayout>

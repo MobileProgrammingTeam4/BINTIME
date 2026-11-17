@@ -61,6 +61,7 @@
 - 요청 상태: `PENDING`, `ACCEPTED`, `REJECTED`, `CANCELED`.
 - BT-032 상충/만료 정리는 `docs/BT-032.md`를 따른다. `matchCleanupJobs`는 서버 전용이며 자동 정리는 직접 취소 cooldown을 변경하지 않는다. 5분 주기 예약 코드와 실제 운영 활성화를 구분한다.
 - 매칭 상태: `ACTIVE`, `ENDED`.
+- BT-033부터 개별 matchId와 실제 chatRoomId를 구분합니다. 서버 전용 chatPairs/chatLinkJobs, 현재 참여자 읽기 전용 chatRoomLinks 및 방의 archived/writable 계약은 `docs/BT-034.md`를 따릅니다. 여러 약속의 대표·종료/후기 선택과 비활성 MessageComposer는 `docs/BT-035.md`의 제공 컴포넌트를 재사용합니다.
 - 서버가 요청 수락/거절/취소를 검증하고 **동시 수락과 상충 요청**을 트랜잭션/멱등 처리로 보호합니다.
 - 매칭 자동 종료는 **확정된 겹침 시간 종료 시점**을 기준으로 하며, 채팅 옵션의 수동 종료도 지원합니다.
 - **ACTIVE 매칭은 채팅방 나가기 불가**. **ENDED 이후에만 나가기 허용**. 매칭 종료 후에도 채팅을 계속 사용할 수 있으며, 종료 이벤트로 기록을 삭제하거나 전송을 막지 않습니다.

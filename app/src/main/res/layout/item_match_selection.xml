@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="112dp"
+    android:layout_marginBottom="12dp" android:padding="16dp" android:orientation="horizontal"
+    android:gravity="center_vertical" android:background="@drawable/bg_timematch"
+    android:foreground="?attr/selectableItemBackground" android:clickable="true" android:focusable="true">
+    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+        <TextView android:id="@+id/appointmentDate" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:textAppearance="@style/TextAppearance.BinTime.Caption" android:textColor="@color/text_secondary" />
+        <TextView android:id="@+id/appointmentTime" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" android:textAppearance="@style/TextAppearance.BinTime.ButtonS" />
+        <TextView android:id="@+id/appointmentPurpose" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" android:textAppearance="@style/TextAppearance.BinTime.BodyM" android:textColor="@color/text_secondary" />
+    </LinearLayout>
+    <TextView android:id="@+id/appointmentStatus" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginStart="12dp" android:textAppearance="@style/TextAppearance.BinTime.CaptionBold" android:textColor="@color/action_pressed" />
+    <ImageView android:layout_width="16dp" android:layout_height="16dp" android:layout_marginStart="8dp"
+        android:importantForAccessibility="no" android:src="@drawable/ic_chevron_right_small" />
+</LinearLayout>

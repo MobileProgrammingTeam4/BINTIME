@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appointment_end_title">어떤 매칭을 종료할까요?</string>
+    <string name="appointment_end_hint">선택한 약속만 종료돼요. 다른 약속과 대화는 유지돼요.</string>
+    <string name="appointment_review_title">어떤 매칭의 후기를 볼까요?</string>
+    <string name="appointment_review_hint">종료된 약속을 선택해 후기를 남기거나 확인해요.</string>
+    <string name="appointment_ongoing">진행 중</string>
+    <string name="appointment_upcoming">예정</string>
+    <string name="appointment_elapsed">종료 시각 경과</string>
+    <string name="appointment_review_written">후기 보기</string>
+    <string name="appointment_review_available">후기 작성</string>
+    <string name="appointment_no_target">선택할 수 있는 약속이 없어요.</string>
+    <string name="appointment_additional">%1$s 외 %2$d건</string>
+    <string name="chat_archive_badge">이전 대화</string>
+    <string name="chat_archive_preview">상대가 나간 대화방이에요</string>
+    <string name="chat_archive_notice">상대가 나간 대화방이에요. 이전 메시지만 확인할 수 있어요.</string>
+    <string name="chat_archive_read_only">기록 열람만 가능해요</string>
+    <string name="chat_link_wait">채팅방을 준비하고 있어요. 잠시 후 다시 눌러주세요.</string>
+    <string name="chat_link_preparing">채팅방 준비 중…</string>
+    <string name="chat_link_failed">채팅방을 준비하지 못했어요. 잠시 후 다시 눌러주세요.</string>
+</resources>

@@ -35,6 +35,10 @@ import com.team4.bintime.review.MockReviewRepository;
 import com.team4.bintime.review.ReviewDetailActivity;
 import com.team4.bintime.review.ReviewRepository;
 import com.team4.bintime.review.ReviewWriteActivity;
+import com.team4.bintime.request.MatchAppointment;
+import com.team4.bintime.request.MatchAppointmentPolicy;
+import com.team4.bintime.request.MatchSelectionSheet;
+import com.team4.bintime.auth.AuthRepositories;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -50,6 +54,12 @@ public class ChatRoomActivity extends AppCompatActivity {
     private static final String KEY_LEAVE_ROOM = "chat.leaveRoom";
     private static final String TAG_LEAVE_BLOCKED = "chat.leaveBlocked";
     private static final String STATE_REPLIES = "replies";
+    private static final String KEY_SELECT_END = "chat.selectEnd", KEY_SELECT_REVIEW = "chat.selectReview";
+    private final java.util.Map<String, Boolean> reviewStatuses = new java.util.HashMap<>();
+    private final android.os.Handler ticker = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable tick = new Runnable() {
+        @Override public void run() { if (room != null) bindRoom(); ticker.postDelayed(this, 1000); }
+    };
 
     public static Intent intent(Context context, String matchId) {
         return new Intent(context, ChatRoomActivity.class).putExtra(EXTRA_MATCH_ID, matchId);
@@ -71,8 +81,6 @@ public class ChatRoomActivity extends AppCompatActivity {
     private View aiButton;
     private LinearLayout replyChips;
     private ArrayList<String> replies;
-    /** null 이면 아직 확인 전 */
-    private Boolean myReviewWritten;
     private boolean actionInProgress, leaving, sending;
     private View sendButton;
 
@@ -109,7 +117,9 @@ public class ChatRoomActivity extends AppCompatActivity {
         replyChips = findViewById(R.id.chatReplyChips);
 
         // 확인 다이얼로그 결과는 화면 회전 뒤에도 받도록 매번 등록한다.
-        getSupportFragmentManager().setFragmentResultListener(KEY_END_MATCH, this, (key, result) -> endMatch());
+        getSupportFragmentManager().setFragmentResultListener(KEY_END_MATCH, this, (key, result) -> endMatch(result.getString(MatchSelectionSheet.MATCH_ID)));
+        getSupportFragmentManager().setFragmentResultListener(KEY_SELECT_END, this, (key, result) -> confirmSelectedEnd(result.getString(MatchSelectionSheet.MATCH_ID)));
+        getSupportFragmentManager().setFragmentResultListener(KEY_SELECT_REVIEW, this, (key, result) -> openSelectedReview(result.getString(MatchSelectionSheet.MATCH_ID)));
         getSupportFragmentManager().setFragmentResultListener(KEY_LEAVE_ROOM, this, (key, result) -> leaveRoom());
 
         adapter = new ChatMessageAdapter(myUid);
@@ -132,6 +142,7 @@ public class ChatRoomActivity extends AppCompatActivity {
                 room = data;
                 adapter.setRoom(data);
                 bindRoom();
+                refreshReviewStatus();
                 // 보고 있는 중에 서버 트리거가 내 안읽음 수를 올리면 바로 0 으로 되돌린다.
                 if (data.unreadCount > 0 && isResumedNow()) repository.markRead(matchId);
             }
@@ -153,7 +164,9 @@ public class ChatRoomActivity extends AppCompatActivity {
         // 후기 화면에서 돌아오면 배너 문구(남기기 → 보기)를 다시 맞춘다.
         refreshReviewStatus();
         if (room != null) bindRoom();
+        ticker.removeCallbacks(tick); ticker.postDelayed(tick, 1000);
     }
+    @Override protected void onPause() { ticker.removeCallbacks(tick); super.onPause(); }
 
     @Override
     protected void onSaveInstanceState(@NonNull Bundle outState) {
@@ -166,6 +179,7 @@ public class ChatRoomActivity extends AppCompatActivity {
         if (roomRegistration != null) roomRegistration.remove();
         if (messageRegistration != null) messageRegistration.remove();
         if (replyRequest != null) replyRequest.cancel();
+        ticker.removeCallbacks(tick);
         super.onDestroy();
     }
 
@@ -197,20 +211,27 @@ public class ChatRoomActivity extends AppCompatActivity {
     private void bindRoom() {
         ((TextView) findViewById(R.id.chatRoomTitle)).setText(room.otherName);
         boolean active = room.status == ChatRoom.Status.ACTIVE;
+        TextView archivedNotice = findViewById(R.id.chatArchivedNotice);
+        archivedNotice.setVisibility(room.archived ? View.VISIBLE : View.GONE);
+        ChatComposer.bind(findViewById(R.id.chatComposer), room.archived, sending);
+        findViewById(R.id.chatAiRow).setVisibility(room.archived ? View.GONE : View.VISIBLE);
         // 매칭 스냅샷(matches/{matchId})을 아직 못 받으면 확정 시간이 없다(BT-034 연결 전·문서 생성 전). 시간 카드를 숨긴다.
-        boolean hasMatchTime = room.meetingDate != null;
+        boolean hasMatchTime = room.meetingDate != null && (room.appointments.isEmpty() || MatchAppointmentPolicy.representative(room.appointments, repository.nowMillis()) != null);
         findViewById(R.id.chatMatchInfo).setVisibility(active && hasMatchTime ? View.VISIBLE : View.GONE);
-        findViewById(R.id.chatEndedBanner).setVisibility(active ? View.GONE : View.VISIBLE);
+        findViewById(R.id.chatEndedBanner).setVisibility(room.archived || active ? View.GONE : View.VISIBLE);
         if (active && hasMatchTime) bindMatchInfo();
         else bindReviewLink();
     }
 
     private void bindMatchInfo() {
-        long now = System.currentTimeMillis();
-        ((TextView) findViewById(R.id.chatMatchTime)).setText(ChatTimeFormatter.timeRange(room, now,
-                getString(R.string.chat_today), getString(R.string.chat_yesterday)));
-        ((TextView) findViewById(R.id.chatMatchRemaining)).setText(getString(R.string.chat_remaining,
-                ChatTimeFormatter.remaining(room, now)));
+        long now = repository.nowMillis();
+        MatchAppointment appointment = MatchAppointmentPolicy.representative(room.appointments, now);
+        ChatRoom display = appointment == null ? room : room.withDisplayAppointment(appointment);
+        String time = ChatTimeFormatter.timeRange(display, now, getString(R.string.chat_today), getString(R.string.chat_yesterday));
+        int additional = MatchAppointmentPolicy.additionalCount(room.appointments, now);
+        ((TextView) findViewById(R.id.chatMatchTime)).setText(additional > 0 ? getString(R.string.appointment_additional, time, additional) : time);
+        ((TextView) findViewById(R.id.chatMatchRemaining)).setText(appointment != null && appointment.startAtMillis() > now
+                ? getString(R.string.appointment_upcoming) : getString(R.string.chat_remaining, ChatTimeFormatter.remaining(display, now)));
         boolean hasPlace = room.recommendedPlace != null;
         findViewById(R.id.chatPlaceRow).setVisibility(hasPlace ? View.VISIBLE : View.GONE);
         if (hasPlace) {
@@ -222,35 +243,49 @@ public class ChatRoomActivity extends AppCompatActivity {
     // ---- 후기 ----
 
     private void refreshReviewStatus() {
-        reviewRepository.loadMyReviewStatus(matchId, new ReviewRepository.StatusCallback() {
-            @Override
-            public void onResult(boolean written) {
-                myReviewWritten = written;
-                if (room != null && room.status == ChatRoom.Status.ENDED) bindReviewLink();
-            }
-
-            @Override
-            public void onError() {
-                myReviewWritten = null;
-                if (room != null && room.status == ChatRoom.Status.ENDED) bindReviewLink();
-            }
-        });
+        if (room == null || AuthRepositories.isFirebaseEnabled(this)) return; // 실제 후기는 BT-044에서 연결
+        for (MatchAppointment item : MatchAppointmentPolicy.targets(room.appointments, MatchAppointmentPolicy.Action.REVIEW)) {
+            reviewRepository.loadMyReviewStatus(item.matchId, new ReviewRepository.StatusCallback() {
+                @Override public void onResult(boolean written) {
+                    if (isFinishing() || isDestroyed()) return;
+                    reviewStatuses.put(item.matchId, written);
+                    if (room != null && room.status == ChatRoom.Status.ENDED) bindReviewLink();
+                }
+                @Override public void onError() {
+                    if (isFinishing() || isDestroyed()) return;
+                    reviewStatuses.remove(item.matchId);
+                    if (room != null && room.status == ChatRoom.Status.ENDED) bindReviewLink();
+                }
+            });
+        }
     }
 
     private void bindReviewLink() {
         TextView link = findViewById(R.id.chatReviewLink);
-        link.setVisibility(myReviewWritten == null ? View.INVISIBLE : View.VISIBLE);
-        if (myReviewWritten != null) {
-            link.setText(myReviewWritten ? R.string.chat_review_view : R.string.chat_review_write);
-        }
+        List<MatchAppointment> targets = MatchAppointmentPolicy.targets(reviewAppointments(), MatchAppointmentPolicy.Action.REVIEW);
+        link.setVisibility(targets.isEmpty() ? View.GONE : View.VISIBLE);
+        link.setText(targets.size() == 1 && targets.get(0).reviewWritten ? R.string.chat_review_view : R.string.chat_review_write);
     }
 
     private void openReview() {
-        if (room == null || room.status != ChatRoom.Status.ENDED || myReviewWritten == null) return;
-        PartnerSummary partner = PartnerSummary.from(this, room, System.currentTimeMillis());
-        startActivity(myReviewWritten
-                ? ReviewDetailActivity.intent(this, matchId, partner)
-                : ReviewWriteActivity.intent(this, matchId, partner));
+        if (room == null || room.archived) return;
+        if (!MatchSelectionSheet.show(getSupportFragmentManager(), KEY_SELECT_REVIEW, MatchAppointmentPolicy.Action.REVIEW,
+                reviewAppointments(), repository.nowMillis())) Toast.makeText(this, R.string.appointment_no_target, Toast.LENGTH_SHORT).show();
+    }
+
+    private List<MatchAppointment> reviewAppointments() {
+        List<MatchAppointment> result = new ArrayList<>();
+        if (room != null) for (MatchAppointment a : room.appointments) result.add(new MatchAppointment(a.matchId, a.chatRoomId, a.meetingDate, a.startMinute,
+                a.endMinute, a.purpose, a.status, a.reviewEligible, reviewStatuses.getOrDefault(a.matchId, a.reviewWritten)));
+        return result;
+    }
+    private void openSelectedReview(String id) {
+        if (room == null || room.archived || isFinishing() || isDestroyed()) return;
+        MatchAppointment selected = MatchAppointmentPolicy.targets(reviewAppointments(), MatchAppointmentPolicy.Action.REVIEW).stream().filter(a -> a.matchId.equals(id)).findFirst().orElse(null);
+        if (selected == null) return;
+        if (AuthRepositories.isFirebaseEnabled(this)) { Toast.makeText(this, R.string.request_review_pending, Toast.LENGTH_SHORT).show(); return; }
+        PartnerSummary partner = PartnerSummary.from(this, room.withDisplayAppointment(selected), repository.nowMillis());
+        startActivity(selected.reviewWritten ? ReviewDetailActivity.intent(this, id, partner) : ReviewWriteActivity.intent(this, id, partner));
     }
 
     // ---- 채팅 옵션 (Figma 120:2575) ----
@@ -263,6 +298,9 @@ public class ChatRoomActivity extends AppCompatActivity {
         if (room.status == ChatRoom.Status.ACTIVE) {
             labels.add(getString(R.string.chat_option_end));
             actions.add(this::confirmEndMatch);
+        }
+        if (!room.archived && !MatchAppointmentPolicy.targets(room.appointments, MatchAppointmentPolicy.Action.REVIEW).isEmpty()) {
+            labels.add(getString(R.string.chat_review_write)); actions.add(this::openReview);
         }
         labels.add(getString(R.string.chat_option_leave));
         actions.add(this::confirmLeaveRoom);
@@ -292,8 +330,17 @@ public class ChatRoomActivity extends AppCompatActivity {
     }
 
     private void confirmEndMatch() {
+        if (room == null || room.archived) return;
+        if (!MatchSelectionSheet.show(getSupportFragmentManager(), KEY_SELECT_END, MatchAppointmentPolicy.Action.END,
+                room.appointments, repository.nowMillis())) Toast.makeText(this, R.string.appointment_no_target, Toast.LENGTH_SHORT).show();
+    }
+    private void confirmSelectedEnd(String id) {
+        if (room == null) return;
+        MatchAppointment selected = MatchAppointmentPolicy.targets(room.appointments, MatchAppointmentPolicy.Action.END).stream().filter(a -> a.matchId.equals(id)).findFirst().orElse(null);
+        if (selected == null || getSupportFragmentManager().isStateSaved()) return;
+        Bundle result = new Bundle(); result.putString(MatchSelectionSheet.MATCH_ID, id);
         ConfirmDialog.show(getSupportFragmentManager(), KEY_END_MATCH, getString(R.string.chat_end_title),
-                getString(R.string.chat_end_message), getString(R.string.chat_end_confirm));
+                MatchSelectionSheet.timeLabel(selected) + "\n" + getString(R.string.chat_end_message), getString(R.string.chat_end_confirm), getString(R.string.chat_close), result);
     }
 
     private void confirmLeaveRoom() {
@@ -308,10 +355,11 @@ public class ChatRoomActivity extends AppCompatActivity {
                 getString(R.string.chat_leave_message), getString(R.string.chat_leave_confirm));
     }
 
-    private void endMatch() {
-        if (actionInProgress) return;
+    private void endMatch(String selectedId) {
+        if (actionInProgress || room == null || room.archived || selectedId == null
+                || MatchAppointmentPolicy.targets(room.appointments, MatchAppointmentPolicy.Action.END).stream().noneMatch(a -> a.matchId.equals(selectedId))) return;
         actionInProgress = true;
-        repository.endMatch(matchId, new ChatRepository.ActionCallback() {
+        repository.endMatch(selectedId, new ChatRepository.ActionCallback() {
             @Override
             public void onSuccess() {
                 // 화면 전환은 observeRoom 이 ENDED 를 전달하며 처리한다.
@@ -355,7 +403,7 @@ public class ChatRoomActivity extends AppCompatActivity {
 
     /** 버튼을 눌렀을 때만 요청한다. 요청 중에는 버튼을 잠가 중복 호출을 막는다. */
     private void requestReplies() {
-        if (replyRequest != null) return;
+        if (replyRequest != null || room == null || room.archived) return;
         setAiButtonEnabled(false);
         replyRequest = replyRepository.requestReplies(matchId, new ReplySuggestionRepository.Callback() {
             @Override
@@ -410,7 +458,7 @@ public class ChatRoomActivity extends AppCompatActivity {
 
     /** 응답이 올 때까지 전송 버튼을 잠가 중복 전송을 막는다. */
     private void send() {
-        if (sending) return;
+        if (sending || room == null || room.archived) return;
         String text = input.getText().toString();
         if (text.trim().isEmpty()) return;
         setSending(true);
@@ -435,8 +483,7 @@ public class ChatRoomActivity extends AppCompatActivity {
 
     private void setSending(boolean value) {
         sending = value;
-        sendButton.setEnabled(!value);
-        sendButton.setAlpha(value ? 0.4f : 1f);
+        ChatComposer.bind(findViewById(R.id.chatComposer), room != null && room.archived, value);
     }
 
     private boolean isResumedNow() {

@@ -168,6 +168,7 @@ export class RequestService {
           endMinute: record.endMinute, overlapMinutes: record.overlapMinutes, status: "ACTIVE", chatReady: false,
           createdAt: next.updatedAt, updatedAt: next.updatedAt,
         });
+        tx.create(this.db.doc(`chatLinkJobs/${input.requestId}`), { matchId: input.requestId, status: "PENDING", updatedAt: next.updatedAt });
         writeConflicts(tx, cleanup!, [record.fromUid, record.toUid], record, now);
         tx.set(this.db.doc(`matchCleanupJobs/${input.requestId}`), { matchId: input.requestId,
           status: cleanup!.overflow ? "PENDING" : "DONE", attempts: 0, acceptedAt: next.updatedAt, updatedAt: next.updatedAt });

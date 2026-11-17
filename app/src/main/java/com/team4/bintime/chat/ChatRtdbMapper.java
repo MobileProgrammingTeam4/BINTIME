@@ -54,7 +54,7 @@ final class ChatRtdbMapper {
                 lastMessageAt == null ? 0L : lastMessageAt,
                 unread == null ? 0 : (int) Math.min(unread, Integer.MAX_VALUE),
                 status,
-                Boolean.TRUE.equals(hidden));
+                Boolean.TRUE.equals(hidden), Boolean.TRUE.equals(map.get("archived")));
     }
 
     /**
@@ -91,7 +91,7 @@ final class ChatRtdbMapper {
                 samePartner ? partner.info : null,
                 samePartner && partner.hasPhoto,
                 entry.lastMessage, entry.lastMessageAt, entry.unreadCount,
-                null /* recommendedPlace: BT-042 */);
+                null /* recommendedPlace: BT-042 */).withAppointments(match == null ? Collections.emptyList() : match.appointments, entry.archived);
     }
 
     @Nullable

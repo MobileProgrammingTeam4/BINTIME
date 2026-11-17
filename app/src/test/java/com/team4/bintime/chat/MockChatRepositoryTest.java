@@ -268,6 +268,32 @@ public class MockChatRepositoryTest {
         assertEquals(ChatRoom.Status.ENDED, room("match-seoyeon").status);
     }
 
+    @Test public void selectedFutureEndKeepsOtherAppointmentAndPreventsReviewPermanently() {
+        com.team4.bintime.request.MatchAppointment current = new com.team4.bintime.request.MatchAppointment("one", "match-jimin", "2026-10-07", 840, 930,
+                "스터디", com.team4.bintime.request.MatchAppointment.Status.ACTIVE, null, false);
+        com.team4.bintime.request.MatchAppointment future = new com.team4.bintime.request.MatchAppointment("two", "match-jimin", "2026-10-08", 600, 690,
+                "대화", com.team4.bintime.request.MatchAppointment.Status.ACTIVE, null, false);
+        repository.setAppointmentsForDemo("match-jimin", java.util.Arrays.asList(current, future), false);
+        ActionResult result = new ActionResult(); repository.endMatch("two", result);
+        ChatRoom after = room("match-jimin");
+        assertEquals(1, result.successes); assertEquals(ChatRoom.Status.ACTIVE, after.status);
+        assertEquals(com.team4.bintime.request.MatchAppointment.Status.ACTIVE, after.appointments.get(0).status);
+        assertEquals(Boolean.FALSE, after.appointments.get(1).reviewEligible);
+        assertEquals(600, after.appointments.get(1).startMinute);
+        repository.leaveRoom("match-jimin", result); assertEquals(1, result.errors);
+    }
+
+    @Test public void archivedConversationKeepsRecordsAndRejectsSending() {
+        ChatRoom before = room("match-jimin");
+        repository.setAppointmentsForDemo("match-jimin", before.appointments, true);
+        SendResult result = new SendResult(); repository.sendMessage("match-jimin", "거부", result);
+        assertEquals(1, result.errors); assertEquals(0, result.successes);
+        ChatRoom archived = room("match-jimin");
+        assertEquals(ChatRoom.Status.ENDED, archived.status); assertFalse(archived.chatReady);
+        assertEquals(before.lastMessage, archived.lastMessage);
+        assertTrue(ChatRoom.Filter.ENDED.matches(archived));
+    }
+
     @Test
     public void leaveRoom_rejectsActiveRoom() {
         ActionResult result = new ActionResult();

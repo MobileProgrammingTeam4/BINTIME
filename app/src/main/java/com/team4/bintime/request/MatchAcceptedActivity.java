@@ -55,7 +55,7 @@ public class MatchAcceptedActivity extends AppCompatActivity {
         }
         findViewById(R.id.acceptedBack).setOnClickListener(v -> finish());
         findViewById(R.id.acceptedHome).setOnClickListener(v -> navigate(false));
-        findViewById(R.id.acceptedChat).setOnClickListener(v -> navigate(true));
+        findViewById(R.id.acceptedChat).setOnClickListener(v -> MatchChatNavigator.open(this, item.id, v));
         if (!mock) ProfileRepositories.get(this).getPublicProfile(item.profileUid, new ProfileRepository.Callback<UserProfile>() {
             @Override public void onSuccess(UserProfile result) {
                 if (isFinishing() || isDestroyed() || result == null) return;
