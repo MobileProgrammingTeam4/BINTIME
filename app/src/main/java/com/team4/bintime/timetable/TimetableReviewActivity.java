@@ -16,21 +16,31 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.team4.bintime.R;
 import com.team4.bintime.common.ConfirmDialog;
 import com.team4.bintime.data.model.Timetable;
+import com.team4.bintime.data.recognition.RecognitionReview;
 import com.team4.bintime.data.repository.AsyncTimetableRepository;
 import com.team4.bintime.data.repository.TimetableFailure;
 import com.team4.bintime.data.repository.TimetableRepositories;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 
 /**
  * 인식 결과 검수 / 기존 시간표 수정. [BT-015] 기존 시간표 수정은 저장소에서 한 번 읽어 온 뒤에만
  * 편집·확인을 허용한다(읽기 전 빈 목록으로 저장해 수업을 지우지 않도록). 저장은 다음 화면
  * {@link TimetableRegistrationActivity}의 등록 완료에서 한다.
+ * <p>
+ * [BT-026] 이미지 인식 검수: 수업(시간대)마다 신뢰도·중복 병합·시간 겹침·수정 필요·주말을 표시하고
+ * ({@link RecognitionReview}), 겹침이나 수정 필요가 남아 있거나 수업이 없으면 확인 버튼을 막는다. 수정·삭제할 때마다
+ * 다시 판정한다. 검수 전에는 저장소에 쓰지 않는다.
  */
 public class TimetableReviewActivity extends AppCompatActivity {
     private static final String EDIT_EXISTING = "edit_existing_timetable";
     private static final String DELETE_COURSE = "delete_timetable_course";
     private static final String LOADED = "timetable_review_loaded";
+    private static final String EXTRA_DROPPED = "timetable_recognition_dropped";
+    private static final String EXTRA_WARNINGS = "timetable_recognition_warnings";
     private TimetableDraft draft;
     private int pendingDelete = -1;
     private boolean editingExisting;
@@ -39,6 +49,13 @@ public class TimetableReviewActivity extends AppCompatActivity {
 
     public static Intent forEditing(Context context) {
         return new Intent(context, TimetableReviewActivity.class).putExtra(EDIT_EXISTING, true);
+    }
+
+    /** [BT-026] 인식 결과 검수. warnings 는 서버(모델) 안내 문장, dropped 는 형식이 틀려 뺀 수업 수. */
+    static Intent forRecognition(Context context, TimetableDraft draft, int dropped, List<String> warnings) {
+        return TimetableDraft.open(context, TimetableReviewActivity.class, draft)
+                .putExtra(EXTRA_DROPPED, dropped)
+                .putStringArrayListExtra(EXTRA_WARNINGS, new ArrayList<>(warnings));
     }
 
     private final ActivityResultLauncher<Intent> editCourse = registerForActivityResult(
@@ -74,8 +91,9 @@ public class TimetableReviewActivity extends AppCompatActivity {
         loaded = !editingExisting || (state != null && state.getBoolean(LOADED, false));
         draft = loaded ? TimetableDraft.restore(state, getIntent()) : null;
         if (draft == null) {
+            // 인식 결과 없이 열리면 빈 새 시간표(예시 수업으로 채우지 않는다).
             draft = editingExisting ? new TimetableDraft(Collections.emptyList())
-                    : TimetableDraft.mockRecognition();
+                    : new TimetableDraft(Collections.emptyList()).markReplacesExisting();
         }
         if (state != null) pendingDelete = state.getInt(DELETE_COURSE, -1);
         if (editingExisting) {
@@ -108,6 +126,10 @@ public class TimetableReviewActivity extends AppCompatActivity {
         if (!loaded) loadExisting();
     }
 
+    private boolean reviewingRecognition() {
+        return !editingExisting;
+    }
+
     private void loadExisting() {
         loading = TimetableLoader.loadOnce(TimetableRepositories.get(this),
                 new AsyncTimetableRepository.Callback<Timetable>() {
@@ -134,11 +156,12 @@ public class TimetableReviewActivity extends AppCompatActivity {
 
     /** 기존 시간표를 읽기 전에는 추가·수정·삭제·확인을 막는다. */
     private void setEditable(boolean editable) {
-        for (int id : new int[]{R.id.timetable_add_course, R.id.btnConfirm, R.id.timetable_register_new}) {
+        for (int id : new int[]{R.id.timetable_add_course, R.id.timetable_register_new}) {
             View v = findViewById(id);
             v.setEnabled(editable);
             v.setAlpha(editable ? 1f : 0.5f);
         }
+        updateConfirm(editable, reviewingRecognition() ? RecognitionDrafts.check(draft) : null);
         LinearLayout courseList = findViewById(R.id.layoutLectureList);
         courseList.setVisibility(editable ? View.VISIBLE : View.INVISIBLE);
         if (!editable) findViewById(R.id.timetable_recognition_empty).setVisibility(View.GONE);
@@ -153,12 +176,14 @@ public class TimetableReviewActivity extends AppCompatActivity {
     private void showCourses() {
         LinearLayout courseList = findViewById(R.id.layoutLectureList);
         courseList.removeAllViews();
+        List<Set<RecognitionReview.Flag>> flags = reviewingRecognition() ? RecognitionDrafts.check(draft) : null;
         for (int i = 0; i < draft.courses.size(); i++) {
             int index = i;
             Course course = draft.courses.get(i);
             View card = getLayoutInflater().inflate(R.layout.item_lecture_review, courseList, false);
             ((TextView) card.findViewById(R.id.tvCourseTitle)).setText(course.getName());
             ((TextView) card.findViewById(R.id.tvCourseInfo)).setText(course.getFormattedInfo());
+            if (flags != null) bindFlags(card.findViewById(R.id.tvCourseFlags), course, flags.get(i));
             View edit = card.findViewById(R.id.btnEditLecture);
             edit.setContentDescription(course.getName() + " 수정");
             edit.setOnClickListener(v -> editCourse.launch(CourseModifyActivity.open(this, draft, index)));
@@ -171,12 +196,70 @@ public class TimetableReviewActivity extends AppCompatActivity {
             });
             courseList.addView(card);
         }
-        if (!editingExisting) {
-            TextView count = findViewById(R.id.tvCourseCountBadge);
-            count.setText("2026년 2학기 · 수업 " + draft.courses.size() + "개");
-        }
+        if (flags != null) showRecognitionSummary(flags);
         findViewById(R.id.timetable_recognition_empty).setVisibility(
                 draft.courses.isEmpty() ? View.VISIBLE : View.GONE);
+        updateConfirm(loaded, flags);
+    }
+
+    /** 확인 버튼: 읽기 전이면 막고, 인식 검수 중이면 겹침·수정 필요가 없고 수업이 1개 이상일 때만 연다. */
+    private void updateConfirm(boolean editable, List<Set<RecognitionReview.Flag>> flags) {
+        boolean enabled = editable && (flags == null || RecognitionReview.canConfirm(flags));
+        View confirm = findViewById(R.id.btnConfirm);
+        confirm.setEnabled(enabled);
+        confirm.setAlpha(enabled ? 1f : 0.5f);
+    }
+
+    /** 행 표시: 막는 판정(빨강)을 먼저, 안내(회색)를 뒤에. */
+    private void bindFlags(TextView view, Course course, Set<RecognitionReview.Flag> flags) {
+        List<String> lines = new ArrayList<>();
+        boolean blocking = false;
+        for (RecognitionReview.Flag flag : flags) {
+            if (!flag.blocking) continue;
+            blocking = true;
+            lines.add(getString(RecognitionMessages.flag(flag)));
+        }
+        for (RecognitionReview.Flag flag : flags) {
+            if (flag.blocking) continue;
+            lines.add(flag == RecognitionReview.Flag.LOW_CONFIDENCE
+                    ? getString(RecognitionMessages.flag(flag),
+                    (int) Math.round(course.getRecognitionConfidence() * 100))
+                    : getString(RecognitionMessages.flag(flag)));
+        }
+        view.setText(android.text.TextUtils.join(" · ", lines));
+        view.setTextColor(getColor(blocking ? R.color.action_primary : R.color.text_secondary));
+        view.setVisibility(lines.isEmpty() ? View.GONE : View.VISIBLE);
+    }
+
+    private void showRecognitionSummary(List<Set<RecognitionReview.Flag>> flags) {
+        int attention = 0;
+        for (Set<RecognitionReview.Flag> f : flags) {
+            for (RecognitionReview.Flag flag : f) {
+                if (flag.blocking || flag == RecognitionReview.Flag.LOW_CONFIDENCE) {
+                    attention++;
+                    break;
+                }
+            }
+        }
+        ((TextView) findViewById(R.id.tvCourseCountBadge)).setText(
+                getString(R.string.timetable_review_summary, draft.courses.size(), attention));
+        StringBuilder desc = new StringBuilder();
+        int blocking = RecognitionReview.blockingCount(flags);
+        if (draft.courses.isEmpty()) {
+            desc.append(getString(R.string.timetable_review_empty_recognition));
+        } else if (blocking > 0) {
+            desc.append(getString(R.string.timetable_review_blocked, blocking));
+        } else {
+            desc.append(getString(R.string.timetable_review_ready));
+        }
+        int dropped = getIntent().getIntExtra(EXTRA_DROPPED, 0);
+        if (dropped > 0) desc.append('\n').append(getString(R.string.timetable_review_dropped, dropped));
+        ArrayList<String> warnings = getIntent().getStringArrayListExtra(EXTRA_WARNINGS);
+        if (warnings != null) for (String w : warnings) desc.append('\n').append(w);
+        TextView descView = findViewById(R.id.tvAnalysisDesc);
+        descView.setText(desc.toString());
+        descView.setTextColor(getColor(blocking > 0 || draft.courses.isEmpty()
+                ? R.color.action_primary : R.color.text_secondary));
     }
 
     @Override

@@ -55,8 +55,9 @@ public class TimetableSelectModeActivity extends AppCompatActivity {
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
         findViewById(R.id.btnManualInput).setOnClickListener(v -> {
             if (!getIntent().hasExtra(EXTRA_SIGNUP_EMAIL)) {
+                // 새로 등록: 저장하면 기존 수업이 바뀌므로 등록 화면에서 교체 확인을 받는다(BT-026 결정 0-3).
                 registration.launch(TimetableDraft.open(this, CourseDirectInputActivity.class,
-                        new TimetableDraft(Collections.emptyList())));
+                        new TimetableDraft(Collections.emptyList()).markReplacesExisting()));
                 return;
             }
             // 가입 중: 이미 저장한 시간표가 있으면 이어서 수정, 없으면 예시 수업 하나로 시작한다.
@@ -73,6 +74,7 @@ public class TimetableSelectModeActivity extends AppCompatActivity {
                             TimetableDraft draft = timetable == null || timetable.getCourseCount() == 0
                                     ? new TimetableDraft(Collections.singletonList(
                                             new Course("컴퓨터 구조론", "공학관 302호", "월", "10:00", "11:30")))
+                                            .markReplacesExisting()
                                     : TimetableDraftMapper.toDraft(timetable);
                             registration.launch(TimetableDraft.open(TimetableSelectModeActivity.this,
                                     CourseDirectInputActivity.class, draft));
