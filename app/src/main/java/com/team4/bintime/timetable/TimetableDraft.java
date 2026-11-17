@@ -4,6 +4,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 
+import com.team4.bintime.data.model.TimeSlot;
+
 import java.io.Serializable;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -95,11 +97,23 @@ final class TimetableDraft implements Serializable {
 
     void discardOccupiedFreeSlots() {
         for (Course course : courses) {
-            if (course.getDayIndex() < 0) continue; // 토·일 수업은 화면 칸이 없다
+            int day = dayIndexIncludingWeekend(course);
+            if (day < 0) continue;
             for (int slot = course.getStartSlotIndex(0); slot < course.getEndSlotIndex(0); slot++) {
-                freeSlots[course.getDayIndex()] &= ~(1L << slot);
+                freeSlots[day] &= ~(1L << slot);
             }
         }
+    }
+
+    /**
+     * [BT-036] 월~일 → 0~6, 알 수 없으면 -1. 토·일은 화면 칸이 없지만 저장할 때 7일을 모두 보내므로
+     * 주말 수업과 겹친 주말 칸도 지워야 한다(남기면 저장이 계속 INVALID_FREE_SLOT으로 거부된다).
+     */
+    private static int dayIndexIncludingWeekend(Course course) {
+        int weekday = course.getDayIndex();
+        if (weekday >= 0) return weekday;
+        int dayOfWeek = TimeSlot.parseDayOfWeek(course.getDay());
+        return dayOfWeek == 6 || dayOfWeek == 7 ? dayOfWeek - 1 : -1;
     }
 
     boolean hasFreeTime() {
