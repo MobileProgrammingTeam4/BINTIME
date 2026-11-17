@@ -12,10 +12,7 @@ import androidx.lifecycle.ViewModelProvider;
 
 import com.team4.bintime.R;
 import com.team4.bintime.common.ConfirmDialog;
-import com.team4.bintime.data.model.Timetable;
-import com.team4.bintime.data.repository.AsyncTimetableRepository;
 import com.team4.bintime.data.repository.FreeSlotValidator;
-import com.team4.bintime.data.repository.TimetableFailure;
 import com.team4.bintime.data.repository.TimetableRepositories;
 
 import java.util.Collections;
@@ -27,7 +24,8 @@ import java.util.Collections;
  * <p>
  * [BT-026 결정 0-3] 새 시간표 등록(이미지 인식·직접 입력 새로 시작, {@link TimetableDraft#replacesExisting()})은
  * replaceCourses 가 기존 수업을 모두 바꾸므로, 기존 수업이 있으면 저장 전에 "기존 수업이 새 시간표로 교체됩니다"
- * 확인을 받는다. 기존 수업 수를 읽지 못하면 수를 빼고 같은 확인을 띄운다.
+ * 확인을 받는다. 기존 수업 수는 서버에서 읽은 값만 쓰고(캐시 0개를 믿지 않음), 읽지 못하면 수를 빼고 같은 확인을
+ * 띄운다({@link TimetableReplaceCheck}).
  */
 public class TimetableRegistrationActivity extends AppCompatActivity {
     private static final String CONFIRM_REPLACE = "timetable_confirm_replace";
@@ -35,7 +33,8 @@ public class TimetableRegistrationActivity extends AppCompatActivity {
     private TimetableDraft draft;
     /** 교체 확인을 받았거나 기존 수업이 없음을 확인했다. */
     private boolean replaceConfirmed;
-    private AsyncTimetableRepository.Registration checkingExisting;
+    /** 서버에서 기존 수업 수를 읽는 중(중복 클릭 방지). */
+    private boolean checkingExisting;
     private TimetableSaveViewModel saver;
     private View complete;
     private OnBackPressedCallback blockBackWhileSaving;
@@ -102,34 +101,28 @@ public class TimetableRegistrationActivity extends AppCompatActivity {
                 TimetableDraftMapper.toCourses(draft), TimetableDraftMapper.toFreeSlots(draft));
     }
 
-    /** 기존 수업 수를 한 번 읽고, 있으면 교체 확인을 띄운다. 없으면 바로 저장한다. */
+    /** 기존 수업 수를 서버에서 한 번 읽고, 있으면 교체 확인을 띄운다. 없으면 바로 저장한다. */
     private void confirmReplace() {
-        if (checkingExisting != null) return;
+        if (checkingExisting) return;
+        checkingExisting = true;
         complete.setEnabled(false);
-        checkingExisting = TimetableLoader.loadOnce(TimetableRepositories.get(this),
-                new AsyncTimetableRepository.Callback<Timetable>() {
-                    @Override
-                    public void onSuccess(Timetable timetable) {
-                        checkingExisting = null;
-                        if (isFinishing() || isDestroyed()) return;
-                        complete.setEnabled(!saver.isSaving());
-                        int existing = timetable == null ? 0 : timetable.getCourseCount();
-                        if (existing == 0) {
-                            replaceConfirmed = true;
-                            save();
-                        } else {
-                            showReplaceDialog(getString(R.string.timetable_replace_message, existing));
-                        }
-                    }
-
-                    @Override
-                    public void onError(TimetableFailure failure) {
-                        checkingExisting = null;
-                        if (isFinishing() || isDestroyed()) return;
-                        complete.setEnabled(!saver.isSaving());
-                        showReplaceDialog(getString(R.string.timetable_replace_message_unknown));
-                    }
-                });
+        TimetableReplaceCheck.run(TimetableRepositories.get(this), decision -> {
+            checkingExisting = false;
+            if (isFinishing() || isDestroyed()) return;
+            complete.setEnabled(!saver.isSaving());
+            switch (decision.kind) {
+                case SAVE:
+                    replaceConfirmed = true;
+                    save();
+                    break;
+                case CONFIRM_WITH_COUNT:
+                    showReplaceDialog(getString(R.string.timetable_replace_message, decision.existingCount));
+                    break;
+                default:
+                    showReplaceDialog(getString(R.string.timetable_replace_message_unknown));
+                    break;
+            }
+        });
     }
 
     private void showReplaceDialog(String message) {
@@ -137,12 +130,6 @@ public class TimetableRegistrationActivity extends AppCompatActivity {
         ConfirmDialog.show(getSupportFragmentManager(), CONFIRM_REPLACE,
                 getString(R.string.timetable_replace_title), message,
                 getString(R.string.timetable_replace_confirm));
-    }
-
-    @Override
-    protected void onDestroy() {
-        if (checkingExisting != null) checkingExisting.remove();
-        super.onDestroy();
     }
 
     private void showSaving(boolean saving) {
