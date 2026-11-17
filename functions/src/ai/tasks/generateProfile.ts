@@ -11,6 +11,10 @@ import { text } from "./shared";
  */
 export const BIO_MAX_LENGTH = 150;
 export const MAX_SUGGESTED_TAGS = 5;
+/** 생성 후 직접 고칠 수 있는 초안이라 넉넉히 줄 필요가 없다(PR #100 D 리뷰). */
+export const DAILY_LIMIT = 5;
+/** 연속 클릭·동시 요청 방지. 같은 사용자 기준 */
+export const MIN_INTERVAL_MS = 10_000;
 
 const input = z
   .object({
@@ -55,7 +59,18 @@ export function normalizeTags(tags: readonly string[]): string[] {
 }
 
 /** 자기소개에 연락처가 들어가면 안 된다(개인정보 노출). 이메일·전화번호·URL 형태를 막는다. */
-const CONTACT_PATTERN = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}|(?:\d[\s-]?){9,}|https?:\/\/|www\./i;
+const CONTACT_SOURCE = String.raw`[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}|(?:\d[\s-]?){9,}|https?:\/\/\S*|www\.\S*`;
+const CONTACT_PATTERN = new RegExp(CONTACT_SOURCE, "i");
+
+/**
+ * 작성 중인 소개에서 연락처 형태를 지우고 공백을 정리한다. 비면 undefined.
+ * 연락처를 Gemini 에 보내지 않고, 모델이 그대로 살려 출력 검사에 계속 걸리는 일(횟수만 소모)을 막는다.
+ */
+export function stripContacts(draft: string | undefined): string | undefined {
+  if (!draft) return undefined;
+  const cleaned = draft.replace(new RegExp(CONTACT_SOURCE, "gi"), " ").replace(/\s+/g, " ").trim();
+  return cleaned.length > 0 ? cleaned : undefined;
+}
 
 export const PROMPT = [
   "너는 대학생 공강 메이트 앱 'BIN TIME'의 자기소개 작성 도우미다.",
@@ -68,7 +83,7 @@ export const PROMPT = [
   "- 이메일, 전화번호, SNS 아이디, 링크 같은 연락처를 넣지 않는다.",
   "- 연애·소개팅·이성 만남을 암시하는 표현을 쓰지 않는다. 친구·스터디 메이트를 찾는 톤을 유지한다.",
   "- 수강 과목은 1~2개만 자연스럽게 언급한다. 과목이 없으면 학과와 선호 활동으로 쓴다.",
-  "- draftBio 가 있으면 그 내용과 말투를 살려 다듬는다.",
+  "- draftBio 가 있으면 그 내용과 말투를 살려 다듬되, 연락처처럼 보이는 내용은 빼고 쓴다.",
   `- suggestedTags: 공강에 함께 할 활동 태그 1~${MAX_SUGGESTED_TAGS}개. 각 2~10자 한국어 명사구, '#' 없이, 서로 다르게.`,
   "  preferredActivities 에 이미 있는 태그보다 새로 어울리는 태그를 먼저 추천한다.",
   "- 지정된 JSON 형식으로만 응답한다.",
@@ -79,7 +94,8 @@ export const generateProfileTask: AiTask<GenerateProfileInput, GenerateProfileOu
   input,
   output,
   timeoutMs: 10_000,
-  dailyLimit: 20,
+  dailyLimit: DAILY_LIMIT,
+  minIntervalMs: MIN_INTERVAL_MS,
   verify: (out) => {
     if (CONTACT_PATTERN.test(out.bio)) {
       // 일시적인 형식 오류로 보고 공통 처리에서 1회 재시도한다.
@@ -99,7 +115,7 @@ export const generateProfileTask: AiTask<GenerateProfileInput, GenerateProfileOu
       grade,
       preferredActivities,
       courseNames,
-      draftBio: draftBio && draftBio.length > 0 ? draftBio : undefined,
+      draftBio: stripContacts(draftBio),
     }),
     temperature: 0.7,
     maxOutputTokens: 400,

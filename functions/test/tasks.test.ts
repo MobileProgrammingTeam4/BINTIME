@@ -4,7 +4,7 @@ import { runAiTask } from "../src/ai/gateway";
 import { aiPingTask } from "../src/ai/tasks/aiPing";
 import { analyzeTimetableTask } from "../src/ai/tasks/analyzeTimetable";
 import { evaluateMatchTask } from "../src/ai/tasks/evaluateMatch";
-import { generateProfileTask } from "../src/ai/tasks/generateProfile";
+import { DAILY_LIMIT, MIN_INTERVAL_MS, generateProfileTask, stripContacts } from "../src/ai/tasks/generateProfile";
 import { recommendPlaceTask } from "../src/ai/tasks/recommendPlace";
 import { suggestChatRepliesTask } from "../src/ai/tasks/suggestChatReplies";
 import type { AiTask } from "../src/ai/types";
@@ -194,6 +194,58 @@ describe("generateProfile", () => {
       const deps = live(JSON.stringify({ bio, suggestedTags: [] }), [{ text: JSON.stringify({ bio, suggestedTags: [] }) }]);
       await expectReason(runAiTask(generateProfileTask, profileInput, ctx(me), deps), "AI_INVALID_OUTPUT");
     }
+  });
+
+  it("live: 작성 중 소개의 연락처는 지우고 보낸다(모델에 보내지 않음)", async () => {
+    const deps = live('{"bio":"같이 공부해요","suggestedTags":[]}');
+    const draftBio = "같이 공부해요 카톡 010-1234-5678 메일 me@kookmin.ac.kr https://insta.com/me 연락 주세요";
+    await runAiTask(generateProfileTask, { ...profileInput, draftBio }, ctx(me), deps);
+    const sent = String(deps.client.calls[0].contents);
+    expect(JSON.parse(sent).draftBio).toBe("같이 공부해요 카톡 메일 연락 주세요");
+    for (const leaked of ["010", "5678", "me@", "kookmin", "insta", "https"]) expect(sent).not.toContain(leaked);
+    expect(deps.client.calls[0].systemInstruction).toContain("연락처처럼 보이는 내용은 빼고");
+  });
+
+  it("stripContacts: 연락처만 있으면 draftBio 를 보내지 않는다", () => {
+    expect(stripContacts("010-1234-5678")).toBeUndefined();
+    expect(stripContacts(undefined)).toBeUndefined();
+    expect(stripContacts("2학년 C++ 프로그래밍 2")).toBe("2학년 C++ 프로그래밍 2");
+  });
+
+  it("하루 5회까지, 6번째는 QUOTA_EXCEEDED", async () => {
+    let t = Date.parse("2026-11-09T03:00:00Z");
+    const deps = makeDeps();
+    const timed = { ...deps, now: () => new Date(t) };
+    for (let i = 0; i < DAILY_LIMIT; i++) {
+      await runAiTask(generateProfileTask, profileInput, ctx(me), timed);
+      t += MIN_INTERVAL_MS;
+    }
+    await expectReason(runAiTask(generateProfileTask, profileInput, ctx(me), timed), "QUOTA_EXCEEDED");
+    expect(DAILY_LIMIT).toBe(5);
+  });
+
+  it("10초 안에 다시 부르면 AI_RATE_LIMITED(retryable)이고 횟수를 차감하지 않는다", async () => {
+    let t = Date.parse("2026-11-09T03:00:00Z");
+    const deps = makeDeps();
+    const timed = { ...deps, now: () => new Date(t) };
+    await runAiTask(generateProfileTask, profileInput, ctx(me), timed);
+    t += MIN_INTERVAL_MS - 1;
+    const error = await expectReason(runAiTask(generateProfileTask, profileInput, ctx(me), timed), "AI_RATE_LIMITED");
+    expect(error.retryable).toBe(true);
+    expect([...deps.usageStore.counts.values()]).toEqual([1]);
+    // 다른 사용자는 영향 없음
+    await runAiTask(generateProfileTask, profileInput, ctx("uid-other"), timed);
+    t += 1;
+    await runAiTask(generateProfileTask, profileInput, ctx(me), timed);
+  });
+
+  it("동시 요청은 하나만 통과한다", async () => {
+    const deps = makeDeps();
+    const results = await Promise.allSettled([
+      runAiTask(generateProfileTask, profileInput, ctx(me), deps),
+      runAiTask(generateProfileTask, profileInput, ctx(me), deps),
+    ]);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
   });
 
   it("학년·수강 과목 숫자는 연락처로 보지 않는다", async () => {
