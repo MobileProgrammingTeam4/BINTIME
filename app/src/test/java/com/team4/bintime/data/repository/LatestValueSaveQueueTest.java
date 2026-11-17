@@ -96,6 +96,35 @@ public class LatestValueSaveQueueTest {
     }
 
     @Test
+    public void selectDeselectReselectDuringSave_endsWithReselectedValue() {
+        // [BT-036] 칸 선택(A) 저장 중에 해제(B)→재선택(A). 값이 처음과 같아도 버전이 바뀌었으므로 한 번 더 저장한다.
+        queue.update("A");
+        queue.flush();
+        queue.update("B");
+        queue.update("A");
+        queue.flush();
+        saver.succeed();
+        assertEquals(List.of("A", "A"), saver.values); // 중간 값 B는 보내지 않는다
+        saver.succeed();
+        assertFalse(queue.needsSave());
+        assertEquals(1, saver.maxInFlight);
+        assertEquals(1, allSaved);
+    }
+
+    @Test
+    public void deselectThenReselectBeforeFlush_sendsOnlyFinalValue() {
+        queue.update("A");
+        queue.flush();
+        saver.succeed();
+        queue.update("B");
+        queue.update("A"); // 디바운스 안에서 되돌림
+        queue.flush();
+        assertEquals(List.of("A", "A"), saver.values);
+        saver.succeed();
+        assertFalse(queue.needsSave());
+    }
+
+    @Test
     public void changeDuringSaveIsSavedAfterCompletionEvenWithoutSecondFlush() {
         queue.update("A");
         queue.flush();
