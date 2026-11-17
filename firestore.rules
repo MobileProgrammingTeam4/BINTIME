@@ -189,6 +189,9 @@ service cloud.firestore {
     match /requestUserGuards/{uid} {
       allow read, write: if false;
     }
+    match /matchCleanupJobs/{matchId} {
+      allow read, write: if false;
+    }
     match /matches/{matchId} {
       allow read: if request.auth != null && request.auth.uid in resource.data.participantUids;
       allow write: if false;

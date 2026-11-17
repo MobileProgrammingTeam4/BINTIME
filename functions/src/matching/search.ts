@@ -1,5 +1,5 @@
 import type { DocumentReference, DocumentSnapshot, Firestore } from "firebase-admin/firestore";
-import { canReceive } from "../requests/policy";
+import { canReceive, type RequestTime } from "../requests/policy";
 import {
   type Candidate,
   type MatchSettings,
@@ -19,7 +19,7 @@ export interface MatchStore {
   blocked(a: string, b: string): Promise<boolean>;
   /** 매칭 스위치 ON 사용자 UID 목록 */
   matchingUids(limit: number): Promise<string[]>;
-  requestEligible?(fromUid: string, toUid: string, now: Date): Promise<boolean>;
+  requestEligible?(fromUid: string, toUid: string, now: Date, time?: RequestTime): Promise<boolean>;
 }
 
 /** shortcut: 후보를 최대 200명만 본다, 사용자가 늘면 공강 요일 색인 쿼리로 바꾼다. */
@@ -53,7 +53,7 @@ export class FirestoreMatchStore implements MatchStore {
     return snapshot.docs.map((doc) => doc.id);
   }
 
-  requestEligible(fromUid: string, toUid: string, now: Date) { return canReceive(this.db, fromUid, toUid, now); }
+  requestEligible(fromUid: string, toUid: string, now: Date, time?: RequestTime) { return canReceive(this.db, fromUid, toUid, now, time); }
 }
 
 export type SearchResult =
@@ -105,7 +105,7 @@ export async function searchMatches(store: MatchStore, uid: string, now: Date): 
       const [theirs, theirSlots] = await Promise.all([store.settings(id), store.slots(id)]);
       const candidate = evaluate(me, reference, id, theirs, theirSlots);
       if (!candidate || (await eitherBlocked(store, uid, id))) return null;
-      if (store.requestEligible && !(await store.requestEligible(uid, id, now))) return null;
+      if (store.requestEligible && !(await store.requestEligible(uid, id, now, candidate))) return null;
       return candidate;
     }),
   );

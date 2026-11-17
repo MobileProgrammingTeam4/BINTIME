@@ -148,6 +148,7 @@ userChatRooms/{uid}/{matchId}
 - 매칭 검색은 `searchMatches()` Callable이 저장된 `matchSettings/{uid}`로 판정합니다. 지금 겹치는 공강, 없으면 가장 가까운 미래 공강 **하나**를 기준으로 양측 ON·검색자가 고른 최소 겹침·목적·차단을 확인하고, 상대 UID(`candidateId`)와 겹침 시간·목적만 돌려줍니다. 이름·사진은 앱이 `publicProfiles`에서 읽습니다. 상세 계약은 [`docs/BT-017.md`](./docs/BT-017.md)를 따릅니다.
 - 요청 생성 입력은 `{candidateId, clientRequestId}`이며 `candidateId`는 상대 UID, `clientRequestId`는 재시도 동안 유지하는 UUID입니다. 서버는 검색자가 선택한 최소 겹침, 프로필 완료·공개 프로필 존재, 차단·확정 매칭 충돌을 확인한 뒤 시간·목적 스냅샷을 정합니다. 상세 계약은 [`docs/BT-019.md`](./docs/BT-019.md)를 따릅니다.
 - 요청 정책은 보낸 대기 3개·받은 대기 5개, 직접 취소 후 모든 상대에 신규 신청 60초 제한, 역방향 대기 요청 차단입니다. 기존 초과 요청은 보존합니다. 실제 수락·거절은 `respondToMatchRequest({requestId, action})`로 처리하며 수락과 확정 매칭 생성을 같은 트랜잭션으로 보호합니다. 상세는 [`docs/BT-031.md`](./docs/BT-031.md)를 따릅니다.
+- 수락 시 양측의 겹치는 대기 요청을 정리하고 종료 시각이 지난 요청은 만료 취소합니다. 자동 정리의 서버 전용 작업·5분 예약 코드·운영 활성화 조건은 [`docs/BT-032.md`](./docs/BT-032.md)를 따릅니다.
 - `matches/{matchId}`가 **매칭의 기준 데이터**입니다. 채팅 생성은 별도 RTDB 작업이므로 재시도·부분 실패를 고려해 연결 상태를 관리합니다.
 - 개인 시간표 원본을 상대방에게 통째로 반환하지 않습니다. 검색 결과에는 필요한 겹침 시간 및 공개 가능한 프로필 정보만 담습니다.
 - `aiUsage/{uid}_{YYYY-MM-DD}`(BT-024)는 Gemini 게이트웨이의 사용자별 하루 호출 수입니다. 날짜는 `Asia/Seoul` 기준이며 **서버(Cloud Functions)만 쓰고 앱은 읽기·쓰기 모두 금지**합니다. 자세한 계약은 [`docs/BT-024.md`](./docs/BT-024.md)를 참고합니다.
