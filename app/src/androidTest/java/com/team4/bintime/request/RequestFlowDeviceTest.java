@@ -62,6 +62,69 @@ public class RequestFlowDeviceTest {
         MockAuthRepository.shared().signOut();
     }
 
+    @Test public void profileReadRecoversAndRealDataDialogsDescribeTheirActions() throws Exception {
+        // 실제 데이터 표시 분기만 선택하는 로컬 대역. Firebase/Functions에는 연결하지 않는다.
+        MockRequestRepository local = new MockRequestRepository(AuthRepositories.get(context).getCurrentUid(), true);
+        RequestRepository requests = (RequestRepository) java.lang.reflect.Proxy.newProxyInstance(
+                RequestRepository.class.getClassLoader(), new Class<?>[]{RequestRepository.class},
+                (proxy, method, args) -> method.getName().equals("isMock") ? false : method.invoke(local, args));
+        int[] reads = {0};
+        try (ActivityScenario<MainActivity> main = ActivityScenario.launch(MainActivity.class)) {
+            main.onActivity(activity -> {
+                activity.findViewById(R.id.tabReceived).performClick();
+                Fragment matching = activity.getSupportFragmentManager().getFragments().stream()
+                        .filter(f -> f instanceof MatchingFragment).findFirst().orElseThrow(AssertionError::new);
+                RequestTabsController controller = new RequestTabsController(matching,
+                        activity.findViewById(R.id.requestContent), requests, intent -> fail("확인만 하고 수락하지 않는다"),
+                        (uid, callback) -> {
+                            if (++reads[0] == 1) callback.onError("temporary offline");
+                            else {
+                                com.team4.bintime.profile.UserProfile profile = com.team4.bintime.profile.UserProfile.empty();
+                                profile.setUid(uid); profile.setNickname("복구된 프로필");
+                                callback.onSuccess(profile);
+                            }
+                        });
+                controller.show(RequestRepository.Tab.RECEIVED);
+            });
+            idle(); screenshot("06-profile-load-error");
+            main.onActivity(activity -> {
+                assertEquals(1, reads[0]);
+                LinearLayout cards = activity.findViewById(R.id.requestCards);
+                assertEquals("프로필을 불러오지 못했어요", ((TextView) cards.getChildAt(0).findViewById(R.id.requestName)).getText().toString());
+                cards.getChildAt(0).findViewById(R.id.requestProfile).performClick();
+            });
+            idle(); screenshot("07-profile-recovered");
+            main.onActivity(activity -> {
+                assertEquals(2, reads[0]);
+                LinearLayout cards = activity.findViewById(R.id.requestCards);
+                assertEquals("복구된 프로필", ((TextView) cards.getChildAt(0).findViewById(R.id.requestName)).getText().toString());
+                cards.getChildAt(0).findViewById(R.id.requestPrimary).performClick();
+            });
+            idle(); screenshot("08-accept-dialog");
+            main.onActivity(activity -> {
+                Fragment matching = activity.getSupportFragmentManager().getFragments().stream()
+                        .filter(f -> f instanceof MatchingFragment).findFirst().orElseThrow(AssertionError::new);
+                DialogFragment dialog = (DialogFragment) matching.getChildFragmentManager().findFragmentByTag("requestAction");
+                String body = ((TextView) dialog.requireDialog().findViewById(R.id.dialogMessage)).getText().toString();
+                assertTrue(body.contains("수락하면 이 시간으로 매칭이 확정돼요."));
+                assertFalse(body.contains("취소하면"));
+                dialog.requireDialog().findViewById(R.id.dialogNegative).performClick();
+            });
+            idle();
+            main.onActivity(activity -> ((LinearLayout) activity.findViewById(R.id.requestCards)).getChildAt(0)
+                    .findViewById(R.id.requestSecondary).performClick());
+            idle(); screenshot("09-reject-dialog");
+            main.onActivity(activity -> {
+                Fragment matching = activity.getSupportFragmentManager().getFragments().stream()
+                        .filter(f -> f instanceof MatchingFragment).findFirst().orElseThrow(AssertionError::new);
+                DialogFragment dialog = (DialogFragment) matching.getChildFragmentManager().findFragmentByTag("requestAction");
+                String body = ((TextView) dialog.requireDialog().findViewById(R.id.dialogMessage)).getText().toString();
+                assertTrue(body.contains("거절하면 양쪽 요청 목록에서 사라져요."));
+                assertFalse(body.contains("취소하면"));
+            });
+        }
+    }
+
     @Test public void createFromProfileThenCancelAfterDialogRecreation() throws Exception {
         RequestRepository repository = RequestRepositories.get(context);
         try (ActivityScenario<ProfileDetailActivity> profile = ActivityScenario.launch(
