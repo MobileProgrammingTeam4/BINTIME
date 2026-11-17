@@ -192,6 +192,16 @@ service cloud.firestore {
     match /matchCleanupJobs/{matchId} {
       allow read, write: if false;
     }
+    match /chatLinkJobs/{matchId} {
+      allow read, write: if false;
+    }
+    match /chatPairs/{pairId} {
+      allow read, write: if false;
+    }
+    match /chatRoomLinks/{roomId} {
+      allow read: if request.auth != null && request.auth.uid in resource.data.participantUids;
+      allow write: if false;
+    }
     match /matches/{matchId} {
       allow read: if request.auth != null && request.auth.uid in resource.data.participantUids;
       allow write: if false;

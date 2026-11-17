@@ -287,6 +287,20 @@
         }
       ],
       "collectionGroup": "matches"
+    },
+    {
+      "collectionGroup": "matches",
+      "fields": [
+        {
+          "arrayConfig": "CONTAINS",
+          "fieldPath": "participantUids"
+        },
+        {
+          "order": "ASCENDING",
+          "fieldPath": "chatRoomId"
+        }
+      ],
+      "queryScope": "COLLECTION"
     }
   ],
   "fieldOverrides": []

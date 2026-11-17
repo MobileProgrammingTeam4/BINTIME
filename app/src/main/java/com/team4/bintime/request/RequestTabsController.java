@@ -149,7 +149,7 @@ public final class RequestTabsController {
             secondary.setText(ended ? R.string.request_review : R.string.request_chat);
             secondary.setOnClickListener(v -> {
                 if (ended) Toast.makeText(v.getContext(), R.string.request_review_pending, Toast.LENGTH_SHORT).show();
-                else ((MainActivity) fragment.requireActivity()).selectTab(R.id.nav_chat);
+                else MatchChatNavigator.open((MainActivity) fragment.requireActivity(), item.id, v);
             });
         } else if (item.sent) {
             secondary.setText(R.string.request_cancel);
