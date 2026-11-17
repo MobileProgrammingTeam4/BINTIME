@@ -98,11 +98,11 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)("BT-017 → BT-019 실제 
     await db.doc("matches/boundary").set({ participantUids: ["receiver"], status: "ACTIVE", meetingDate: "2026-11-12", startMinute: 690, endMinute: 720 });
     expect((await service.create("sender", input())).status).toBe("PENDING");
   });
-  it("반대 방향 PENDING은 보존하고 같은 방향 중복만 거절한다(BT-031 정리 경계)", async () => {
+  it("같은 방향 중복과 역방향 신청을 각각 거절한다(BT-031 정책)", async () => {
     await service.create("sender", input());
     await expect(service.create("sender", input())).rejects.toMatchObject({ details: { reason: "DUPLICATE_PENDING" } });
-    await service.create("receiver", { ...input(), candidateId: "sender" });
-    expect((await db.collection("matchRequests").get()).size).toBe(2);
+    await expect(service.create("receiver", { ...input(), candidateId: "sender" })).rejects.toMatchObject({ details: { reason: "REVERSE_PENDING" } });
+    expect((await db.collection("matchRequests").get()).size).toBe(1);
   });
   it("합친 Rules에서 프로필·시간표·공강·설정 권한을 보존하고 서버 전용 경로를 차단한다", async () => {
     const client = env.authenticatedContext("sender", { email: "test@school.ac.kr", email_verified: true }).firestore();

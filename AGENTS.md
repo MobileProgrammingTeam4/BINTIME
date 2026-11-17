@@ -156,6 +156,7 @@ userChatRooms/{uid}/{matchId}
 | `matchRequests` | `fromUid`, `toUid`, `status`, `meetingDate`, `startMinute`, `endMinute`, `overlapMinutes` 등 **시간 스냅샷** |
 | 요청 생성 계약 | `createMatchRequest({candidateId, clientRequestId})`: 상대 UID와 재시도 UUID만 입력. 검색자가 선택한 최소 겹침, 프로필·차단·시간표·확정 매칭 충돌을 같은 서버 트랜잭션에서 검증. 같은 방향 PENDING 중복은 서버 전용 `matchRequestGuards`로 막음. 계약은 `docs/BT-019.md` |
 | 요청 목록·취소 계약 | UID별 발신/수신 Firestore 리스너, `cancelMatchRequest(requestId)`, 두 복합 인덱스와 검증 범위는 `docs/BT-020.md`를 따릅니다. |
+| 요청 수락·제한 계약 | `respondToMatchRequest({requestId, action})`, action은 `ACCEPTED` 또는 `REJECTED`. 토큰 수신자만 처리. 보낸 유효 PENDING 3개·받은 5개, 직접 취소 후 신규 신청 60초 제한·역방향 차단. 기존 초과 요청 보존, UUID 재시도와 자동 취소는 제한을 새로 만들지 않음. 서버 전용 `requestUserGuards/{uid}`는 사용자 단위 경합과 cooldownUntil을 보호. 상세는 `docs/BT-031.md` |
 | `matches` | `participantUids`, `requestId`, `status`, `meetingDate`, `startMinute`, `endMinute`, `chatReady` 등 **확정 스냅샷** |
 | `chatRooms` | `matchId`를 룸 식별자로 사용, 메시지 발신자·권한 검증. Rules는 `database.rules.json`: 멤버만 읽기, 메시지는 새로 쓰기만(`senderId === auth.uid`, 서버 시각, 본문 1~1000자), `members`는 서버 전용. 계약은 `docs/BT-021.md` |
 | `userChatRooms` | 사용자별 목록/읽지 않음 수, 서버와 동기화. 앱은 본인 `unreadCount`를 0으로만 쓸 수 있고 `status`·`hidden`은 서버 전용 |

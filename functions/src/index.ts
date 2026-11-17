@@ -9,7 +9,7 @@ import { analyzeTimetableTask } from "./ai/tasks/analyzeTimetable";
 import { generateProfileTask } from "./ai/tasks/generateProfile";
 import { recommendPlaceTask } from "./ai/tasks/recommendPlace";
 import { suggestChatRepliesTask } from "./ai/tasks/suggestChatReplies";
-import { cancelRequestCallable, createRequestCallable } from "./requests/callable";
+import { cancelRequestCallable, createRequestCallable, respondRequestCallable } from "./requests/callable";
 import { createSearchCallable } from "./matching/callable";
 import { createMessageTrigger } from "./chat/trigger";
 
@@ -17,6 +17,8 @@ import { createMessageTrigger } from "./chat/trigger";
 export const createMatchRequest = createRequestCallable();
 /** D · BT-020. 발신자 본인의 PENDING 요청만 취소한다. */
 export const cancelMatchRequest = cancelRequestCallable();
+/** D · BT-031. 수신자만 수락·거절, 수락과 확정 매칭은 한 트랜잭션. */
+export const respondToMatchRequest = respondRequestCallable();
 
 /** BT-024 연결 확인 */
 export const aiPing = createAiCallable(aiPingTask);
