@@ -1,6 +1,7 @@
 package com.team4.bintime.timetable;
 
 import android.content.ContentResolver;
+import android.content.res.AssetFileDescriptor;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -22,7 +23,7 @@ import java.io.InputStream;
 /**
  * [BT-025] 시간표 이미지를 업로드용 JPEG로 만든다.
  * <ul>
- *   <li>원본 형식·크기·디코딩·해상도를 {@link TimetableImageValidator}로 검사한다.</li>
+ *   <li>원본 형식·크기·헤더 해상도를 디코딩 전에 {@link #inspect}로 검사한다. 디코딩 실패도 검사한다.</li>
  *   <li>긴 변을 {@link #MAX_SIDE}px로 줄이고 다시 인코딩한다. EXIF 방향은 픽셀에 반영하고, 위치 등 EXIF
  *       메타데이터는 남기지 않는다(프로필 사진 압축기와 같은 방식, 글자 판독을 위해 해상도만 크게).</li>
  *   <li>결과가 {@link TimetableImagePaths#MAX_UPLOAD_BYTES} 미만이 될 때까지 품질을 {@link #QUALITIES} 순서로
@@ -81,11 +82,32 @@ final class TimetableImageCompressor {
         return sample;
     }
 
+    /**
+     * 선택 직후 검사: 형식 → 원본 크기 → 헤더 해상도. 픽셀을 디코딩하지 않으므로 큰 원본도 메모리에 올리지 않는다.
+     * 통과하면 null.
+     */
+    static Code inspect(ContentResolver resolver, Uri uri) {
+        try {
+            Code type = TimetableImageValidator.checkType(safeType(resolver, uri));
+            if (type != null) return type;
+            Code size = TimetableImageValidator.checkSourceSize(sourceBytes(resolver, uri));
+            if (size != null) return size;
+            int[] bounds = headerBounds(resolver, uri);
+            return TimetableImageValidator.checkDimensions(bounds[0], bounds[1]);
+        } catch (FileNotFoundException | SecurityException e) {
+            return Code.READ_FAILED;
+        } catch (IOException | RuntimeException e) {
+            return Code.CORRUPT;
+        }
+    }
+
+    /**
+     * 업로드용 JPEG를 만든다. 선택 시 검사({@link #inspect})를 다시 통과해야만 디코딩한다(그 사이 파일이 바뀌었거나
+     * 검사를 거치지 않은 호출 방어).
+     */
     static Result prepare(ContentResolver resolver, Uri uri) {
-        Code type = TimetableImageValidator.checkType(safeType(resolver, uri));
-        if (type != null) return Result.fail(type);
-        Code size = TimetableImageValidator.checkSourceSize(sourceBytes(resolver, uri));
-        if (size != null) return Result.fail(size);
+        Code inspected = inspect(resolver, uri);
+        if (inspected != null) return Result.fail(inspected);
         Bitmap bitmap = null;
         try {
             int[] original = new int[2];
@@ -126,14 +148,46 @@ final class TimetableImageCompressor {
         }
     }
 
-    /** 원본 바이트 수. 모르면 0. */
-    private static long sourceBytes(ContentResolver resolver, Uri uri) {
+    /**
+     * 원본 바이트 수. 메타데이터(SIZE) → 파일 설명자 길이 → 직접 세기(상한 + 1바이트까지만) 순서로 구한다.
+     * 크기를 모른 채 디코딩으로 넘어가지 않게 한다.
+     */
+    private static long sourceBytes(ContentResolver resolver, Uri uri) throws IOException {
         try (Cursor cursor = resolver.query(uri, new String[]{OpenableColumns.SIZE}, null, null, null)) {
-            if (cursor != null && cursor.moveToFirst() && !cursor.isNull(0)) return Math.max(0, cursor.getLong(0));
+            if (cursor != null && cursor.moveToFirst() && !cursor.isNull(0) && cursor.getLong(0) > 0) {
+                return cursor.getLong(0);
+            }
         } catch (RuntimeException ignored) {
-            // 크기는 선택 정보다. 실제 디코딩으로 판단한다.
+            // 메타데이터가 없는 제공자도 있다. 아래 방법으로 잰다.
         }
-        return 0;
+        try (AssetFileDescriptor fd = resolver.openAssetFileDescriptor(uri, "r")) {
+            if (fd != null && fd.getLength() > 0) return fd.getLength();
+        } catch (IllegalArgumentException | UnsupportedOperationException ignored) {
+            // 길이를 알려 주지 않는 제공자: 직접 센다.
+        }
+        return countBytes(resolver, uri, TimetableImageValidator.MAX_SOURCE_BYTES + 1);
+    }
+
+    private static long countBytes(ContentResolver resolver, Uri uri, long cap) throws IOException {
+        try (InputStream in = resolver.openInputStream(uri)) {
+            if (in == null) throw new FileNotFoundException();
+            byte[] buffer = new byte[64 * 1024];
+            long total = 0;
+            int read;
+            while (total < cap && (read = in.read(buffer)) != -1) total += read;
+            return total;
+        }
+    }
+
+    /** 헤더만 읽어 너비·높이를 구한다(픽셀 디코딩 없음). 읽을 수 없으면 0. */
+    private static int[] headerBounds(ContentResolver resolver, Uri uri) throws IOException {
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        try (InputStream in = resolver.openInputStream(uri)) {
+            if (in == null) throw new FileNotFoundException();
+            BitmapFactory.decodeStream(in, null, bounds);
+        }
+        return new int[]{bounds.outWidth, bounds.outHeight};
     }
 
     /** original[0..1]에 원본 너비·높이를 채운다. */

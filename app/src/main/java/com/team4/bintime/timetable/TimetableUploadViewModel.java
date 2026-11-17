@@ -17,67 +17,72 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * [BT-025] 업로드 화면 회전 뒤에도 준비·업로드를 이어 가기 위한 ViewModel.
+ * [BT-025] 업로드 화면의 선택·검사·업로드 상태를 회전 뒤에도 유지한다. 판정과 흐름은
+ * {@link TimetableUploadController}가 하고, 이 클래스는 Android 연결(스레드, Uri 검사·압축)만 맡는다.
  * 화면을 완전히 떠나면({@link #onCleared}) 진행 중인 업로드를 취소하고 올린 이미지를 지운다.
  * 메인 스레드에서만 호출한다.
  */
 public class TimetableUploadViewModel extends ViewModel {
 
-    private final MutableLiveData<TimetableUploadState> state =
-            new MutableLiveData<>(TimetableUploadState.idle());
-    private final ExecutorService preparation = Executors.newSingleThreadExecutor();
+    private final MutableLiveData<TimetableUploadScreen> screen =
+            new MutableLiveData<>(TimetableUploadScreen.empty());
+    private final ExecutorService background = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private TimetableImageUploader uploader;
-    /** 업로드가 끝나 다음 단계(인식)로 넘어가야 한다. 화면이 한 번만 소비한다. */
-    private boolean recognitionPending;
+    private TimetableUploadController<Uri> controller;
 
-    LiveData<TimetableUploadState> getState() {
-        return state;
+    LiveData<TimetableUploadScreen> getScreen() {
+        return screen;
     }
 
-    /** 처음 한 번 저장소를 연결한다. 회전 뒤 다시 불러도 기존 연결을 유지한다. */
-    void attach(TimetableImageRepository repository) {
-        if (uploader != null) return;
-        uploader = new TimetableImageUploader(repository, preparation, mainHandler::post, next -> {
-            if (next.phase == TimetableUploadState.Phase.UPLOADED) recognitionPending = true;
-            state.setValue(next);
-        });
+    /**
+     * 처음 한 번 저장소와 resolver를 연결한다. 회전 뒤 다시 불러도 기존 연결을 유지한다.
+     * resolver는 Application의 것을 넘긴다(화면 Context를 붙잡지 않도록).
+     */
+    void attach(TimetableImageRepository repository, ContentResolver resolver) {
+        if (controller != null) return;
+        controller = new TimetableUploadController<>(repository, background, mainHandler::post,
+                uri -> TimetableImageCompressor.inspect(resolver, uri),
+                uri -> TimetableImageCompressor.prepare(resolver, uri),
+                screen::setValue);
     }
 
-    /** 선택한 이미지를 준비·업로드한다. 진행 중이면 무시한다. resolver는 Application의 것을 넘긴다. */
-    void start(ContentResolver resolver, List<Uri> images) {
-        List<Uri> selection = new ArrayList<>(images);
-        uploader.start(selection.size(), index -> TimetableImageCompressor.prepare(resolver, selection.get(index)));
+    List<Uri> selection() {
+        return controller == null ? new ArrayList<>() : controller.selection();
     }
 
-    /** 선택이 바뀌었다: 진행 중인 작업 취소, 올린 이미지 삭제. */
-    void discard() {
-        recognitionPending = false;
-        if (uploader != null) uploader.discard();
+    /** @return 최대 장수를 넘어 잘랐으면 true */
+    boolean select(List<Uri> picked) {
+        return controller.select(picked);
     }
 
-    /** 이미 올린 같은 선택으로 다시 인식 단계로 넘어간다(검수 화면에서 뒤로 온 뒤 다시 분석). */
-    void requestRecognitionAgain() {
-        TimetableUploadState current = state.getValue();
-        if (current != null && current.phase == TimetableUploadState.Phase.UPLOADED) recognitionPending = true;
+    /** 프로세스 종료 뒤 복원: 이미 선택이 있으면(회전) 그대로 둔다. */
+    void restoreIfEmpty(List<Uri> saved) {
+        if (saved != null && !saved.isEmpty() && controller.selection().isEmpty()) controller.select(saved);
+    }
+
+    void remove(Uri uri) {
+        controller.remove(uri);
+    }
+
+    /** 분석 시작 요청. 분석 가능 판정을 통과하지 못하면 무시된다. */
+    TimetableUploadController.AnalyzeResult analyze() {
+        return controller.analyze();
     }
 
     /** 인식으로 넘어갈 차례면 true를 한 번만 돌려준다. */
     boolean takeRecognitionRequest() {
-        boolean pending = recognitionPending;
-        recognitionPending = false;
-        return pending;
+        return controller != null && controller.takeRecognitionRequest();
     }
 
     /** analyzeTimetable 에 넘길 경로(P3). UPLOADED가 아니면 빈 목록. */
     List<String> uploadedPaths() {
-        return uploader == null ? new ArrayList<>() : uploader.getUploadedPaths();
+        return controller == null ? new ArrayList<>() : controller.uploadedPaths();
     }
 
     @Override
     protected void onCleared() {
-        if (uploader != null) uploader.discard();
-        preparation.shutdownNow();
+        if (controller != null) controller.clear();
+        background.shutdownNow();
         super.onCleared();
     }
 }

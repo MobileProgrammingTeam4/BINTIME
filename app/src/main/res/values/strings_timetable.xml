@@ -11,6 +11,10 @@
     <string name="timetable_upload_reselect">이미지 다시 선택</string>
     <string name="timetable_upload_image_error_line">%1$d번 이미지: %2$s</string>
     <string name="timetable_upload_image_error_cd">이미지 %1$d 업로드 불가</string>
+    <string name="timetable_upload_selected_count">이미지 %1$d장 선택됨 · %2$s</string>
+    <string name="timetable_upload_status_checking">이미지 확인 중</string>
+    <string name="timetable_upload_status_blocked">올릴 수 없는 이미지가 있어요</string>
+    <string name="timetable_upload_status_ready">AI 분석 준비 완료</string>
 
     <string name="timetable_upload_error_unsupported">JPG·PNG·WEBP·HEIC 이미지만 올릴 수 있어요.</string>
     <string name="timetable_upload_error_source_too_large">20MB 이하 이미지만 올릴 수 있어요.</string>

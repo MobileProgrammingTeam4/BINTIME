@@ -7,7 +7,6 @@ import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
-import android.text.format.Formatter;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -31,14 +30,14 @@ import com.team4.bintime.data.repository.TimetableImageRepositories;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * 시간표 이미지 선택·업로드. [BT-025] 이미지 검사·압축 → 묶음 업로드({@link TimetableUploadViewModel})가 끝나면
- * 인식 결과 검수로 넘어간다.
+ * 시간표 이미지 선택·업로드. [BT-025] 선택하면 바로 원본을 검사해 문제 있는 이미지를 표시하고, 분석은
+ * {@link TimetableUploadViewModel#analyze()} 한 경로로만 시작한다(오류 이미지가 있거나 검사 중이면 무시).
+ * 압축 → 묶음 업로드가 끝나면 인식 결과 검수로 넘어간다. 화면은 상태 스냅샷({@link TimetableUploadScreen})만 그린다.
  * <p>
  * P1: 업로드 저장소는 Mock이고 인식은 아직 고정 예시({@link TimetableDraft#mockRecognition()})다. 실제 인식
  * (analyzeTimetable)은 BT-026에서 {@link TimetableUploadViewModel#uploadedPaths()}로 연결한다.
@@ -48,9 +47,10 @@ public class TimetableUploadActivity extends AppCompatActivity {
     private static final int MAX_IMAGES = TimetableImagePaths.MAX_IMAGES;
     private static final String STATE_IMAGES = "timetable_images";
 
-    private final ArrayList<Uri> images = new ArrayList<>();
     private final ExecutorService thumbnails = Executors.newSingleThreadExecutor();
     private TimetableUploadViewModel upload;
+    /** 지금 미리보기로 그려 둔 선택. ViewModel 선택과 다르면 미리보기를 다시 만든다. */
+    private List<Uri> shown = new ArrayList<>();
 
     private final ActivityResultLauncher<PickVisualMediaRequest> gallery = registerForActivityResult(
             new ActivityResultContracts.PickMultipleVisualMedia(MAX_IMAGES), this::onImagesPicked);
@@ -66,59 +66,57 @@ public class TimetableUploadActivity extends AppCompatActivity {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         setContentView(R.layout.activity_timetable_upload);
-        if (state != null) {
-            ArrayList<Uri> restored = state.getParcelableArrayList(STATE_IMAGES);
-            if (restored != null) images.addAll(restored);
-        }
         upload = new ViewModelProvider(this).get(TimetableUploadViewModel.class);
-        upload.attach(TimetableImageRepositories.get(this));
+        upload.attach(TimetableImageRepositories.get(this), getApplicationContext().getContentResolver());
+        if (state != null) {
+            // 회전이면 ViewModel에 선택이 남아 있다. 프로세스가 종료됐다가 돌아온 경우에만 다시 검사한다.
+            upload.restoreIfEmpty(state.getParcelableArrayList(STATE_IMAGES));
+        }
 
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
         findViewById(R.id.btnSelectFromGallery).setOnClickListener(v -> openGallery());
-        findViewById(R.id.btnAnalyze).setOnClickListener(v -> analyzeImages());
-        showImages();
-        upload.getState().observe(this, this::render);
+        // 분석 시작 경로는 이것 하나다. 판정은 ViewModel(TimetableUploadController.canAnalyze)이 한다.
+        findViewById(R.id.btnAnalyze).setOnClickListener(v -> upload.analyze());
+        upload.getScreen().observe(this, this::render);
     }
 
     private void openGallery() {
-        if (currentState().isBusy()) return;
+        if (currentScreen().upload.isBusy()) return;
         gallery.launch(new PickVisualMediaRequest.Builder()
                 .setMediaType(ActivityResultContracts.PickVisualMedia.ImageOnly.INSTANCE).build());
     }
 
-    private void analyzeImages() {
-        TimetableUploadState state = currentState();
-        if (state.isBusy() || images.isEmpty()) return;
-        if (state.phase == TimetableUploadState.Phase.UPLOADED) {
-            // 같은 선택은 다시 올리지 않고 인식 단계로 넘어간다.
-            upload.requestRecognitionAgain();
-            openRecognitionIfReady();
-            return;
+    private TimetableUploadScreen currentScreen() {
+        TimetableUploadScreen screen = upload.getScreen().getValue();
+        return screen != null ? screen : TimetableUploadScreen.empty();
+    }
+
+    private void onImagesPicked(List<Uri> picked) {
+        if (picked.isEmpty()) return;
+        if (upload.select(picked)) {
+            Toast.makeText(this, getString(R.string.timetable_upload_too_many, MAX_IMAGES),
+                    Toast.LENGTH_LONG).show();
         }
-        upload.start(getApplicationContext().getContentResolver(), images);
     }
 
-    private TimetableUploadState currentState() {
-        TimetableUploadState state = upload.getState().getValue();
-        return state != null ? state : TimetableUploadState.idle();
-    }
+    private void render(TimetableUploadScreen screen) {
+        if (screen == null) return;
+        List<Uri> selection = upload.selection();
+        if (!selection.equals(shown)) showImages(selection);
 
-    private void render(TimetableUploadState state) {
-        if (state == null) return;
-        updateAnalyzeButton(state);
+        updateAnalyzeButton(screen);
+        updateHint(screen, selection);
 
         ProgressBar progress = findViewById(R.id.timetable_upload_progress);
-        boolean uploading = state.phase == TimetableUploadState.Phase.UPLOADING;
-        progress.setVisibility(state.isBusy() ? View.VISIBLE : View.GONE);
+        boolean uploading = screen.upload.phase == TimetableUploadState.Phase.UPLOADING;
+        progress.setVisibility(screen.upload.isBusy() ? View.VISIBLE : View.GONE);
         progress.setIndeterminate(!uploading);
-        if (uploading) progress.setProgress(state.progressPercent);
+        if (uploading) progress.setProgress(screen.upload.progressPercent);
 
-        boolean matchesSelection = state.imageCount == images.size();
         LinearLayout previews = findViewById(R.id.timetable_previews);
         for (int i = 0; i < previews.getChildCount(); i++) {
             View preview = previews.getChildAt(i);
-            TimetableImageFailure.Code code = matchesSelection && i < state.imageFailures.size()
-                    ? state.imageFailures.get(i) : null;
+            TimetableImageFailure.Code code = i < screen.imageFailures.size() ? screen.imageFailures.get(i) : null;
             preview.findViewById(R.id.vImageError).setVisibility(code != null ? View.VISIBLE : View.GONE);
             preview.findViewById(R.id.ivThumbnail).setContentDescription(code != null
                     ? getString(R.string.timetable_upload_image_error_cd, i + 1)
@@ -126,25 +124,24 @@ public class TimetableUploadActivity extends AppCompatActivity {
         }
 
         TextView errors = findViewById(R.id.timetable_upload_errors);
-        String message = state.phase == TimetableUploadState.Phase.FAILED ? errorText(state, matchesSelection) : null;
+        String message = errorText(screen);
         errors.setText(message);
         errors.setVisibility(message != null ? View.VISIBLE : View.GONE);
 
         openRecognitionIfReady();
     }
 
-    private String errorText(TimetableUploadState state, boolean matchesSelection) {
+    private String errorText(TimetableUploadScreen screen) {
         StringBuilder text = new StringBuilder();
-        if (matchesSelection) {
-            for (int i = 0; i < state.imageFailures.size(); i++) {
-                TimetableImageFailure.Code code = state.imageFailures.get(i);
-                if (code == null) continue;
-                if (text.length() > 0) text.append('\n');
-                text.append(getString(R.string.timetable_upload_image_error_line, i + 1,
-                        getString(TimetableUploadMessages.of(code))));
-            }
+        for (int i = 0; i < screen.imageFailures.size(); i++) {
+            TimetableImageFailure.Code code = screen.imageFailures.get(i);
+            if (code == null) continue;
+            if (text.length() > 0) text.append('\n');
+            text.append(getString(R.string.timetable_upload_image_error_line, i + 1,
+                    getString(TimetableUploadMessages.of(code))));
         }
-        if (text.length() == 0 && state.failure != null) {
+        TimetableUploadState state = screen.upload;
+        if (text.length() == 0 && state.phase == TimetableUploadState.Phase.FAILED && state.failure != null) {
             text.append(getString(TimetableUploadMessages.of(state.failure.getCode())));
         }
         return text.length() > 0 ? text.toString() : null;
@@ -157,79 +154,67 @@ public class TimetableUploadActivity extends AppCompatActivity {
                 TimetableReviewActivity.class, TimetableDraft.mockRecognition()));
     }
 
-    private void onImagesPicked(List<Uri> picked) {
-        if (picked.isEmpty()) return;
-        ArrayList<Uri> unique = new ArrayList<>(new LinkedHashSet<>(picked));
-        if (unique.size() > MAX_IMAGES) {
-            Toast.makeText(this, getString(R.string.timetable_upload_too_many, MAX_IMAGES),
-                    Toast.LENGTH_LONG).show();
-        }
-        upload.discard();
-        images.clear();
-        images.addAll(unique.subList(0, Math.min(unique.size(), MAX_IMAGES)));
-        showImages();
-    }
-
-    private void showImages() {
-        boolean selected = !images.isEmpty();
+    private void showImages(List<Uri> selection) {
+        shown = new ArrayList<>(selection);
+        boolean selected = !selection.isEmpty();
         findViewById(R.id.layoutUploadBox).setBackgroundResource(selected
                 ? R.drawable.bg_upload_card_selected : R.drawable.bg_upload_card);
         TextView title = findViewById(R.id.tvSelectHintTitle);
-        TextView hint = findViewById(R.id.tvSelectHintSub);
         TextView picker = findViewById(R.id.btnSelectFromGallery);
         picker.setText(selected ? getString(R.string.timetable_upload_reselect) : "사진 보관함에서 선택");
-        updateAnalyzeButton(currentState());
-        hint.setTextColor(ContextCompat.getColor(this, selected ? R.color.action_primary : R.color.text_tertiary));
 
         LinearLayout previews = findViewById(R.id.timetable_previews);
         previews.removeAllViews();
         findViewById(R.id.timetable_preview_scroll).setVisibility(selected ? View.VISIBLE : View.GONE);
         title.setText("시간표 이미지 선택");
-        if (!selected) {
-            hint.setText(getString(R.string.timetable_upload_hint_empty, MAX_IMAGES));
-            return;
-        }
-        String count = "이미지 " + images.size() + "장 선택됨";
-        hint.setText(count + " · AI 분석 준비 완료");
-        List<Uri> selection = new ArrayList<>(images);
+        if (!selected) return;
         thumbnails.execute(() -> {
             String filename = imageName(selection.get(0));
             if (selection.size() > 1) filename += " 외 " + (selection.size() - 1) + "장";
-            long bytes = 0;
-            for (Uri uri : selection) bytes += imageBytes(uri);
-            String size = bytes > 0 ? " · " + Formatter.formatShortFileSize(this, bytes) : "";
             String displayName = filename;
             runOnUiThread(() -> {
-                if (isDestroyed() || !images.equals(selection)) return;
+                if (isDestroyed() || !shown.equals(selection)) return;
                 title.setText(displayName);
-                hint.setText(count + size + " · AI 분석 준비 완료");
             });
         });
-        for (int i = 0; i < images.size(); i++) {
-            Uri uri = images.get(i);
+        for (int i = 0; i < selection.size(); i++) {
+            Uri uri = selection.get(i);
             View preview = getLayoutInflater().inflate(R.layout.item_upload_image_preview, previews, false);
             ((TextView) preview.findViewById(R.id.tvOrderBadge)).setText(String.valueOf(i + 1));
             View remove = preview.findViewById(R.id.btnRemoveImage);
             remove.setContentDescription("이미지 " + (i + 1) + " 삭제");
-            remove.setOnClickListener(v -> {
-                if (currentState().isBusy()) return;
-                upload.discard();
-                images.remove(uri);
-                showImages();
-            });
+            remove.setOnClickListener(v -> upload.remove(uri));
             previews.addView(preview);
             loadThumbnail(uri, preview.findViewById(R.id.ivThumbnail));
         }
-        render(currentState());
     }
 
-    private void updateAnalyzeButton(TimetableUploadState state) {
-        boolean busy = state.isBusy();
-        boolean blockedByImages = state.phase == TimetableUploadState.Phase.FAILED && state.hasImageFailures();
-        boolean enabled = !images.isEmpty() && !busy && !blockedByImages;
+    /** 선택 장수와 검사 결과. 오류가 있으면 "분석 준비 완료"라고 쓰지 않는다. */
+    private void updateHint(TimetableUploadScreen screen, List<Uri> selection) {
+        TextView hint = findViewById(R.id.tvSelectHintSub);
+        boolean selected = !selection.isEmpty();
+        hint.setTextColor(ContextCompat.getColor(this, selected ? R.color.action_primary : R.color.text_tertiary));
+        if (!selected) {
+            hint.setText(getString(R.string.timetable_upload_hint_empty, MAX_IMAGES));
+            return;
+        }
+        int status;
+        if (screen.checking) {
+            status = R.string.timetable_upload_status_checking;
+        } else if (screen.hasImageFailures()) {
+            status = R.string.timetable_upload_status_blocked;
+        } else {
+            status = R.string.timetable_upload_status_ready;
+        }
+        hint.setText(getString(R.string.timetable_upload_selected_count, selection.size(), getString(status)));
+    }
+
+    private void updateAnalyzeButton(TimetableUploadScreen screen) {
+        TimetableUploadState state = screen.upload;
+        boolean enabled = screen.canAnalyze;
         TextView analyze = findViewById(R.id.btnAnalyze);
         analyze.setEnabled(enabled);
-        if (state.phase == TimetableUploadState.Phase.PREPARING) {
+        if (screen.checking || state.phase == TimetableUploadState.Phase.PREPARING) {
             analyze.setText(R.string.timetable_upload_preparing);
         } else if (state.phase == TimetableUploadState.Phase.UPLOADING) {
             analyze.setText(getString(R.string.timetable_upload_progress, state.progressPercent));
@@ -240,7 +225,7 @@ public class TimetableUploadActivity extends AppCompatActivity {
         }
         analyze.setBackgroundResource(enabled ? R.drawable.bg_pill_primary : R.drawable.bg_btn_disabled_pill);
         analyze.setTextColor(ContextCompat.getColor(this, enabled ? R.color.bg_card : R.color.timetable_disabled_text));
-        findViewById(R.id.btnSelectFromGallery).setEnabled(!busy);
+        findViewById(R.id.btnSelectFromGallery).setEnabled(!state.isBusy());
     }
 
     private String imageName(Uri uri) {
@@ -251,15 +236,6 @@ public class TimetableUploadActivity extends AppCompatActivity {
             // A provider may omit metadata even when it can supply the image.
         }
         return "시간표 이미지";
-    }
-
-    private long imageBytes(Uri uri) {
-        try (Cursor cursor = getContentResolver().query(uri, new String[]{OpenableColumns.SIZE}, null, null, null)) {
-            if (cursor != null && cursor.moveToFirst()) return Math.max(0, cursor.getLong(0));
-        } catch (RuntimeException ignored) {
-            // The size is optional.
-        }
-        return 0;
     }
 
     private void loadThumbnail(Uri uri, ImageView target) {
@@ -296,7 +272,7 @@ public class TimetableUploadActivity extends AppCompatActivity {
     @Override
     protected void onSaveInstanceState(@NonNull Bundle out) {
         super.onSaveInstanceState(out);
-        out.putParcelableArrayList(STATE_IMAGES, images);
+        out.putParcelableArrayList(STATE_IMAGES, new ArrayList<>(upload.selection()));
     }
 
     @Override
