@@ -13,6 +13,15 @@
         android:scaleType="centerCrop"
         android:contentDescription="선택된 이미지 미리보기" />
 
+    <!-- [BT-025] 업로드할 수 없는 이미지 표시 -->
+    <View
+        android:id="@+id/vImageError"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_upload_image_error"
+        android:importantForAccessibility="no"
+        android:visibility="gone" />
+
     <!-- 선택 상태 뱃지 (순번 1, 2, 3...) -->
     <TextView
         android:id="@+id/tvOrderBadge"

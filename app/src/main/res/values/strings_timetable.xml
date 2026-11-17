@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- [BT-025] 시간표 이미지 업로드 문구. 공용 strings.xml 을 바꾸지 않도록 시간표 전용 파일에 둔다. -->
+<resources>
+    <string name="timetable_upload_privacy_notice">• 이름·학번이 보이지 않게 가려 주세요</string>
+    <string name="timetable_upload_hint_empty">JPG · PNG · 최대 %1$d장</string>
+    <string name="timetable_upload_too_many">이미지는 최대 %1$d장까지 올릴 수 있어요. 앞의 %1$d장만 담았어요.</string>
+    <string name="timetable_upload_analyze">시간표 분석하기</string>
+    <string name="timetable_upload_preparing">이미지 확인 중…</string>
+    <string name="timetable_upload_progress">업로드 중… %1$d%%</string>
+    <string name="timetable_upload_retry">다시 시도</string>
+    <string name="timetable_upload_reselect">이미지 다시 선택</string>
+    <string name="timetable_upload_image_error_line">%1$d번 이미지: %2$s</string>
+    <string name="timetable_upload_image_error_cd">이미지 %1$d 업로드 불가</string>
+
+    <string name="timetable_upload_error_unsupported">JPG·PNG·WEBP·HEIC 이미지만 올릴 수 있어요.</string>
+    <string name="timetable_upload_error_source_too_large">20MB 이하 이미지만 올릴 수 있어요.</string>
+    <string name="timetable_upload_error_corrupt">손상되었거나 열 수 없는 이미지예요.</string>
+    <string name="timetable_upload_error_too_small">해상도가 너무 낮아 글자를 읽기 어려워요.</string>
+    <string name="timetable_upload_error_compressed_too_large">용량을 줄여도 5MB를 넘어요. 시간표 부분만 잘라서 올려 주세요.</string>
+    <string name="timetable_upload_error_read_failed">이미지를 읽을 수 없어요. 다시 선택해 주세요.</string>
+    <string name="timetable_upload_error_count">이미지를 1~5장 선택해 주세요.</string>
+    <string name="timetable_upload_error_not_signed_in">로그인이 필요해요. 다시 로그인해 주세요.</string>
+    <string name="timetable_upload_error_permission">업로드 권한이 없어요. 다시 로그인해 주세요.</string>
+    <string name="timetable_upload_error_network">네트워크 연결을 확인한 뒤 다시 시도해 주세요.</string>
+    <string name="timetable_upload_error_unknown">업로드하지 못했어요. 다시 시도해 주세요.</string>
+</resources>
