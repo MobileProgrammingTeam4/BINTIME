@@ -3,7 +3,7 @@ import type { TaskName } from "./types";
 
 /**
  * 사용자별 하루 호출 수. Firestore aiUsage/{uid}_{YYYY-MM-DD}(Asia/Seoul) 문서에 작업별로 센다.
- * 작업에 최소 호출 간격이 있으면 같은 트랜잭션에서 마지막 호출 시각(lastCalledAtMs.<task>)도 확인·기록한다.
+ * 같은 트랜잭션에서 작업별 마지막 호출 시각(lastCalledAtMs.<task>)을 항상 기록하고, 작업에 최소 호출 간격이 있을 때만 이 값으로 간격을 확인한다.
  * 서버(Admin SDK)만 쓰고 앱은 읽기·쓰기 모두 금지한다(Rules 작성 시 deny 로 둔다).
  * 토큰 수 등 상세 사용량은 Cloud Logging 의 "ai_call" 로그에 남긴다.
  */
