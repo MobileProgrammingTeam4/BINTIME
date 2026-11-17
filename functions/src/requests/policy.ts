@@ -37,9 +37,17 @@ export async function pendingCount(db: Firestore, uid: string, direction: "fromU
 }
 
 /** 검색용 읽기. 생성 API는 같은 조건을 사용자 잠금과 함께 트랜잭션 안에서 다시 판정한다. */
-export async function canReceive(db: Firestore, fromUid: string, toUid: string, now: Date): Promise<boolean> {
+export async function canReceive(db: Firestore, fromUid: string, toUid: string, now: Date, time?: RequestTime): Promise<boolean> {
   if (await pendingCount(db, toUid, "toUid", now, RECEIVED_LIMIT) >= RECEIVED_LIMIT) return false;
-  return !(await reversePending(db, fromUid, toUid, now));
+  if (await reversePending(db, fromUid, toUid, now)) return false;
+  if (time) {
+    const collisions = await Promise.all([fromUid, toUid].map(uid => db.collection("matches")
+      .where("participantUids", "array-contains", uid).where("status", "==", "ACTIVE")
+      .where("meetingDate", "==", time.meetingDate).where("startMinute", "<", time.endMinute)
+      .where("endMinute", ">", time.startMinute).orderBy("startMinute").orderBy("endMinute").limit(1).get()));
+    if (collisions.some(s => !s.empty)) return false;
+  }
+  return true;
 }
 
 export async function reversePending(db: Firestore, fromUid: string, toUid: string, now: Date, tx?: Transaction): Promise<boolean> {

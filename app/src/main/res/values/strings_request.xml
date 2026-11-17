@@ -25,8 +25,8 @@
     <string name="request_mock_metadata">%1$s · 시연 데이터</string>
     <string name="request_empty_title">%1$s이 없어요</string>
     <string name="request_empty_message">새로운 요청이나 매칭이 생기면 여기에 표시돼요.</string>
-    <string name="request_sent_notice">• 겹치는 시간에 보낸 매칭 요청 중 하나가 수락되면 나머지 요청은 자동으로 취소처리 돼요\n• 매칭된 이후에는 약속을 취소할 수 없어요\n• 상대가 다른 매칭을 먼저 수락하거나 거절하면 요청 탭에 더이상 표시되지 않아요</string>
-    <string name="request_received_notice">• 겹치는 시간에 받은 매칭 요청 중 하나를 수락하면 나머지는 자동으로 거절처리 돼요\n• 매칭된 이후에는 약속을 취소할 수 없어요\n• 상대가 다른 상대와 매칭되면 이 탭에 더이상 표시되지 않아요</string>
+    <string name="request_sent_notice">• 겹치는 시간에 보낸 매칭 요청 중 하나가 수락되면 나머지 요청은 자동으로 취소처리 돼요\n• 매칭된 이후에는 요청 취소를 할 수 없어요\n• 상대가 겹치는 시간에 다른 매칭을 먼저 수락하거나 거절하면 요청 탭에 더이상 표시되지 않아요</string>
+    <string name="request_received_notice">• 겹치는 시간에 받은 매칭 요청 중 하나를 수락하면 나머지는 자동으로 거절처리 돼요\n• 매칭된 이후에는 요청 취소를 할 수 없어요\n• 상대가 겹치는 시간에 다른 상대와 매칭되면 이 탭에 더이상 표시되지 않아요</string>
     <string name="request_completed_notice">• 매칭된 이후에는 약속을 취소할 수 없어요</string>
     <string name="request_confirm_title">%1$s 요청을 %2$s할까요?</string>
     <string name="request_confirm_message">%1$s\n%2$s\n이 화면에서는 시연 데이터만 변경됩니다.</string>

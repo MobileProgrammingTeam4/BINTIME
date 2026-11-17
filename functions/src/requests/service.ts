@@ -1,6 +1,7 @@
 import { Timestamp, type Firestore, type Transaction } from "firebase-admin/firestore";
 import { type CandidateResolver, type CreateInput, type RespondInput, key, requestError, validateSnapshot } from "./contracts";
 import { CANCEL_COOLDOWN_MS, endsAt, overlaps, pendingCount, RECEIVED_LIMIT, reversePending, SENT_LIMIT } from "./policy";
+import { readConflicts, writeConflicts, type ConflictPlan } from "./maintenance";
 
 export interface RequestRecord {
   candidateId: string;
@@ -126,6 +127,7 @@ export class RequestService {
       const now = this.now();
       const guards = await Promise.all([record.fromUid, record.toUid].map(id => tx.get(this.db.doc(`requestUserGuards/${id}`))));
       const expired = endsAt(record) <= now.getTime();
+      let cleanup: ConflictPlan | undefined;
       if (!expired && input.action === "ACCEPTED") {
         validateSnapshot(record.fromUid, { toUid: record.toUid, purpose: record.purpose, meetingDate: record.meetingDate,
           startMinute: record.startMinute, endMinute: record.endMinute }, now);
@@ -154,6 +156,7 @@ export class RequestService {
         }
         const match = await tx.get(this.db.doc(`matches/${input.requestId}`));
         if (match.exists) throw requestError("failed-precondition", "MATCH_CONFLICT", "이미 처리된 매칭입니다.");
+        cleanup = await readConflicts(this.db, tx, input.requestId, [record.fromUid, record.toUid], record, Timestamp.fromDate(now));
       }
       const next: RequestRecord = { ...record, status: expired ? "CANCELED" : input.action,
         updatedAt: Timestamp.fromDate(now), terminalReason: expired ? "EXPIRED" : input.action === "REJECTED" ? "RECIPIENT_REJECTED" : "ACCEPTED" };
@@ -165,6 +168,9 @@ export class RequestService {
           endMinute: record.endMinute, overlapMinutes: record.overlapMinutes, status: "ACTIVE", chatReady: false,
           createdAt: next.updatedAt, updatedAt: next.updatedAt,
         });
+        writeConflicts(tx, cleanup!, [record.fromUid, record.toUid], record, now);
+        tx.set(this.db.doc(`matchCleanupJobs/${input.requestId}`), { matchId: input.requestId,
+          status: cleanup!.overflow ? "PENDING" : "DONE", attempts: 0, acceptedAt: next.updatedAt, updatedAt: next.updatedAt });
       }
       this.touch(tx, record.fromUid, guards[0].get("revision"));
       this.touch(tx, record.toUid, guards[1].get("revision"));

@@ -169,6 +169,124 @@
           "fieldPath": "endMinute"
         }
       ]
+    },
+    {
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "fromUid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "meetingDate",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "startMinute",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "endMinute",
+          "order": "ASCENDING"
+        }
+      ],
+      "collectionGroup": "matchRequests"
+    },
+    {
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "toUid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "meetingDate",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "startMinute",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "endMinute",
+          "order": "ASCENDING"
+        }
+      ],
+      "collectionGroup": "matchRequests"
+    },
+    {
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "meetingDate",
+          "order": "ASCENDING"
+        }
+      ],
+      "collectionGroup": "matchRequests"
+    },
+    {
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "meetingDate",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "endMinute",
+          "order": "ASCENDING"
+        }
+      ],
+      "collectionGroup": "matchRequests"
+    },
+    {
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "participantUids",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "meetingDate",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "startMinute",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "endMinute",
+          "order": "ASCENDING"
+        }
+      ],
+      "collectionGroup": "matches"
     }
   ],
   "fieldOverrides": []
