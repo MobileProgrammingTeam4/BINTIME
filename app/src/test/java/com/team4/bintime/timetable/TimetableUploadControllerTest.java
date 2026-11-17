@@ -104,8 +104,9 @@ public class TimetableUploadControllerTest {
     // ── 기존 동작 유지 ─────────────────────────────────────────────────────
 
     @Test
-    public void twoToFiveGoodImages_canAnalyze_andUploadInSelectionOrder() {
-        for (int n = 2; n <= 5; n++) {
+    public void oneToFiveGoodImages_canAnalyze_andUploadInSelectionOrder() {
+        // 장수 규칙 1~5장(결정). 이슈의 "2장 이상"은 여러 장 업로드 완료 조건.
+        for (int n = 1; n <= 5; n++) {
             List<String> images = new ArrayList<>();
             for (int i = 0; i < n; i++) images.add("img" + n + "-" + i);
             controller.select(images);
