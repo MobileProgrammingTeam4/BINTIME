@@ -64,4 +64,22 @@ public interface AuthRepository {
 
     /** 로그아웃 */
     void signOut();
+
+    /** BT-030 세션 확인 결과. */
+    enum SessionState {
+        /** 로그인이 유효하다. */
+        VALID,
+        /** 계정이 삭제·비활성화됐거나 토큰이 무효다. 이미 로그아웃 처리됐으니 다시 로그인해야 한다. */
+        EXPIRED,
+        /** 네트워크 등으로 확인하지 못했다. 기기에 남은 로그인으로 계속 진행한다(오프라인에서 막지 않음). */
+        UNKNOWN
+    }
+
+    /**
+     * 기기에 남은 로그인이 서버에서도 유효한지 확인한다(BT-030). 앱 시작 라우팅에서 쓴다.
+     * 기본 구현(Mock)은 로그인 여부만 본다. 콜백은 정확히 한 번 호출된다.
+     */
+    default void checkSession(Callback<SessionState> callback) {
+        if (callback != null) callback.onSuccess(isSignedIn() ? SessionState.VALID : SessionState.EXPIRED);
+    }
 }

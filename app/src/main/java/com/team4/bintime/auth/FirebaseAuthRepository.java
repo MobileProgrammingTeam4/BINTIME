@@ -112,6 +112,35 @@ public final class FirebaseAuthRepository implements AuthRepository {
         prefs().edit().remove(KEY_PENDING_EMAIL).apply();
     }
 
+    /**
+     * BT-030: 서버에서 계정 상태를 다시 읽어(user.reload) 기기에 남은 로그인이 아직 유효한지 본다.
+     * 계정 삭제·비활성화·토큰 무효면 로그아웃하고 EXPIRED, 네트워크 등으로 확인 못 하면 UNKNOWN(계속 진행).
+     */
+    @Override
+    public void checkSession(Callback<SessionState> callback) {
+        FirebaseUser user = auth.getCurrentUser();
+        if (user == null) {
+            if (callback != null) callback.onSuccess(SessionState.EXPIRED);
+            return;
+        }
+        user.reload().addOnCompleteListener(task -> {
+            SessionState state;
+            if (task.isSuccessful()) {
+                state = auth.getCurrentUser() != null ? SessionState.VALID : SessionState.EXPIRED;
+            } else {
+                Exception e = task.getException();
+                String code = e instanceof FirebaseAuthException ? ((FirebaseAuthException) e).getErrorCode() : null;
+                if (FirebaseAuthErrors.isSessionInvalid(code)) {
+                    signOut();
+                    state = SessionState.EXPIRED;
+                } else {
+                    state = SessionState.UNKNOWN;
+                }
+            }
+            if (callback != null) callback.onSuccess(state);
+        });
+    }
+
     @Override
     public String getPendingEmail() {
         return prefs().getString(KEY_PENDING_EMAIL, null);

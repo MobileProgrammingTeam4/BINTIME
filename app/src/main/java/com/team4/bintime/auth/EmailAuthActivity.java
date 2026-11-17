@@ -98,7 +98,9 @@ public class EmailAuthActivity extends AppCompatActivity {
         viewModel.getVerification().observe(this, this::onVerificationResult);
 
         // 메일의 링크로 앱이 처음 열린 경우. 회전 등으로 재생성된 경우는 이미 처리했으므로 건너뛴다.
-        if (savedInstanceState == null) handleIncomingLink(getIntent());
+        if (savedInstanceState == null) {
+            if (!restorePendingSentState(getIntent())) handleIncomingLink(getIntent());
+        }
     }
 
     @Override
@@ -113,6 +115,24 @@ public class EmailAuthActivity extends AppCompatActivity {
         super.onSaveInstanceState(outState);
         outState.putSerializable(STATE_AUTH, authState);
         outState.putString(STATE_OTHER_DEVICE_LINK, otherDeviceLink);
+    }
+
+    /**
+     * BT-030 인증 미완료 복원: 링크를 보낸 뒤 앱을 껐다 켜서 이 화면에 다시 왔다면(링크로 연 게 아님),
+     * 이메일 입력부터 다시 시키지 않고 "메일을 확인해 주세요"(Figma 235:1961) 상태로 돌려놓는다.
+     * 재발송·이메일 다시 입력은 그 화면의 버튼 그대로다.
+     *
+     * @return 복원했으면 true
+     */
+    private boolean restorePendingSentState(Intent intent) {
+        if (intent != null && intent.getData() != null) return false; // 링크로 열림 → 링크 처리
+        if (authRepository.isSignedIn()) return false;
+        String pendingEmail = authRepository.getPendingEmail();
+        if (pendingEmail == null || pendingEmail.isEmpty()) return false;
+        authState.setEmail(pendingEmail);
+        etEmail.setText(pendingEmail);
+        updateUiForState(EmailVerificationState.Status.SENT);
+        return true;
     }
 
     /**

@@ -163,6 +163,12 @@ public final class FirebaseProfileRepository implements ProfileRepository {
         });
     }
 
+    /** BT-030: 로그아웃 시 사진 캐시를 비운다(다음 계정이 이전 계정에서 받은 사진을 캐시로 보지 않게). */
+    @Override
+    public void clearSessionCaches() {
+        photoLoader.invalidateAll();
+    }
+
     @Override
     public void hasCompletedProfile(String uid, Callback<Boolean> callback) {
         if (uid == null) {

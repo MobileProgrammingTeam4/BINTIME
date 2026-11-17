@@ -26,6 +26,23 @@ public final class FirebaseAuthErrors {
         }
     }
 
+    /**
+     * BT-030: 세션 확인(user.reload) 실패 코드 중 "다시 로그인해야 하는" 것.
+     * 계정 삭제·비활성화·토큰 만료/무효만 해당하고, 네트워크·일시 오류는 아니다(오프라인에서 로그아웃시키지 않음).
+     */
+    public static boolean isSessionInvalid(String errorCode) {
+        if (errorCode == null) return false;
+        switch (errorCode) {
+            case "ERROR_USER_NOT_FOUND":
+            case "ERROR_USER_DISABLED":
+            case "ERROR_USER_TOKEN_EXPIRED":
+            case "ERROR_INVALID_USER_TOKEN":
+                return true;
+            default:
+                return false;
+        }
+    }
+
     public static String message(AuthRepository.Failure failure) {
         switch (failure) {
             case LINK_EXPIRED: return "인증 링크가 만료되었어요.";

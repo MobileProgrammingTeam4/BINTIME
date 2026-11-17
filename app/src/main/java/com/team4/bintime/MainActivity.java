@@ -14,6 +14,7 @@ import androidx.fragment.app.FragmentTransaction;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.team4.bintime.auth.AuthRepositories;
 import com.team4.bintime.auth.OnboardingActivity;
+import com.team4.bintime.auth.SessionGuard;
 import com.team4.bintime.chat.ChatListFragment;
 import com.team4.bintime.matching.MatchingFragment;
 import com.team4.bintime.notification.NotificationListFragment;
@@ -99,6 +100,25 @@ public class MainActivity extends AppCompatActivity {
         });
         getOnBackPressedDispatcher().addCallback(this, backToMatching);
         if (savedInstanceState == null) showTab(R.id.nav_matching);
+    }
+
+    /** BT-030(B): 다시 보일 때 로그인이 끊겼으면 온보딩으로, 보이는 동안 끊기면 바로 온보딩으로. */
+    private SessionGuard.Watch sessionWatch;
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        if (SessionGuard.redirectIfSignedOut(this)) return;
+        sessionWatch = SessionGuard.watch(this);
+    }
+
+    @Override
+    protected void onStop() {
+        if (sessionWatch != null) {
+            sessionWatch.stop();
+            sessionWatch = null;
+        }
+        super.onStop();
     }
 
     @Override
