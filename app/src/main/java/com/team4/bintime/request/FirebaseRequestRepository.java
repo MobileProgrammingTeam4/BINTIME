@@ -59,6 +59,25 @@ final class FirebaseRequestRepository implements RequestRepository {
     @Override public boolean isSubmitting(String toUid) { return submitting.contains(toUid); }
     @Override public boolean isMock() { return false; }
     @Override public boolean respond(String id, Status next) { return false; }
+    @Override public void respond(String requestId, Status next, Callback callback) {
+        if (next != Status.ACCEPTED && next != Status.REJECTED) { callback.onError("요청 처리 방법을 확인해주세요."); return; }
+        if (!signedIn()) { callback.onError("다시 로그인해주세요."); return; }
+        if (!updating.add(requestId)) { callback.onError("이미 요청을 처리하고 있어요."); return; }
+        changed();
+        Map<String, Object> input = new HashMap<>();
+        input.put("requestId", requestId); input.put("action", next.name());
+        functions.getHttpsCallable("respondToMatchRequest").call(input).addOnCompleteListener(task -> {
+            updating.remove(requestId);
+            if (!signedIn()) { items.clear(); changed(); callback.onError("다시 로그인해주세요."); return; }
+            if (!task.isSuccessful()) { changed(); callback.onError(errorMessage(task.getException())); return; }
+            try {
+                Object data = task.getResult().getData();
+                if (!(data instanceof Map)) throw new IllegalArgumentException();
+                Item item = items.applyResponse(decode((Map<?, ?>) data));
+                changed(); callback.onSuccess(item);
+            } catch (RuntimeException invalid) { changed(); callback.onError("요청 결과를 확인하지 못했어요. 다시 시도해주세요."); }
+        });
+    }
     @Override public boolean isLoading() { return loading; }
     @Override public String error() { return loadError; }
     @Override public boolean isUpdating(String id) { return updating.contains(id); }
@@ -142,6 +161,12 @@ final class FirebaseRequestRepository implements RequestRepository {
                 if ("REQUEST_NOT_PENDING".equals(reason)) return "이미 처리된 요청이에요. 목록을 확인해주세요.";
                 if ("INVALID_CANDIDATE".equals(reason)) return "요청 조건이 바뀌었어요. 다시 검색해주세요.";
                 if ("MATCH_CONFLICT".equals(reason)) return "이미 확정된 매칭과 시간이 겹쳐요.";
+                if ("SENT_LIMIT".equals(reason)) return "보낸 요청은 최대 3개까지 대기할 수 있어요.";
+                if ("RECEIVED_LIMIT".equals(reason)) return "현재 신청할 수 없는 상대예요. 잠시 후 다시 확인해주세요.";
+                if ("REVERSE_PENDING".equals(reason)) return "이미 요청을 받은 상대예요. 받은 요청 탭에서 확인해주세요.";
+                if ("REQUEST_COOLDOWN".equals(reason)) return "요청 취소 후 1분 동안은 새로 신청할 수 없어요.";
+                if ("NOT_RECIPIENT".equals(reason)) return "받은 요청만 수락하거나 거절할 수 있어요.";
+                if ("PARTICIPANT_UNAVAILABLE".equals(reason)) return "현재 매칭할 수 없는 상대예요.";
                 if ("PERMISSION_DENIED".equals(reason)) return "학교 이메일로 다시 로그인해주세요.";
             }
         }

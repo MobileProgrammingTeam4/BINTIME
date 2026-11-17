@@ -16,13 +16,20 @@ public final class MockRequestRepository implements RequestRepository, Serializa
     private final Map<String, Item> items = new LinkedHashMap<>();
     private final Map<String, String> attempts = new LinkedHashMap<>();
     private transient List<Runnable> listeners;
+    private long cooldownUntil;
+    private transient java.util.function.LongSupplier clock;
 
     public MockRequestRepository() {
         this("mock-me", true);
     }
 
     public MockRequestRepository(String ownerUid, boolean seed) {
+        this(ownerUid, seed, System::currentTimeMillis);
+    }
+
+    MockRequestRepository(String ownerUid, boolean seed, java.util.function.LongSupplier clock) {
         this.ownerUid = ownerUid;
+        this.clock = clock;
         if (!seed || ownerUid == null) return;
         LocalDate date = LocalDate.now(ZoneId.of("Asia/Seoul"));
         add(new Item("sent-1", ownerUid, "u1", ownerUid, "스터디", date.toString(), 840, 930, Status.PENDING, null, 0));
@@ -55,6 +62,11 @@ public final class MockRequestRepository implements RequestRepository, Serializa
         catch (RuntimeException invalid) { callback.onError("요청 날짜를 확인해주세요."); return; }
         Item previous = find(attempts.get(draft.clientRequestId));
         if (previous != null) { callback.onSuccess(previous); return; }
+        if (now() < cooldownUntil) { callback.onError("요청 취소 후 1분 동안은 새로 신청할 수 없어요."); return; }
+        if (list(Tab.SENT).size() >= 3) { callback.onError("보낸 요청은 최대 3개까지 대기할 수 있어요."); return; }
+        for (Item received : list(Tab.RECEIVED)) if (received.fromUid.equals(draft.toUid)) {
+            callback.onError("이미 요청을 받은 상대예요. 받은 요청 탭에서 확인해주세요."); return;
+        }
         for (Item item : items.values()) {
             if (item.sent && item.profileUid.equals(draft.toUid) && item.status == Status.PENDING) {
                 callback.onSuccess(item);
@@ -83,7 +95,7 @@ public final class MockRequestRepository implements RequestRepository, Serializa
     @Override public void cancel(String requestId, Callback callback) {
         Item item = find(requestId);
         if (item != null && item.sent && item.status == Status.CANCELED) { callback.onSuccess(item); return; }
-        if (respond(requestId, Status.CANCELED)) callback.onSuccess(item);
+        if (respond(requestId, Status.CANCELED)) { cooldownUntil = now() + 60_000; callback.onSuccess(item); }
         else callback.onError("이미 처리되었거나 취소할 수 없는 요청이에요.");
     }
     @Override public Registration observe(Runnable listener) {
@@ -95,6 +107,8 @@ public final class MockRequestRepository implements RequestRepository, Serializa
     private void changed() {
         if (listeners != null) for (Runnable listener : new ArrayList<>(listeners)) listener.run();
     }
+
+    private long now() { return clock == null ? System.currentTimeMillis() : clock.getAsLong(); }
 
     /** 1회만 처리. 수락 시 같은 날짜에 겹치는 대기 요청은 방향별로 정리한다(Mock). */
     public boolean respond(String id, Status next) {

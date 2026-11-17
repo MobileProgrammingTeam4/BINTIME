@@ -10,6 +10,8 @@ import androidx.fragment.app.Fragment;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry;
+import androidx.test.runner.lifecycle.Stage;
 
 import com.google.firebase.FirebaseApp;
 import com.team4.bintime.MainActivity;
@@ -122,6 +124,54 @@ public class RequestFlowDeviceTest {
             });
             idle(); screenshot("05-empty-sent-list");
             main.onActivity(activity -> assertEquals(0, ((LinearLayout) activity.findViewById(R.id.requestCards)).getChildCount()));
+        }
+    }
+
+    @Test public void acceptReceivedRequestOpensConfirmedSnapshot() throws Exception {
+        // 다른 테스트의 Mock 요청과 분리한다. 실제 Auth·메일은 사용하지 않는다.
+        MockAuthRepository auth = MockAuthRepository.shared();
+        auth.signOut();
+        String email = "accept.qa@kookmin.ac.kr";
+        auth.sendSignInLink(email, null);
+        auth.verifySignInLink(email, auth.getIssuedLinkForDemo(), null);
+        RequestRepository repository = RequestRepositories.get(context);
+        assertTrue(repository.isMock());
+        try (ActivityScenario<MainActivity> main = ActivityScenario.launch(MainActivity.class)) {
+            main.onActivity(activity -> {
+                activity.findViewById(R.id.tabReceived).performClick();
+                LinearLayout cards = activity.findViewById(R.id.requestCards);
+                assertTrue(cards.getChildCount() > 0);
+                cards.getChildAt(0).findViewById(R.id.requestPrimary).performClick();
+            });
+            idle();
+            main.onActivity(activity -> {
+                for (Fragment fragment : activity.getSupportFragmentManager().getFragments()) {
+                    if (fragment instanceof MatchingFragment) {
+                        DialogFragment dialog = (DialogFragment) fragment.getChildFragmentManager().findFragmentByTag("requestAction");
+                        assertNotNull(dialog);
+                        dialog.requireDialog().findViewById(R.id.dialogPositive).performClick();
+                    }
+                }
+            });
+            idle();
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
+                boolean found = false;
+                for (android.app.Activity activity : ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED)) {
+                    if (activity instanceof MatchAcceptedActivity) {
+                        found = true;
+                        assertTrue(((TextView) activity.findViewById(R.id.time)).getText().toString().contains("14:00"));
+                    }
+                }
+                assertTrue("수락한 시간 스냅샷의 확인 화면으로 이동", found);
+            });
+            assertEquals(RequestRepository.Status.ACCEPTED, repository.find("received-1").status());
+            Thread.sleep(1200);
+            screenshot("06-request-accepted");
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
+                for (android.app.Activity activity : new ArrayList<>(ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED))) {
+                    if (activity instanceof MatchAcceptedActivity) activity.finish();
+                }
+            });
         }
     }
 
