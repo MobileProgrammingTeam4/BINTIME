@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { initializeApp, deleteApp } from "firebase-admin/app";
-import { getFirestore, Timestamp } from "firebase-admin/firestore";
+import { getFirestore, Timestamp, type Firestore, type Transaction } from "firebase-admin/firestore";
 import { assertFails, initializeTestEnvironment, type RulesTestEnvironment } from "@firebase/rules-unit-testing";
 import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
 import { beforeAll, beforeEach, afterAll, describe, expect, it } from "vitest";
@@ -33,6 +33,36 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)("BT-032 정리·만료", (
     ]));
   });
   afterAll(async () => { await env?.cleanup(); await db.terminate(); await deleteApp(app); });
+
+  it("cutoff: 잠금 대기 중 생성이 완료된 요청도 수락과 함께 정리한다", async () => {
+    const selected = await create("u0", "u1");
+    let reached!: () => void, release!: () => void;
+    const atGuard = new Promise<void>(resolve => { reached = resolve; });
+    const allowed = new Promise<void>(resolve => { release = resolve; });
+    let delayed = false;
+    const acceptingDb = new Proxy(db, { get(target, prop) {
+      if (prop === "runTransaction") return (fn: (tx: Transaction) => Promise<unknown>) => target.runTransaction(tx => fn(new Proxy(tx, { get(real, name) {
+        if (name === "get") return async (ref: { path?: string }, ...args: unknown[]) => {
+          if (ref.path === "requestUserGuards/u0" && !delayed) { delayed = true; reached(); await allowed; }
+          return (real.get as Function).call(real, ref, ...args);
+        };
+        const value = Reflect.get(real, name); return typeof value === "function" ? value.bind(real) : value;
+      } })));
+      const value = Reflect.get(target, prop); return typeof value === "function" ? value.bind(target) : value;
+    } }) as Firestore;
+    const accepting = new RequestService(acceptingDb, { async resolve(_tx, _from, toUid) { return { toUid, purpose: "스터디", ...window }; } },
+      () => new Date(clock)).respond("u1", { requestId: selected.id, action: "ACCEPTED" });
+    await atGuard;
+    let concurrent: Awaited<ReturnType<typeof create>>;
+    try { clock += 1000; concurrent = await create("u0", "u2"); }
+    finally { release(); }
+    await accepting;
+    expect((await db.doc(`matchRequests/${concurrent!.id}`).get()).data()).toMatchObject({ status: "CANCELED", terminalReason: "MATCH_CONFLICT" });
+    expect((await db.doc(`matchCleanupJobs/${selected.id}`).get()).get("status")).toBe("DONE");
+    expect((await db.doc("requestUserGuards/u0").get()).get("cooldownUntil")).toBeUndefined();
+    await maintenance.runBatch();
+    expect((await db.doc(`matchRequests/${concurrent!.id}`).get()).get("status")).toBe("CANCELED");
+  });
 
   it("양측 네 방향 상충 요청을 정리하고 비겹침·다른 날짜·스냅샷은 보존한다", async () => {
     const sentA = await create("u0", "u2"), receivedA = await create("u3", "u0");
