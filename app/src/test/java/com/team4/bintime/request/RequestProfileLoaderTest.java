@@ -35,12 +35,21 @@ public class RequestProfileLoaderTest {
         assertEquals(1, source.calls);
     }
 
-    @Test public void missingPublicProfileHasRetryableFailureInsteadOfInfiniteLoading() {
+    @Test public void missingPublicProfileIsDistinctFromReadFailureAndDoesNotRetry() {
         Source source = new Source();
         RequestProfileLoader loader = new RequestProfileLoader(source, () -> {});
         loader.load("peer"); source.pending.onSuccess(null); loader.load("peer");
-        assertTrue(loader.failed("peer")); assertEquals(1, source.calls);
-        loader.retry("peer"); assertEquals(2, source.calls);
+        assertTrue(loader.missing("peer")); assertFalse(loader.failed("peer")); assertEquals(1, source.calls);
+        loader.retry("peer"); assertEquals(1, source.calls);
+    }
+
+    @Test public void retryOfReadFailureCanResolveToMissingWithoutStaleError() {
+        Source source = new Source();
+        RequestProfileLoader loader = new RequestProfileLoader(source, () -> {});
+        loader.load("peer"); source.pending.onError("offline"); loader.retry("peer");
+        source.pending.onSuccess(null);
+        assertTrue(loader.missing("peer")); assertFalse(loader.failed("peer"));
+        loader.load("peer"); loader.retry("peer"); assertEquals(2, source.calls);
     }
 
     @Test public void callbackAfterViewReleaseCannotRepopulateOrRedraw() {

@@ -125,6 +125,36 @@ public class RequestFlowDeviceTest {
         }
     }
 
+    @Test public void missingPublicProfileHasNoRetryAndPreservesRequest() throws Exception {
+        MockRequestRepository local = new MockRequestRepository(AuthRepositories.get(context).getCurrentUid(), true);
+        RequestRepository requests = (RequestRepository) java.lang.reflect.Proxy.newProxyInstance(
+                RequestRepository.class.getClassLoader(), new Class<?>[]{RequestRepository.class},
+                (proxy, method, args) -> method.getName().equals("isMock") ? false : method.invoke(local, args));
+        int[] reads = {0};
+        try (ActivityScenario<MainActivity> main = ActivityScenario.launch(MainActivity.class)) {
+            main.onActivity(activity -> {
+                activity.findViewById(R.id.tabReceived).performClick();
+                Fragment matching = activity.getSupportFragmentManager().getFragments().stream()
+                        .filter(f -> f instanceof MatchingFragment).findFirst().orElseThrow(AssertionError::new);
+                RequestTabsController controller = new RequestTabsController(matching, activity.findViewById(R.id.requestContent),
+                        requests, intent -> fail("조회만 수행한다"), (uid, callback) -> { reads[0]++; callback.onSuccess(null); });
+                controller.show(RequestRepository.Tab.RECEIVED); controller.render(); controller.render();
+            });
+            idle();
+            main.onActivity(activity -> {
+                assertEquals(1, reads[0]);
+                LinearLayout cards = activity.findViewById(R.id.requestCards);
+                assertEquals(1, cards.getChildCount());
+                assertEquals(activity.getString(R.string.request_profile_missing), ((TextView) cards.getChildAt(0).findViewById(R.id.requestName)).getText().toString());
+                assertEquals(android.view.View.GONE, cards.getChildAt(0).findViewById(R.id.requestProfile).getVisibility());
+                RequestRepository.Item item = local.list(RequestRepository.Tab.RECEIVED).get(0);
+                assertEquals(RequestRepository.Status.PENDING, item.status());
+                assertTrue(((TextView) cards.getChildAt(0).findViewById(R.id.time)).getText().toString().contains("14:00 ~ 15:30"));
+            });
+            screenshot("10-profile-unavailable");
+        }
+    }
+
     @Test public void createFromProfileThenCancelAfterDialogRecreation() throws Exception {
         RequestRepository repository = RequestRepositories.get(context);
         try (ActivityScenario<ProfileDetailActivity> profile = ActivityScenario.launch(
