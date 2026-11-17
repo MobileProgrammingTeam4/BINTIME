@@ -124,8 +124,9 @@ export class RequestService {
         if (record.status === input.action) return response(input.requestId, record);
         throw requestError("failed-precondition", "REQUEST_NOT_PENDING", "이미 처리된 요청입니다.");
       }
-      const now = this.now();
       const guards = await Promise.all([record.fromUid, record.toUid].map(id => tx.get(this.db.doc(`requestUserGuards/${id}`))));
+      // 잠금 대기 중 먼저 커밋한 생성 요청도 이 수락의 정리 기준 시각에 포함한다.
+      const now = this.now();
       const expired = endsAt(record) <= now.getTime();
       let cleanup: ConflictPlan | undefined;
       if (!expired && input.action === "ACCEPTED") {
