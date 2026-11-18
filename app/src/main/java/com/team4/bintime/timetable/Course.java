@@ -18,6 +18,12 @@ public class Course implements Serializable {
     private String courseId;
     private String professor;
     private String colorCode;
+    /**
+     * [BT-026] 이미지 인식으로 만든 행이면 그 신뢰도(0~1), 아니면 NaN. 합친 원본 항목 수(중복 병합 표시용).
+     * 화면 입력값이 아니라 equals 에 넣지 않고, 사용자가 수정하면 새 행이 되어 사라진다(검수했다는 뜻).
+     */
+    private double recognitionConfidence = Double.NaN;
+    private int recognitionMergedCount;
 
     private String name;
     private String classroom;
@@ -61,6 +67,21 @@ public class Course implements Serializable {
 
     public void setColorCode(String colorCode) {
         this.colorCode = colorCode;
+    }
+
+    /** [BT-026] 인식 결과에서 온 행으로 표시한다. */
+    void markRecognized(double confidence, int mergedCount) {
+        recognitionConfidence = confidence;
+        recognitionMergedCount = mergedCount;
+    }
+
+    /** 인식 신뢰도. 인식 행이 아니거나 사용자가 수정했으면 NaN. */
+    double getRecognitionConfidence() {
+        return recognitionConfidence;
+    }
+
+    int getRecognitionMergedCount() {
+        return recognitionMergedCount;
     }
 
     /** 수정한 값에 원래 수업의 courseId·professor·colorCode를 이어 붙인다(화면에 없는 값 보존). */

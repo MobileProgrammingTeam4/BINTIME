@@ -14,6 +14,7 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.PickVisualMediaRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -23,6 +24,9 @@ import androidx.core.content.ContextCompat;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.team4.bintime.R;
+import com.team4.bintime.data.recognition.RecognitionFailure;
+import com.team4.bintime.data.recognition.RecognitionResult;
+import com.team4.bintime.data.recognition.TimetableRecognitionRepositories;
 import com.team4.bintime.data.repository.TimetableImageFailure;
 import com.team4.bintime.data.repository.TimetableImagePaths;
 import com.team4.bintime.data.repository.TimetableImageRepositories;
@@ -30,6 +34,7 @@ import com.team4.bintime.data.repository.TimetableImageRepositories;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -39,8 +44,9 @@ import java.util.concurrent.Executors;
  * {@link TimetableUploadViewModel#analyze()} 한 경로로만 시작한다(오류 이미지가 있거나 검사 중이면 무시).
  * 압축 → 묶음 업로드가 끝나면 인식 결과 검수로 넘어간다. 화면은 상태 스냅샷({@link TimetableUploadScreen})만 그린다.
  * <p>
- * P1: 업로드 저장소는 Mock이고 인식은 아직 고정 예시({@link TimetableDraft#mockRecognition()})다. 실제 인식
- * (analyzeTimetable)은 BT-026에서 {@link TimetableUploadViewModel#uploadedPaths()}로 연결한다.
+ * [BT-026] 업로드가 끝나면 인식(analyzeTimetable)을 부르고, 결과를 검수 화면으로 넘긴다. 인식이 실패하면 사유별 안내와
+ * (가능하면) 다시 시도, 그리고 "직접 입력하기"로 수동 입력에 이어 간다. 여기서는 저장소에 쓰지 않는다.
+ * P3: 업로드·인식 저장소는 모두 Mock이다(실제 연동은 BT-025 P2·BT-026 P4).
  * URI·파일명·이미지 내용을 로그에 남기지 않는다.
  */
 public class TimetableUploadActivity extends AppCompatActivity {
@@ -55,19 +61,18 @@ public class TimetableUploadActivity extends AppCompatActivity {
     private final ActivityResultLauncher<PickVisualMediaRequest> gallery = registerForActivityResult(
             new ActivityResultContracts.PickMultipleVisualMedia(MAX_IMAGES), this::onImagesPicked);
     private final ActivityResultLauncher<Intent> review = registerForActivityResult(
-            new ActivityResultContracts.StartActivityForResult(), result -> {
-                if (result.getResultCode() == RESULT_OK) {
-                    setResult(RESULT_OK, result.getData());
-                    finish();
-                }
-            });
+            new ActivityResultContracts.StartActivityForResult(), this::finishIfSaved);
+    /** [BT-026] 인식 실패 시 수동 입력. 저장까지 끝나면 같은 방식으로 결과를 넘긴다. */
+    private final ActivityResultLauncher<Intent> manual = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(), this::finishIfSaved);
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         setContentView(R.layout.activity_timetable_upload);
         upload = new ViewModelProvider(this).get(TimetableUploadViewModel.class);
-        upload.attach(TimetableImageRepositories.get(this), getApplicationContext().getContentResolver());
+        upload.attach(TimetableImageRepositories.get(this), TimetableRecognitionRepositories.get(this),
+                getApplicationContext().getContentResolver());
         if (state != null) {
             // 회전이면 ViewModel에 선택이 남아 있다. 프로세스가 종료됐다가 돌아온 경우에만 다시 검사한다.
             upload.restoreIfEmpty(state.getParcelableArrayList(STATE_IMAGES));
@@ -77,11 +82,27 @@ public class TimetableUploadActivity extends AppCompatActivity {
         findViewById(R.id.btnSelectFromGallery).setOnClickListener(v -> openGallery());
         // 분석 시작 경로는 이것 하나다. 판정은 ViewModel(TimetableUploadController.canAnalyze)이 한다.
         findViewById(R.id.btnAnalyze).setOnClickListener(v -> upload.analyze());
+        findViewById(R.id.timetable_upload_manual).setOnClickListener(v -> openManualInput());
         upload.getScreen().observe(this, this::render);
     }
 
+    private void finishIfSaved(ActivityResult result) {
+        if (result.getResultCode() == RESULT_OK) {
+            setResult(RESULT_OK, result.getData());
+            finish();
+        }
+    }
+
+    /** 인식 대신 직접 입력(새 시간표). 저장 전에 기존 수업 교체 확인을 받는다. */
+    private void openManualInput() {
+        if (currentScreen().isBusy()) return;
+        manual.launch(TimetableDraft.open(this, CourseDirectInputActivity.class,
+                new TimetableDraft(Collections.emptyList()).markReplacesExisting()));
+    }
+
     private void openGallery() {
-        if (currentScreen().upload.isBusy()) return;
+        TimetableUploadScreen screen = currentScreen();
+        if (screen.upload.isBusy() || screen.recognizing) return;
         gallery.launch(new PickVisualMediaRequest.Builder()
                 .setMediaType(ActivityResultContracts.PickVisualMedia.ImageOnly.INSTANCE).build());
     }
@@ -109,7 +130,7 @@ public class TimetableUploadActivity extends AppCompatActivity {
 
         ProgressBar progress = findViewById(R.id.timetable_upload_progress);
         boolean uploading = screen.upload.phase == TimetableUploadState.Phase.UPLOADING;
-        progress.setVisibility(screen.upload.isBusy() ? View.VISIBLE : View.GONE);
+        progress.setVisibility(screen.upload.isBusy() || screen.recognizing ? View.VISIBLE : View.GONE);
         progress.setIndeterminate(!uploading);
         if (uploading) progress.setProgress(screen.upload.progressPercent);
 
@@ -127,6 +148,8 @@ public class TimetableUploadActivity extends AppCompatActivity {
         String message = errorText(screen);
         errors.setText(message);
         errors.setVisibility(message != null ? View.VISIBLE : View.GONE);
+        findViewById(R.id.timetable_upload_manual).setVisibility(
+                RecognitionMessages.offersManualInput(screen.recognitionFailure) ? View.VISIBLE : View.GONE);
 
         openRecognitionIfReady();
     }
@@ -144,14 +167,20 @@ public class TimetableUploadActivity extends AppCompatActivity {
         if (text.length() == 0 && state.phase == TimetableUploadState.Phase.FAILED && state.failure != null) {
             text.append(getString(TimetableUploadMessages.of(state.failure.getCode())));
         }
+        RecognitionFailure recognition = screen.recognitionFailure;
+        if (text.length() == 0 && recognition != null) {
+            text.append(getString(RecognitionMessages.of(recognition.getReason())));
+        }
         return text.length() > 0 ? text.toString() : null;
     }
 
-    /** 업로드가 끝났으면 인식 결과 검수로 한 번만 넘어간다. P1은 고정 예시 인식. */
+    /** 인식이 끝났으면 결과를 검수 화면으로 한 번만 넘긴다(중복 병합은 RecognitionDrafts). */
     private void openRecognitionIfReady() {
-        if (isFinishing() || isDestroyed() || !upload.takeRecognitionRequest()) return;
-        review.launch(TimetableDraft.open(this,
-                TimetableReviewActivity.class, TimetableDraft.mockRecognition()));
+        if (isFinishing() || isDestroyed()) return;
+        RecognitionResult result = upload.takeRecognition();
+        if (result == null) return;
+        review.launch(TimetableReviewActivity.forRecognition(this, RecognitionDrafts.toDraft(result),
+                result.droppedCount, result.warnings));
     }
 
     private void showImages(List<Uri> selection) {
@@ -185,7 +214,10 @@ public class TimetableUploadActivity extends AppCompatActivity {
             remove.setContentDescription("이미지 " + (i + 1) + " 삭제");
             remove.setOnClickListener(v -> upload.remove(uri));
             previews.addView(preview);
-            loadThumbnail(uri, preview.findViewById(R.id.ivThumbnail));
+            ImageView thumbnail = preview.findViewById(R.id.ivThumbnail);
+            // 둥근 배경 모양대로 사진을 잘라 오류 테두리 밖으로 모서리가 삐져나오지 않게 한다.
+            thumbnail.setClipToOutline(true);
+            loadThumbnail(uri, thumbnail);
         }
     }
 
@@ -218,14 +250,16 @@ public class TimetableUploadActivity extends AppCompatActivity {
             analyze.setText(R.string.timetable_upload_preparing);
         } else if (state.phase == TimetableUploadState.Phase.UPLOADING) {
             analyze.setText(getString(R.string.timetable_upload_progress, state.progressPercent));
-        } else if (state.canRetrySameSelection()) {
+        } else if (screen.recognizing) {
+            analyze.setText(R.string.timetable_upload_recognizing);
+        } else if (state.canRetrySameSelection() || RecognitionMessages.showsRetry(screen.recognitionFailure)) {
             analyze.setText(R.string.timetable_upload_retry);
         } else {
             analyze.setText(R.string.timetable_upload_analyze);
         }
         analyze.setBackgroundResource(enabled ? R.drawable.bg_pill_primary : R.drawable.bg_btn_disabled_pill);
         analyze.setTextColor(ContextCompat.getColor(this, enabled ? R.color.bg_card : R.color.timetable_disabled_text));
-        findViewById(R.id.btnSelectFromGallery).setEnabled(!state.isBusy());
+        findViewById(R.id.btnSelectFromGallery).setEnabled(!state.isBusy() && !screen.recognizing);
     }
 
     private String imageName(Uri uri) {

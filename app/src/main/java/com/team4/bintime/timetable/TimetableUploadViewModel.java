@@ -9,6 +9,8 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
+import com.team4.bintime.data.recognition.RecognitionResult;
+import com.team4.bintime.data.recognition.TimetableRecognitionRepository;
 import com.team4.bintime.data.repository.TimetableImageRepository;
 
 import java.util.ArrayList;
@@ -17,7 +19,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * [BT-025] 업로드 화면의 선택·검사·업로드 상태를 회전 뒤에도 유지한다. 판정과 흐름은
+ * [BT-025/026] 업로드 화면의 선택·검사·업로드·인식 상태를 회전 뒤에도 유지한다. 판정과 흐름은
  * {@link TimetableUploadController}가 하고, 이 클래스는 Android 연결(스레드, Uri 검사·압축)만 맡는다.
  * 화면을 완전히 떠나면({@link #onCleared}) 진행 중인 업로드를 취소하고 올린 이미지를 지운다.
  * 메인 스레드에서만 호출한다.
@@ -38,9 +40,10 @@ public class TimetableUploadViewModel extends ViewModel {
      * 처음 한 번 저장소와 resolver를 연결한다. 회전 뒤 다시 불러도 기존 연결을 유지한다.
      * resolver는 Application의 것을 넘긴다(화면 Context를 붙잡지 않도록).
      */
-    void attach(TimetableImageRepository repository, ContentResolver resolver) {
+    void attach(TimetableImageRepository repository, TimetableRecognitionRepository recognizer,
+                ContentResolver resolver) {
         if (controller != null) return;
-        controller = new TimetableUploadController<>(repository, background, mainHandler::post,
+        controller = new TimetableUploadController<>(repository, recognizer, background, mainHandler::post,
                 uri -> TimetableImageCompressor.inspect(resolver, uri),
                 uri -> TimetableImageCompressor.prepare(resolver, uri),
                 screen::setValue);
@@ -69,12 +72,12 @@ public class TimetableUploadViewModel extends ViewModel {
         return controller.analyze();
     }
 
-    /** 인식으로 넘어갈 차례면 true를 한 번만 돌려준다. */
-    boolean takeRecognitionRequest() {
-        return controller != null && controller.takeRecognitionRequest();
+    /** 검수로 넘어갈 차례면 인식 결과를 한 번만 돌려준다. 아니면 null. */
+    RecognitionResult takeRecognition() {
+        return controller == null ? null : controller.takeRecognition();
     }
 
-    /** analyzeTimetable 에 넘길 경로(P3). UPLOADED가 아니면 빈 목록. */
+    /** analyzeTimetable 에 넘긴 경로. UPLOADED가 아니면 빈 목록. */
     List<String> uploadedPaths() {
         return controller == null ? new ArrayList<>() : controller.uploadedPaths();
     }

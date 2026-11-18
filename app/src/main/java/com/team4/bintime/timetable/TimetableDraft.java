@@ -27,6 +27,11 @@ final class TimetableDraft implements Serializable {
     /** 요일(월~일)별 선택 칸. 비트 i = 자정 기준 30분 칸 i. 화면은 앞의 5개(월~금)만 쓴다. */
     private final long[] freeSlots = new long[7];
     private boolean suggested;
+    /**
+     * [BT-026 결정 0-3] 새 시간표 등록(직접 입력 새로 시작·이미지 인식)이라 저장하면 기존 수업이 모두 바뀐다.
+     * 저장 전에 "기존 수업이 새 시간표로 교체됩니다" 확인을 받는다. 기존 시간표 수정이면 false.
+     */
+    private boolean replacesExisting;
 
     TimetableDraft(List<Course> courses) {
         this.courses = new ArrayList<>(courses);
@@ -36,19 +41,18 @@ final class TimetableDraft implements Serializable {
         TimetableDraft copy = new TimetableDraft(courses);
         System.arraycopy(freeSlots, 0, copy.freeSlots, 0, Math.min(freeSlots.length, copy.freeSlots.length));
         copy.suggested = suggested;
+        copy.replacesExisting = replacesExisting;
         return copy;
     }
 
-    static TimetableDraft mockRecognition() {
-        return new TimetableDraft(Arrays.asList(
-                new Course("컴퓨터 구조론", "공학관 302호", "월", "10:00", "11:30"),
-                new Course("미적분학", "공학관 201호", "화", "09:00", "10:30"),
-                new Course("수학", "본관 202호", "수", "09:00", "10:00"),
-                new Course("자료구조", "공학관 301호", "수", "11:00", "12:30"),
-                new Course("웹 프로그래밍", "공학관 303호", "목", "13:00", "14:30"),
-                new Course("영어", "인문관 101호", "금", "10:00", "11:00"),
-                new Course("세미나", "본관 401호", "금", "12:00", "12:30")
-        ));
+    /** 새 시간표 등록으로 표시한다(저장 시 기존 수업 교체 확인). */
+    TimetableDraft markReplacesExisting() {
+        replacesExisting = true;
+        return this;
+    }
+
+    boolean replacesExisting() {
+        return replacesExisting;
     }
 
     boolean overlaps(Course candidate, int excludedIndex) {

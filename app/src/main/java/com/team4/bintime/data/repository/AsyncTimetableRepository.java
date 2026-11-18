@@ -74,4 +74,11 @@ public interface AsyncTimetableRepository {
      * </ul>
      */
     void saveFreeSlots(List<TimeSlot> selected, Callback<Void> callback);
+
+    /**
+     * [BT-026] 저장된 수업 수를 **서버에서만** 읽는다(기기 캐시 사용 안 함). 새 시간표로 교체하기 전에
+     * "기존 수업 N개가 지워진다"를 확인받는 데 쓴다. 캐시의 0개를 믿고 확인 없이 교체하지 않도록,
+     * 오프라인·권한 거부 등으로 서버 값을 얻지 못하면 onError 로 끝낸다(호출한 화면이 수를 뺀 확인을 띄운다).
+     */
+    void countCoursesFromServer(Callback<Integer> callback);
 }
