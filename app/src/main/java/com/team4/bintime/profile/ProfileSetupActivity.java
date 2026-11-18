@@ -29,6 +29,7 @@ import com.team4.bintime.R;
 import com.team4.bintime.auth.AuthRepositories;
 import com.team4.bintime.common.ChipViews;
 import com.team4.bintime.common.ConfirmDialog;
+import com.team4.bintime.common.NetworkStatus;
 
 import java.util.ArrayList;
 import java.util.List;
