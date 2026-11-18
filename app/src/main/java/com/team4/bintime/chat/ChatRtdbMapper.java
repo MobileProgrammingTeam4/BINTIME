@@ -92,7 +92,8 @@ final class ChatRtdbMapper {
                 samePartner ? partner.info : null,
                 samePartner && partner.hasPhoto,
                 entry.lastMessage, entry.lastMessageAt, entry.unreadCount,
-                null /* recommendedPlace: BT-042 */).withAppointments(match == null ? Collections.emptyList() : match.appointments, entry.archived);
+                null /* recommendedPlace: BT-042 */).withAppointments(match == null ? Collections.emptyList() : match.appointments, entry.archived)
+                .withPartnerPhoto(samePartner ? partner.photoPath : null);
     }
 
     @Nullable

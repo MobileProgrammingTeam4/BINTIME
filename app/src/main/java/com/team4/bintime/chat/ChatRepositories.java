@@ -11,6 +11,8 @@ import com.google.firebase.FirebaseApp;
 import com.google.firebase.database.FirebaseDatabase;
 import com.team4.bintime.R;
 import com.team4.bintime.auth.AuthRepositories;
+import com.team4.bintime.profile.ProfileRepositories;
+import com.team4.bintime.profile.ProfileRepository;
 
 import java.util.Objects;
 
@@ -39,8 +41,11 @@ public final class ChatRepositories {
         if (!(selected instanceof FirebaseChatRepository) || !Objects.equals(selectedUid, uid)) {
             if (selected instanceof FirebaseChatRepository) ((FirebaseChatRepository) selected).close();
             selectedUid = uid;
+            String fallbackName = context.getString(R.string.chat_partner_fallback_name);
+            ProfileRepository profiles = ProfileRepositories.get(context);
             selected = new FirebaseChatRepository(uid, database(context), uid == null ? MatchInfoSource.UNAVAILABLE : new FirestoreMatchInfoSource(uid),
-                    PartnerSource.UNAVAILABLE, context.getString(R.string.chat_partner_fallback_name));
+                    uid == null ? PartnerSource.UNAVAILABLE : new ProfilePartnerSource(profiles::getPublicProfile, fallbackName),
+                    fallbackName);
         }
         return selected;
     }

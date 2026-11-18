@@ -43,7 +43,8 @@ final class ChatMessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
 
     void setRoom(ChatRoom room) {
         boolean avatarChanged = this.room == null || !this.room.otherName.equals(room.otherName)
-                || this.room.otherHasPhoto != room.otherHasPhoto || this.room.archived != room.archived;
+                || this.room.otherHasPhoto != room.otherHasPhoto || this.room.archived != room.archived
+                || !java.util.Objects.equals(this.room.otherPhotoPath, room.otherPhotoPath);
         this.room = room;
         if (avatarChanged) notifyDataSetChanged();
     }
