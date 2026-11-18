@@ -1,5 +1,6 @@
 package com.team4.bintime.timetable;
 
+import com.team4.bintime.data.recognition.RecognitionFailure;
 import com.team4.bintime.data.repository.TimetableImageFailure;
 
 import java.util.ArrayList;
@@ -7,9 +8,9 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * [BT-025] 업로드 화면이 그대로 그리는 스냅샷(불변). 선택한 이미지별 오류와 업로드 진행 상태, 그리고
- * 분석 버튼을 켤지({@link #canAnalyze})를 함께 담는다. 버튼 활성 조건은 화면이 따로 계산하지 않는다.
- * 이미지 내용·URI는 담지 않는다.
+ * [BT-025/026] 업로드 화면이 그대로 그리는 스냅샷(불변). 선택한 이미지별 오류, 업로드 진행 상태, 인식 진행·실패,
+ * 그리고 분석 버튼을 켤지({@link #canAnalyze})를 함께 담는다. 버튼 활성 조건은 화면이 따로 계산하지 않는다.
+ * 이미지 내용·URI·인식 결과는 담지 않는다.
  */
 final class TimetableUploadScreen {
 
@@ -21,20 +22,28 @@ final class TimetableUploadScreen {
     final boolean checking;
     /** 업로드 진행 상태. */
     final TimetableUploadState upload;
-    /** 분석 시작(또는 이미 올린 선택으로 검수 재진입)이 가능하다. */
+    /** [BT-026] analyzeTimetable 호출 중. */
+    final boolean recognizing;
+    /** [BT-026] 마지막 인식 실패. 없으면 null. */
+    final RecognitionFailure recognitionFailure;
+    /** 분석 시작(또는 이미 인식한 선택으로 검수 재진입·인식 재시도)이 가능하다. */
     final boolean canAnalyze;
 
     TimetableUploadScreen(List<TimetableImageFailure.Code> imageFailures, boolean checking,
-                          TimetableUploadState upload, boolean canAnalyze) {
+                          TimetableUploadState upload, boolean recognizing, RecognitionFailure recognitionFailure,
+                          boolean canAnalyze) {
         this.imageFailures = Collections.unmodifiableList(new ArrayList<>(imageFailures));
         this.count = this.imageFailures.size();
         this.checking = checking;
         this.upload = upload == null ? TimetableUploadState.idle() : upload;
+        this.recognizing = recognizing;
+        this.recognitionFailure = recognitionFailure;
         this.canAnalyze = canAnalyze;
     }
 
     static TimetableUploadScreen empty() {
-        return new TimetableUploadScreen(Collections.emptyList(), false, TimetableUploadState.idle(), false);
+        return new TimetableUploadScreen(Collections.emptyList(), false, TimetableUploadState.idle(), false, null,
+                false);
     }
 
     boolean hasImageFailures() {
@@ -43,6 +52,6 @@ final class TimetableUploadScreen {
     }
 
     boolean isBusy() {
-        return checking || upload.isBusy();
+        return checking || upload.isBusy() || recognizing;
     }
 }

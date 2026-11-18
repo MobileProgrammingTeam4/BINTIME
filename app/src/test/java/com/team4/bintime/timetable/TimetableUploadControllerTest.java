@@ -2,9 +2,13 @@ package com.team4.bintime.timetable;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import com.team4.bintime.data.recognition.MockTimetableRecognitionRepositoryAccess;
+import com.team4.bintime.data.recognition.RecognitionFailure;
+import com.team4.bintime.data.recognition.RecognitionResult;
 import com.team4.bintime.data.repository.MockTimetableImageRepositoryAccess;
 import com.team4.bintime.data.repository.TimetableImageFailure.Code;
 
@@ -29,6 +33,8 @@ public class TimetableUploadControllerTest {
     private final Queue<Runnable> background = new ArrayDeque<>();
     private final Executor direct = Runnable::run;
     private final MockTimetableImageRepositoryAccess repo = new MockTimetableImageRepositoryAccess("uid-me");
+    private final MockTimetableRecognitionRepositoryAccess recognizer =
+            new MockTimetableRecognitionRepositoryAccess("uid-me");
     /** 선택 시 검사 결과. 없으면 통과. */
     private final Map<String, Code> inspectResults = new HashMap<>();
     private final List<String> inspected = new ArrayList<>();
@@ -36,7 +42,7 @@ public class TimetableUploadControllerTest {
     private final List<TimetableUploadScreen> screens = new ArrayList<>();
 
     private final TimetableUploadController<String> controller = new TimetableUploadController<>(
-            repo.repository(), background::add, direct,
+            repo.repository(), recognizer.repository(), background::add, direct,
             image -> {
                 inspected.add(image);
                 return inspectResults.get(image);
@@ -73,7 +79,7 @@ public class TimetableUploadControllerTest {
         runBackground();
         assertTrue(prepared.isEmpty());
         assertTrue(repo.storedPaths().isEmpty());
-        assertFalse(controller.takeRecognitionRequest());
+        assertNull(controller.takeRecognition());
         assertEquals(TimetableUploadState.Phase.IDLE, last().upload.phase);
     }
 
@@ -120,8 +126,8 @@ public class TimetableUploadControllerTest {
         assertEquals(TimetableUploadState.Phase.UPLOADED, last().upload.phase);
         assertEquals(Arrays.asList("img5-0", "img5-1", "img5-2", "img5-3", "img5-4"), prepared);
         assertEquals(5, controller.uploadedPaths().size());
-        assertTrue(controller.takeRecognitionRequest());
-        assertFalse(controller.takeRecognitionRequest()); // 한 번만
+        assertNotNull(controller.takeRecognition());
+        assertNull(controller.takeRecognition()); // 한 번만
     }
 
     @Test
@@ -184,7 +190,7 @@ public class TimetableUploadControllerTest {
     @Test
     public void inspectorCrash_isTreatedAsCorrupt() {
         TimetableUploadController<String> crashing = new TimetableUploadController<>(
-                repo.repository(), background::add, direct,
+                repo.repository(), recognizer.repository(), background::add, direct,
                 image -> {
                     throw new IllegalStateException("decoder");
                 },
@@ -199,7 +205,7 @@ public class TimetableUploadControllerTest {
     public void failureFoundOnlyWhilePreparing_isKeptOnImage_andBlocksAnalyze() {
         // 선택 시 검사는 통과했지만 압축에서 실패(예: 5MB 미만으로 줄지 않음).
         TimetableUploadController<String> c = new TimetableUploadController<>(
-                repo.repository(), background::add, direct, image -> null,
+                repo.repository(), recognizer.repository(), background::add, direct, image -> null,
                 image -> "b".equals(image)
                         ? TimetableImageCompressor.Result.fail(Code.COMPRESSED_TOO_LARGE)
                         : TimetableImageCompressor.Result.ok(new byte[1]),
@@ -240,7 +246,7 @@ public class TimetableUploadControllerTest {
         runBackground();
         controller.analyze();
         runBackground();
-        assertTrue(controller.takeRecognitionRequest());
+        assertNotNull(controller.takeRecognition());
         List<String> paths = new ArrayList<>(controller.uploadedPaths());
         prepared.clear();
 
@@ -250,7 +256,7 @@ public class TimetableUploadControllerTest {
         assertTrue(prepared.isEmpty());
         assertEquals(paths, controller.uploadedPaths());
         assertEquals(paths, repo.storedPaths());
-        assertTrue(controller.takeRecognitionRequest());
+        assertNotNull(controller.takeRecognition());
     }
 
     @Test
@@ -277,7 +283,7 @@ public class TimetableUploadControllerTest {
         controller.select(Collections.singletonList("c"));
         assertTrue(repo.storedPaths().isEmpty());
         assertEquals(TimetableUploadState.Phase.IDLE, last().upload.phase);
-        assertFalse(controller.takeRecognitionRequest());
+        assertNull(controller.takeRecognition());
     }
 
     @Test
@@ -293,5 +299,81 @@ public class TimetableUploadControllerTest {
         assertEquals(before.canAnalyze, again.canAnalyze);
         assertFalse(again.canAnalyze);
         assertNull(again.imageFailures.get(0));
+    }
+
+    // ── [BT-026] 업로드 뒤 인식 ───────────────────────────────────────────
+
+    private void uploadTwo() {
+        controller.select(Arrays.asList("a", "b"));
+        runBackground();
+        controller.analyze();
+        runBackground();
+    }
+
+    @Test
+    public void afterUpload_recognitionRunsOnce_andResultIsHandedOverOnce() {
+        uploadTwo();
+        assertEquals(1, recognizer.calls());
+        assertFalse(last().recognizing);
+        assertNull(last().recognitionFailure);
+        RecognitionResult result = controller.takeRecognition();
+        assertNotNull(result);
+        assertEquals(4, result.courses.size()); // 서버 mock 과 같은 데이터
+        assertNull(controller.takeRecognition());
+
+        // 검수에서 돌아와 다시 분석: 업로드·인식 모두 다시 하지 않는다(AI 횟수 절약).
+        assertEquals(TimetableUploadController.AnalyzeResult.OPEN_REVIEW, controller.analyze());
+        assertEquals(1, recognizer.calls());
+        assertEquals(result, controller.takeRecognition());
+    }
+
+    @Test
+    public void retryableRecognitionFailure_allowsRetry_withoutReupload() {
+        recognizer.failNext(RecognitionFailure.of(RecognitionFailure.Reason.AI_TIMEOUT));
+        uploadTwo();
+        assertEquals(RecognitionFailure.Reason.AI_TIMEOUT, last().recognitionFailure.getReason());
+        assertTrue(last().canAnalyze);
+        assertNull(controller.takeRecognition());
+        List<String> paths = new ArrayList<>(controller.uploadedPaths());
+        prepared.clear();
+
+        assertEquals(TimetableUploadController.AnalyzeResult.RECOGNIZING, controller.analyze());
+        runBackground();
+        assertTrue(prepared.isEmpty()); // 다시 올리지 않음
+        assertEquals(paths, controller.uploadedPaths());
+        assertEquals(2, recognizer.calls());
+        assertNull(last().recognitionFailure);
+        assertNotNull(controller.takeRecognition());
+    }
+
+    @Test
+    public void nonRetryableRecognitionFailure_blocksAnalyze_untilSelectionChanges() {
+        recognizer.failNext(RecognitionFailure.of(RecognitionFailure.Reason.QUOTA_EXCEEDED));
+        uploadTwo();
+        assertEquals(RecognitionFailure.Reason.QUOTA_EXCEEDED, last().recognitionFailure.getReason());
+        assertFalse(last().canAnalyze);
+        assertEquals(TimetableUploadController.AnalyzeResult.IGNORED, controller.analyze());
+        assertEquals(1, recognizer.calls());
+
+        controller.remove("b");
+        assertNull(last().recognitionFailure);
+        assertTrue(last().canAnalyze);
+    }
+
+    @Test
+    public void serverRetryableFalse_overridesReasonDefault() {
+        // AI_UNAVAILABLE 은 기본 retryable 이지만 서버가 false(키·결제 설정 문제)를 주면 따른다.
+        recognizer.failNext(RecognitionFailure.fromServer("AI_UNAVAILABLE", false, "req-1"));
+        uploadTwo();
+        assertFalse(last().canAnalyze);
+    }
+
+    @Test
+    public void newSelection_dropsRecognitionResult() {
+        uploadTwo();
+        controller.select(Collections.singletonList("c"));
+        assertNull(controller.takeRecognition());
+        assertNull(last().recognitionFailure);
+        assertFalse(last().recognizing);
     }
 }

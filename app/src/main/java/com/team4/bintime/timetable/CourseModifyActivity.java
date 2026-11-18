@@ -40,6 +40,8 @@ public class CourseModifyActivity extends AppCompatActivity {
         original = adding ? CourseFields.empty() : draft.courses.get(index);
         save = findViewById(R.id.btnSaveAndRegister);
         fields = new CourseFields(this, CourseFields.restore(state, original), this::updateSaveButton);
+        // [BT-026] 원래 강의실이 없던 수업(인식 null·기존 null)만 비워 둘 수 있다. 추가는 필수.
+        if (!adding && CourseFormRules.classroomOptional(original)) fields.allowEmptyClassroom();
         ((TextView) findViewById(R.id.tvToolbarTitle)).setText(adding ? "수업 추가하기" : "수업 수정하기");
         ((TextView) findViewById(R.id.course_form_title)).setText(adding
                 ? "수업 정보를 입력해 주세요" : "수업 정보를 수정해 주세요");
@@ -70,7 +72,7 @@ public class CourseModifyActivity extends AppCompatActivity {
     }
 
     private void requestBack() {
-        if (original.equals(fields.value())) {
+        if (CourseFormRules.sameAsOriginal(original, fields.value())) {
             finish();
             return;
         }
@@ -80,7 +82,7 @@ public class CourseModifyActivity extends AppCompatActivity {
 
     private void updateSaveButton() {
         if (fields == null) return;
-        boolean changed = !original.equals(fields.value());
+        boolean changed = !CourseFormRules.sameAsOriginal(original, fields.value());
         save.setEnabled(changed);
         save.setBackgroundResource(changed ? R.drawable.bg_pill_primary : R.drawable.bg_btn_disabled_pill);
         save.setTextColor(ContextCompat.getColor(this, changed ? R.color.bg_card : R.color.timetable_disabled_text));

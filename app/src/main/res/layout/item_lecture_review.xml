@@ -34,6 +34,20 @@
             android:textAppearance="@style/TextAppearance.BinTime.BodyS"
             android:textColor="@color/text_secondary"
             tools:text="월 10:00 ~ 11:30 · 공학관 302호" />
+
+        <!-- [BT-026] 인식 검수 표시: 시간 겹침·수정 필요(빨강), 신뢰도·병합·주말·강의실 없음(회색) -->
+        <TextView
+            android:id="@+id/tvCourseFlags"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:includeFontPadding="false"
+            android:lineSpacingExtra="2dp"
+            android:textAppearance="@style/TextAppearance.BinTime.BodyS"
+            android:textColor="@color/text_secondary"
+            android:visibility="gone"
+            tools:text="확인 필요 · 인식 신뢰도 52%"
+            tools:visibility="visible" />
     </LinearLayout>
 
     <TextView
