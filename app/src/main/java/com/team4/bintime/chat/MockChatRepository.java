@@ -48,6 +48,26 @@ public final class MockChatRepository implements ChatRepository {
         return shared;
     }
 
+    /** 로컬 시연 전용. 실제 수락은 BT-033 Callable의 방 ID를 사용한다. */
+    public void connectMatchForDemo(com.team4.bintime.request.RequestRepository.Item item) {
+        if (rooms.containsKey(item.id)) return;
+        ChatRoom room = new ChatRoom(item.id, Arrays.asList(MY_UID, item.profileUid), ChatRoom.Status.ACTIVE,
+                item.meetingDate, item.startMinute, item.endMinute, true, item.profileUid, "매칭 상대", "", false,
+                "", 0, 0, null);
+        rooms.put(item.id, room.withAppointments(Collections.singletonList(new com.team4.bintime.request.MatchAppointment(item.id, item.id,
+                item.meetingDate, item.startMinute, item.endMinute, item.purpose, com.team4.bintime.request.MatchAppointment.Status.ACTIVE, null, false)), false));
+        messages.put(item.id, new ArrayList<>()); notifyRoomChanged(item.id);
+    }
+
+    /** 약속 선택·이전 대화 UI의 Mock 검증 주입점. Firebase 저장소에는 영향을 주지 않는다. */
+    public void setAppointmentsForDemo(String roomId, List<com.team4.bintime.request.MatchAppointment> appointments, boolean archived) {
+        setAppointmentsForDemo(roomId, appointments, archived, !archived);
+    }
+    public void setAppointmentsForDemo(String roomId, List<com.team4.bintime.request.MatchAppointment> appointments, boolean archived, boolean ready) {
+        ChatRoom room = rooms.get(roomId);
+        if (room != null) { rooms.put(roomId, room.withAppointments(appointments, archived).withChatReady(ready)); notifyRoomChanged(roomId); }
+    }
+
     private static final class Subscription<T> {
         final String matchId;
         final Listener<T> listener;
@@ -81,6 +101,7 @@ public final class MockChatRepository implements ChatRepository {
     public String currentUid() {
         return MY_UID;
     }
+    @Override public long nowMillis() { return clock.millis(); }
 
     @Override
     public Registration observeRooms(Listener<List<ChatRoom>> listener) {
@@ -115,7 +136,7 @@ public final class MockChatRepository implements ChatRepository {
     public void sendMessage(String matchId, String content, SendCallback callback) {
         ChatRoom room = rooms.get(matchId);
         String text = content == null ? "" : content.trim();
-        if (room == null || text.isEmpty() || demoState == DemoState.ERROR) {
+        if (room == null || room.archived || text.isEmpty() || demoState == DemoState.ERROR) {
             callback.onError();
             return;
         }
@@ -135,13 +156,20 @@ public final class MockChatRepository implements ChatRepository {
     @Override
     public void endMatch(String matchId, ActionCallback callback) {
         ChatRoom room = rooms.get(matchId);
-        if (room == null || leftRooms.contains(matchId) || demoState == DemoState.ERROR) {
+        if (room == null) for (ChatRoom candidate : rooms.values()) {
+            if (candidate.appointments.stream().anyMatch(a -> matchId.equals(a.matchId))) { room = candidate; break; }
+        }
+        if (room == null || leftRooms.contains(room.matchId) || room.archived || demoState == DemoState.ERROR) {
             callback.onError();
             return;
         }
         if (room.status == ChatRoom.Status.ACTIVE) {
-            rooms.put(matchId, room.withStatus(ChatRoom.Status.ENDED));
-            notifyRoomChanged(matchId);
+            List<com.team4.bintime.request.MatchAppointment> items = new ArrayList<>();
+            for (com.team4.bintime.request.MatchAppointment item : room.appointments) items.add(matchId.equals(item.matchId)
+                    ? new com.team4.bintime.request.MatchAppointment(item.matchId, item.chatRoomId, item.meetingDate, item.startMinute, item.endMinute,
+                        item.purpose, com.team4.bintime.request.MatchAppointment.Status.ENDED, item.startAtMillis() <= clock.millis(), item.reviewWritten) : item);
+            rooms.put(room.matchId, items.isEmpty() ? room.withStatus(ChatRoom.Status.ENDED) : room.withAppointments(items, false));
+            notifyRoomChanged(room.matchId);
         }
         callback.onSuccess();
     }
@@ -176,7 +204,7 @@ public final class MockChatRepository implements ChatRepository {
 
     private void receiveMockReply(String matchId) {
         ChatRoom room = rooms.get(matchId);
-        if (room == null) return;
+        if (room == null || room.archived) return;
         String reply = MOCK_REPLIES[nextReply++ % MOCK_REPLIES.length];
         append(room, room.otherUid, reply, room.unreadCount + 1);
     }
@@ -282,6 +310,8 @@ public final class MockChatRepository implements ChatRepository {
         messages.put(matchId, list);
         rooms.put(matchId, new ChatRoom(matchId, Arrays.asList(MY_UID, otherUid), status,
                 meetingDate, start, end, true, otherUid, otherName, otherInfo, hasPhoto,
-                last.content, last.createdAt, unread, place));
+                last.content, last.createdAt, unread, place).withAppointments(Collections.singletonList(new com.team4.bintime.request.MatchAppointment(
+                    matchId, matchId, meetingDate, start, end, "함께 시간 보내기", com.team4.bintime.request.MatchAppointment.Status.valueOf(status.name()),
+                    status == ChatRoom.Status.ENDED ? Boolean.TRUE : null, false)), false));
     }
 }

@@ -23,6 +23,8 @@ import com.team4.bintime.data.MockMatchRepository;
 import com.team4.bintime.matching.ProfileDetailActivity;
 import com.team4.bintime.model.MatchCandidate;
 import com.team4.bintime.model.MatchFilter;
+import com.team4.bintime.profile.ProfileRepositories;
+import com.team4.bintime.profile.UserProfile;
 
 import java.util.Collections;
 import java.util.List;
@@ -41,13 +43,21 @@ public final class RequestTabsController {
     private MockRequestRepository.Tab tab = MockRequestRepository.Tab.SENT;
     private RequestRepository.Registration registration;
     private final Consumer<Intent> openAccepted;
+    private final RequestProfileLoader profiles;
 
     public RequestTabsController(Fragment fragment, View root, RequestRepository repository,
                                  Consumer<Intent> openAccepted) {
+        this(fragment, root, repository, openAccepted, ProfileRepositories.get(root.getContext())::getPublicProfile);
+    }
+
+    RequestTabsController(Fragment fragment, View root, RequestRepository repository,
+                          Consumer<Intent> openAccepted, RequestProfileLoader.Source source) {
         this.fragment = fragment;
         this.root = root;
         this.repository = repository;
         this.openAccepted = openAccepted;
+        profiles = new RequestProfileLoader(source,
+                () -> root.post(() -> { if (canShowFeedback()) render(); }));
         fragment.getChildFragmentManager().setFragmentResultListener(ACTION_RESULT,
                 fragment.getViewLifecycleOwner(), (key, result) -> handleAction(result));
         fragment.getViewLifecycleOwner().getLifecycle().addObserver(new DefaultLifecycleObserver() {
@@ -56,6 +66,7 @@ public final class RequestTabsController {
                 if (registration != null) registration.remove();
                 registration = null;
             }
+            @Override public void onDestroy(LifecycleOwner owner) { profiles.close(); }
         });
     }
 
@@ -94,8 +105,14 @@ public final class RequestTabsController {
 
     private void bind(View card, MockRequestRepository.Item item) {
         MatchCandidate profile = repository.isMock() ? MockMatchRepository.find(item.profileUid) : null;
-        text(card, R.id.requestName, profile == null ? fragment.getString(R.string.request_profile_pending) : profile.name);
-        text(card, R.id.requestInfo, profile == null ? fragment.getString(R.string.request_profile_pending_message)
+        if (!repository.isMock()) profiles.load(item.profileUid);
+        UserProfile actual = profiles.get(item.profileUid);
+        boolean profileFailed = profiles.failed(item.profileUid);
+        boolean profileMissing = profiles.missing(item.profileUid);
+        text(card, R.id.requestName, actual != null ? publicName(actual) : profile == null
+                ? fragment.getString(profileMissing ? R.string.request_profile_missing : profileFailed ? R.string.request_profile_error : R.string.request_profile_pending) : profile.name);
+        text(card, R.id.requestInfo, actual != null ? actual.getDepartment() + " " + actual.getGrade() + " · " + actual.getGender()
+                : profile == null ? fragment.getString(profileMissing ? R.string.request_profile_missing_message : profileFailed ? R.string.request_profile_retry_message : R.string.request_profile_pending_message)
                 : profile.department + " " + profile.grade + "학년 · " + profile.gender);
         boolean completed = item.status() == MockRequestRepository.Status.ACCEPTED;
         boolean ended = item.matchStatus() == MockRequestRepository.MatchStatus.ENDED;
@@ -103,20 +120,22 @@ public final class RequestTabsController {
         badge.setVisibility(item.sent || completed ? View.VISIBLE : View.GONE);
         badge.setText(completed ? item.matchStatus() == null ? R.string.request_completed
                 : ended ? R.string.request_ended : R.string.request_active : R.string.request_waiting);
-        View profileButton = card.findViewById(R.id.requestProfile);
-        profileButton.setVisibility(profile != null && !item.sent && !completed ? View.VISIBLE : View.GONE);
-        if (profile != null) profileButton.setOnClickListener(v -> fragment.startActivity(ProfileDetailActivity.intent(
-                v.getContext(), profile.uid, Collections.emptySet())));
+        TextView profileButton = card.findViewById(R.id.requestProfile);
+        profileButton.setVisibility(profileFailed || (profile != null || actual != null) && !item.sent && !completed ? View.VISIBLE : View.GONE);
+        profileButton.setText(profileFailed ? R.string.request_retry : R.string.request_profile);
+        profileButton.setOnClickListener(profileFailed ? v -> profiles.retry(item.profileUid)
+                : v -> fragment.startActivity(ProfileDetailActivity.intent(v.getContext(), item.profileUid, Collections.emptySet())));
         // 시간 요약은 후보의 현재 공강 대신 요청 스냅샷을 표시한다.
         text(card, R.id.time, timeLabel(item));
         text(card, R.id.duration, MatchFilter.formatDuration(item.endMinute - item.startMinute) + " 겹침");
         text(card, R.id.reasons, profile == null ? "" : String.join("\n", profile.reasons));
-        text(card, R.id.requestIntro, profile == null ? "" : profile.intro);
+        text(card, R.id.requestIntro, actual != null ? actual.getBio() : profile == null ? "" : profile.intro);
         card.findViewById(R.id.reasons).setVisibility(profile == null ? View.GONE : View.VISIBLE);
-        card.findViewById(R.id.requestIntro).setVisibility(profile == null ? View.GONE : View.VISIBLE);
+        card.findViewById(R.id.requestIntro).setVisibility(profile == null && actual == null ? View.GONE : View.VISIBLE);
         LinearLayout tags = card.findViewById(R.id.requestTags);
         addTag(tags, item.purpose, true);
         if (profile != null) for (String tag : profile.tags) addTag(tags, tag, tag.equals("#전공스터디") || tag.equals("#카페"));
+        if (actual != null && actual.getInterestTags() != null) for (String tag : actual.getInterestTags()) addTag(tags, tag, false);
         text(card, R.id.requestMetadata, repository.isMock() ? fragment.getString(R.string.request_mock_metadata,
                 fragment.getString(completed ? R.string.request_completed : item.sent
                         ? R.string.request_sent : R.string.request_received)) : java.time.Instant.ofEpochMilli(item.createdAt)
@@ -124,12 +143,13 @@ public final class RequestTabsController {
         TextView secondary = card.findViewById(R.id.requestSecondary);
         TextView primary = card.findViewById(R.id.requestPrimary);
         secondary.setEnabled(!repository.isUpdating(item.id));
+        primary.setEnabled(!repository.isUpdating(item.id));
         primary.setVisibility(!item.sent && !completed ? View.VISIBLE : View.GONE);
         if (completed) {
             secondary.setText(ended ? R.string.request_review : R.string.request_chat);
             secondary.setOnClickListener(v -> {
                 if (ended) Toast.makeText(v.getContext(), R.string.request_review_pending, Toast.LENGTH_SHORT).show();
-                else ((MainActivity) fragment.requireActivity()).selectTab(R.id.nav_chat);
+                else MatchChatNavigator.open((MainActivity) fragment.requireActivity(), item.id, v);
             });
         } else if (item.sent) {
             secondary.setText(R.string.request_cancel);
@@ -139,12 +159,6 @@ public final class RequestTabsController {
             secondary.setOnClickListener(v -> confirm(item, MockRequestRepository.Status.REJECTED, "거절"));
             primary.setText(R.string.request_accept);
             primary.setOnClickListener(v -> confirm(item, MockRequestRepository.Status.ACCEPTED, "수락"));
-            if (!repository.isMock()) {
-                secondary.setEnabled(false);
-                primary.setEnabled(false);
-                secondary.setContentDescription(fragment.getString(R.string.request_response_pending));
-                primary.setContentDescription(fragment.getString(R.string.request_response_pending));
-            }
         }
     }
 
@@ -153,12 +167,16 @@ public final class RequestTabsController {
         if (fragment.getChildFragmentManager().isStateSaved()
                 || fragment.getChildFragmentManager().findFragmentByTag(key) != null) return;
         MatchCandidate profile = repository.isMock() ? MockMatchRepository.find(item.profileUid) : null;
+        UserProfile actual = profiles.get(item.profileUid);
+        String name = actual != null ? publicName(actual) : profile == null ? "상대방" : profile.name;
         Bundle result = new Bundle();
         result.putString("id", item.id); result.putString("status", status.name());
         ConfirmDialog.show(fragment.getChildFragmentManager(), key,
-                fragment.getString(R.string.request_confirm_title, profile == null ? "이" : profile.name + "님의", action),
-                fragment.getString(repository.isMock() ? R.string.request_confirm_message : R.string.request_cancel_message,
-                        profile == null ? "상대방" : profile.name, timeLabel(item)),
+                fragment.getString(R.string.request_confirm_title, name + "님의", action),
+                fragment.getString(repository.isMock() ? R.string.request_confirm_message
+                                : status == RequestRepository.Status.CANCELED ? R.string.request_cancel_message
+                                : status == RequestRepository.Status.ACCEPTED ? R.string.request_accept_message : R.string.request_reject_message,
+                        name, timeLabel(item)),
                 fragment.getString(status == MockRequestRepository.Status.CANCELED ? R.string.request_cancel_confirm
                         : status == MockRequestRepository.Status.REJECTED ? R.string.request_reject : R.string.request_accept),
                 fragment.getString(status == MockRequestRepository.Status.CANCELED ? R.string.request_close : R.string.request_dismiss), result);
@@ -176,14 +194,18 @@ public final class RequestTabsController {
             });
             return;
         }
-        if (!repository.isMock()) { feedback(fragment.getString(R.string.request_response_pending)); return; }
         if (!"ACCEPTED".equals(action) && !"REJECTED".equals(action)) return;
-        boolean changed = repository.respond(id, RequestRepository.Status.valueOf(action));
-        render();
-        if (changed && "ACCEPTED".equals(action) && canShowFeedback()
-                && !fragment.getParentFragmentManager().isStateSaved()) {
-            openAccepted.accept(MatchAcceptedActivity.intent(root.getContext(), repository.find(id)));
-        } else feedback(fragment.getString(changed ? R.string.request_changed : R.string.request_failed));
+        repository.respond(id, RequestRepository.Status.valueOf(action), new RequestRepository.Callback() {
+            @Override public void onSuccess(RequestRepository.Item item) {
+                if (!canShowFeedback()) return;
+                render();
+                if (item.status() == RequestRepository.Status.ACCEPTED && "ACCEPTED".equals(action)
+                        && !fragment.getParentFragmentManager().isStateSaved()) {
+                    openAccepted.accept(MatchAcceptedActivity.intent(root.getContext(), item));
+                } else feedback(fragment.getString(R.string.request_changed));
+            }
+            @Override public void onError(String message) { feedback(message); }
+        });
     }
 
     private boolean canShowFeedback() {
@@ -217,5 +239,10 @@ public final class RequestTabsController {
 
     private static void text(View root, int id, String value) {
         ((TextView) root.findViewById(id)).setText(value);
+    }
+
+    private static String publicName(UserProfile profile) {
+        String name = profile.getNickname();
+        return name == null || name.isBlank() ? "상대방" : name;
     }
 }

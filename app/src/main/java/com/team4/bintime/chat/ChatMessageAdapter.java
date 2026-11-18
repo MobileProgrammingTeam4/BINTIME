@@ -21,6 +21,7 @@ final class ChatMessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
     private static final int TYPE_DATE = 0;
     private static final int TYPE_INCOMING = 1;
     private static final int TYPE_OUTGOING = 2;
+    private static final int TYPE_PARTNER_LEFT = 3;
 
     private static final class Row {
         final String date;
@@ -42,7 +43,7 @@ final class ChatMessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
 
     void setRoom(ChatRoom room) {
         boolean avatarChanged = this.room == null || !this.room.otherName.equals(room.otherName)
-                || this.room.otherHasPhoto != room.otherHasPhoto;
+                || this.room.otherHasPhoto != room.otherHasPhoto || this.room.archived != room.archived;
         this.room = room;
         if (avatarChanged) notifyDataSetChanged();
     }
@@ -62,6 +63,7 @@ final class ChatMessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
 
     @Override
     public int getItemViewType(int position) {
+        if (position == rows.size() && room != null && room.archived) return TYPE_PARTNER_LEFT;
         ChatMessage message = rows.get(position).message;
         if (message == null) return TYPE_DATE;
         return Objects.equals(currentUid, message.senderId) ? TYPE_OUTGOING : TYPE_INCOMING;
@@ -74,12 +76,17 @@ final class ChatMessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
         if (viewType == TYPE_DATE) {
             return new DateHolder(inflater.inflate(R.layout.item_chat_date_divider, parent, false));
         }
+        if (viewType == TYPE_PARTNER_LEFT) return new LeftNoticeHolder(inflater.inflate(R.layout.item_chat_partner_left, parent, false));
         int layout = viewType == TYPE_OUTGOING ? R.layout.item_chat_message_outgoing : R.layout.item_chat_message_incoming;
         return new MessageHolder(inflater.inflate(layout, parent, false));
     }
 
     @Override
     public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
+        if (holder instanceof LeftNoticeHolder) {
+            ((LeftNoticeHolder) holder).notice.setText(holder.itemView.getContext().getString(R.string.chat_partner_left, room.otherName));
+            return;
+        }
         Row row = rows.get(position);
         if (holder instanceof DateHolder) {
             ((DateHolder) holder).date.setText(row.date);
@@ -93,7 +100,12 @@ final class ChatMessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
 
     @Override
     public int getItemCount() {
-        return rows.size();
+        return rows.size() + (room != null && room.archived ? 1 : 0);
+    }
+
+    private static final class LeftNoticeHolder extends RecyclerView.ViewHolder {
+        final TextView notice;
+        LeftNoticeHolder(View view) { super(view); notice = view.findViewById(R.id.chatPartnerLeftNotice); }
     }
 
     private static final class DateHolder extends RecyclerView.ViewHolder {

@@ -14,7 +14,8 @@ const projectId = "demo-bintime";
 const snapshot = { toUid: "receiver", purpose: "스터디", meetingDate: "2026-11-12", startMinute: 600, endMinute: 690 };
 let currentSnapshot = { ...snapshot };
 const resolver: CandidateResolver = { async resolve() { return { ...currentSnapshot }; } };
-const now = () => new Date("2026-11-11T00:00:00Z");
+let clock = Date.parse("2026-11-11T00:00:00Z");
+const now = () => new Date(clock);
 const app = initializeApp({ projectId }, `requests-test-${randomUUID()}`);
 const admin = getFirestore(app);
 const service = new RequestService(admin, resolver, now);
@@ -27,7 +28,7 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)("BT-019 Firestore 에뮬�
     env = await initializeTestEnvironment({ projectId,
       firestore: { rules: readFileSync(new URL("../../firestore.rules", import.meta.url), "utf8") } });
   });
-  beforeEach(async () => { await env.clearFirestore(); currentSnapshot = { ...snapshot }; });
+  beforeEach(async () => { await env.clearFirestore(); currentSnapshot = { ...snapshot }; clock = Date.parse("2026-11-11T00:00:00Z"); });
   afterAll(async () => { await env?.cleanup(); await admin.terminate(); await deleteApp(app); });
 
   it("두 인증 사용자만 동일한 요청을 조회하고 타인·클라이언트 쓰기는 차단한다", async () => {
@@ -102,6 +103,7 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)("BT-019 Firestore 에뮬�
     expect(await Promise.all(waits)).toEqual([original.id, original.id]);
     expect(await service.cancel("sender", original.id)).toEqual(canceled);
     expect((await admin.collection("matchRequests").doc(original.id).get()).data()).toMatchObject(snapshot);
+    clock += 60_000;
     const replacement = await service.create("sender", { candidateId: "candidate-1", clientRequestId: randomUUID() });
     expect(replacement.id).not.toBe(original.id);
     expect((await admin.collection("matchRequests").get()).size).toBe(2);
@@ -125,7 +127,8 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)("BT-019 Firestore 에뮬�
   it("동시 취소는 멱등이며 수락/취소 경합도 한 상태로 직렬화된다", async () => {
     const original = await service.create("sender", { candidateId: "candidate-1", clientRequestId: randomUUID() });
     const canceled = await Promise.all(Array.from({ length: 4 }, () => service.cancel("sender", original.id)));
-    expect(new Set(canceled.map((c) => JSON.stringify(c))).size).toBe(1);
+    for (const result of canceled) expect(result).toEqual(canceled[0]);
+    clock += 60_000;
     const next = await service.create("sender", { candidateId: "candidate-2", clientRequestId: randomUUID() });
     const ref = admin.collection("matchRequests").doc(next.id);
     // BT-031의 수락 구현 대신 동일 문서에서 PENDING을 확인하는 테스트 트랜잭션만 사용한다.

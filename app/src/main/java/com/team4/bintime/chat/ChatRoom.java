@@ -1,6 +1,9 @@
 package com.team4.bintime.chat;
 
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Collections;
+import com.team4.bintime.request.MatchAppointment;
 
 /**
  * BT-009·BT-010 임시 모델. 매칭 필드는 AGENTS.md 5장의 matches 계약을 따르고, BT-012 확정 후 위치·이름을 맞춘다.
@@ -22,6 +25,9 @@ public final class ChatRoom {
     }
 
     public final String matchId;
+    /** 기존 API의 matchId는 RTDB 방 키다. 개별 약속 ID는 appointments에서 가져온다. */
+    public final List<MatchAppointment> appointments;
+    public final boolean archived;
     public final List<String> participantUids;
     public final Status status;
     public final String meetingDate;
@@ -41,6 +47,14 @@ public final class ChatRoom {
              int startMinute, int endMinute, boolean chatReady, String otherUid, String otherName,
              String otherInfo, boolean otherHasPhoto, String lastMessage, long lastMessageAt,
              int unreadCount, String recommendedPlace) {
+        this(matchId, participantUids, status, meetingDate, startMinute, endMinute, chatReady, otherUid, otherName,
+                otherInfo, otherHasPhoto, lastMessage, lastMessageAt, unreadCount, recommendedPlace, Collections.emptyList(), false);
+    }
+
+    private ChatRoom(String matchId, List<String> participantUids, Status status, String meetingDate,
+             int startMinute, int endMinute, boolean chatReady, String otherUid, String otherName,
+             String otherInfo, boolean otherHasPhoto, String lastMessage, long lastMessageAt,
+             int unreadCount, String recommendedPlace, List<MatchAppointment> appointments, boolean archived) {
         this.matchId = matchId;
         this.participantUids = participantUids;
         this.status = status;
@@ -56,12 +70,14 @@ public final class ChatRoom {
         this.lastMessageAt = lastMessageAt;
         this.unreadCount = unreadCount;
         this.recommendedPlace = recommendedPlace;
+        this.appointments = Collections.unmodifiableList(new ArrayList<>(appointments));
+        this.archived = archived;
     }
 
     ChatRoom withLastMessage(String message, long at, int unread) {
         return new ChatRoom(matchId, participantUids, status, meetingDate, startMinute, endMinute,
                 chatReady, otherUid, otherName, otherInfo, otherHasPhoto, message, at, unread,
-                recommendedPlace);
+                recommendedPlace, appointments, archived);
     }
 
     ChatRoom withUnread(int unread) {
@@ -72,6 +88,22 @@ public final class ChatRoom {
     ChatRoom withStatus(Status newStatus) {
         return new ChatRoom(matchId, participantUids, newStatus, meetingDate, startMinute, endMinute,
                 chatReady, otherUid, otherName, otherInfo, otherHasPhoto, lastMessage, lastMessageAt,
-                unreadCount, recommendedPlace);
+                unreadCount, recommendedPlace, appointments, archived);
+    }
+
+    ChatRoom withAppointments(List<MatchAppointment> items, boolean archived) {
+        Status aggregate = items.isEmpty() ? status : items.stream().anyMatch(a -> a.status == MatchAppointment.Status.ACTIVE) ? Status.ACTIVE : Status.ENDED;
+        return new ChatRoom(matchId, participantUids, archived ? Status.ENDED : aggregate, meetingDate, startMinute, endMinute,
+                chatReady && !archived, otherUid, otherName, otherInfo, otherHasPhoto, lastMessage, lastMessageAt,
+                unreadCount, recommendedPlace, items, archived);
+    }
+    ChatRoom withChatReady(boolean ready) {
+        return new ChatRoom(matchId, participantUids, status, meetingDate, startMinute, endMinute,
+                ready && !archived, otherUid, otherName, otherInfo, otherHasPhoto, lastMessage, lastMessageAt,
+                unreadCount, recommendedPlace, appointments, archived);
+    }
+    ChatRoom withDisplayAppointment(MatchAppointment item) {
+        return new ChatRoom(matchId, participantUids, status, item.meetingDate, item.startMinute, item.endMinute, chatReady,
+                otherUid, otherName, otherInfo, otherHasPhoto, lastMessage, lastMessageAt, unreadCount, recommendedPlace, appointments, archived);
     }
 }

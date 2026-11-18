@@ -9,14 +9,23 @@ import { analyzeTimetableTask } from "./ai/tasks/analyzeTimetable";
 import { generateProfileTask } from "./ai/tasks/generateProfile";
 import { recommendPlaceTask } from "./ai/tasks/recommendPlace";
 import { suggestChatRepliesTask } from "./ai/tasks/suggestChatReplies";
-import { cancelRequestCallable, createRequestCallable } from "./requests/callable";
+import { cancelRequestCallable, createRequestCallable, respondRequestCallable } from "./requests/callable";
 import { createSearchCallable } from "./matching/callable";
 import { createMessageTrigger } from "./chat/trigger";
+import { createRequestMaintenanceSchedule } from "./requests/scheduled";
+import { createChatLinkCallable, createChatLinkTrigger } from "./chat/linkCallable";
 
 /** D · BT-019 요청 생성. */
 export const createMatchRequest = createRequestCallable();
 /** D · BT-020. 발신자 본인의 PENDING 요청만 취소한다. */
 export const cancelMatchRequest = cancelRequestCallable();
+/** D · BT-031. 수신자만 수락·거절, 수락과 확정 매칭은 한 트랜잭션. */
+export const respondToMatchRequest = respondRequestCallable();
+/** D · BT-032. 배포 시 예약 작업이 생성되므로 운영 적용은 별도 승인 후 진행한다. */
+export const maintainMatchRequests = createRequestMaintenanceSchedule();
+/** D · BT-033. Firestore 매칭 → RTDB 방 연결과 참여자의 멱등 재시도. */
+export const chatOnMatchCreated = createChatLinkTrigger();
+export const ensureMatchChat = createChatLinkCallable();
 
 /** BT-024 연결 확인 */
 export const aiPing = createAiCallable(aiPingTask);
