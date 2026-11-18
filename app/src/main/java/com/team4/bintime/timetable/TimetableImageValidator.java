@@ -46,6 +46,21 @@ final class TimetableImageValidator {
         return Math.max(width, height) < MIN_LONG_SIDE ? Code.TOO_SMALL : null;
     }
 
+    /**
+     * 한 번에 올리는 이미지 전체 원본 상한(이하). 서버 analyzeTimetable 의 MAX_TOTAL_IMAGE_BYTES 와 같다
+     * (base64 를 더해도 Gemini 인라인 요청 20MB 안). 넘으면 서버가 INVALID_INPUT 으로 거부한다.
+     */
+    static final long MAX_TOTAL_UPLOAD_BYTES = 14L * 1024 * 1024;
+
+    /**
+     * count장을 올릴 때 한 장의 압축 상한(이 값 미만) = min(5MiB, 14MiB ÷ count). 모든 장이 이 미만이면 합계가
+     * {@link #MAX_TOTAL_UPLOAD_BYTES}를 넘지 않는다. count 가 범위 밖이면 가장 엄격한 5장 기준을 쓴다.
+     */
+    static long uploadLimit(int count) {
+        int n = count < 1 || count > TimetableImagePaths.MAX_IMAGES ? TimetableImagePaths.MAX_IMAGES : count;
+        return Math.min(TimetableImagePaths.MAX_UPLOAD_BYTES, MAX_TOTAL_UPLOAD_BYTES / n);
+    }
+
     /** 압축 결과가 업로드 상한 미만인지. */
     static Code checkUploadSize(byte[] jpeg) {
         if (jpeg == null || jpeg.length == 0) return Code.CORRUPT;

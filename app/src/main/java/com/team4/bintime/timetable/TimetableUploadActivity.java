@@ -61,7 +61,7 @@ public class TimetableUploadActivity extends AppCompatActivity {
     private final ActivityResultLauncher<PickVisualMediaRequest> gallery = registerForActivityResult(
             new ActivityResultContracts.PickMultipleVisualMedia(MAX_IMAGES), this::onImagesPicked);
     private final ActivityResultLauncher<Intent> review = registerForActivityResult(
-            new ActivityResultContracts.StartActivityForResult(), this::finishIfSaved);
+            new ActivityResultContracts.StartActivityForResult(), this::onReviewResult);
     /** [BT-026] 인식 실패 시 수동 입력. 저장까지 끝나면 같은 방식으로 결과를 넘긴다. */
     private final ActivityResultLauncher<Intent> manual = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(), this::finishIfSaved);
@@ -84,6 +84,12 @@ public class TimetableUploadActivity extends AppCompatActivity {
         findViewById(R.id.btnAnalyze).setOnClickListener(v -> upload.analyze());
         findViewById(R.id.timetable_upload_manual).setOnClickListener(v -> openManualInput());
         upload.getScreen().observe(this, this::render);
+    }
+
+    /** [BT-026] 검수가 끝나면(저장이든 뒤로든) 인식에 쓴 이미지를 지운다(실패는 사용자에게 보이지 않음). */
+    private void onReviewResult(ActivityResult result) {
+        upload.onReviewFinished();
+        finishIfSaved(result);
     }
 
     private void finishIfSaved(ActivityResult result) {

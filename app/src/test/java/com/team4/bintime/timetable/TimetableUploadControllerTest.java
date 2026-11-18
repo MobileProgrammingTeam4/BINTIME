@@ -9,8 +9,11 @@ import static org.junit.Assert.assertTrue;
 import com.team4.bintime.data.recognition.MockTimetableRecognitionRepositoryAccess;
 import com.team4.bintime.data.recognition.RecognitionFailure;
 import com.team4.bintime.data.recognition.RecognitionResult;
+import com.team4.bintime.data.recognition.TimetableRecognitionRepository;
 import com.team4.bintime.data.repository.MockTimetableImageRepositoryAccess;
 import com.team4.bintime.data.repository.TimetableImageFailure.Code;
+import com.team4.bintime.data.repository.TimetableImagePaths;
+import com.team4.bintime.data.repository.TimetableImageRepository;
 
 import org.junit.Test;
 
@@ -40,18 +43,64 @@ public class TimetableUploadControllerTest {
     private final List<String> inspected = new ArrayList<>();
     private final List<String> prepared = new ArrayList<>();
     private final List<TimetableUploadScreen> screens = new ArrayList<>();
+    /** 압축기에 넘긴 한 장 상한. */
+    private final List<Long> limits = new ArrayList<>();
+    /** 삭제 호출 기록("images:2", "batch:{id}"). 중복 삭제 확인용. */
+    private final List<String> deletes = new ArrayList<>();
+    private final TimetableImageRepository images = new CountingImages(repo.repository(), deletes);
 
     private final TimetableUploadController<String> controller = new TimetableUploadController<>(
-            repo.repository(), recognizer.repository(), background::add, direct,
+            images, recognizer.repository(), background::add, direct,
             image -> {
                 inspected.add(image);
                 return inspectResults.get(image);
             },
-            image -> {
+            (image, limit) -> {
                 prepared.add(image);
+                limits.add(limit);
                 return TimetableImageCompressor.Result.ok(new byte[100]);
             },
             screens::add);
+
+    /** Mock 이미지 저장소에 위임하면서 삭제 호출을 기록한다. */
+    private static final class CountingImages implements TimetableImageRepository {
+        private final TimetableImageRepository delegate;
+        private final List<String> deletes;
+
+        CountingImages(TimetableImageRepository delegate, List<String> deletes) {
+            this.delegate = delegate;
+            this.deletes = deletes;
+        }
+
+        @Override
+        public Registration uploadBatch(String batchId, List<byte[]> jpegs, UploadListener listener) {
+            return delegate.uploadBatch(batchId, jpegs, listener);
+        }
+
+        @Override
+        public void deleteImages(List<String> paths, Callback<Void> callback) {
+            deletes.add("images:" + paths.size());
+            delegate.deleteImages(paths, callback);
+        }
+
+        @Override
+        public void deleteBatch(String batchId, Callback<Void> callback) {
+            deletes.add("batch:" + batchId);
+            delegate.deleteBatch(batchId, callback);
+        }
+    }
+
+    /** 결과를 직접 돌려주는 비동기 인식 저장소(실제 Callable 처럼 나중에 끝난다). */
+    private static final class AsyncRecognizer implements TimetableRecognitionRepository {
+        final List<Callback> callbacks = new ArrayList<>();
+        int cancels;
+
+        @Override
+        public Registration analyze(List<String> imagePaths, Callback callback) {
+            callbacks.add(callback);
+            return () -> cancels++;
+        }
+    }
 
     private void runBackground() {
         while (!background.isEmpty()) background.poll().run();
@@ -194,7 +243,7 @@ public class TimetableUploadControllerTest {
                 image -> {
                     throw new IllegalStateException("decoder");
                 },
-                image -> TimetableImageCompressor.Result.ok(new byte[1]), screens::add);
+                (image, limit) -> TimetableImageCompressor.Result.ok(new byte[1]), screens::add);
         crashing.select(Collections.singletonList("x"));
         runBackground();
         assertEquals(Arrays.asList(Code.CORRUPT), last().imageFailures);
@@ -206,7 +255,7 @@ public class TimetableUploadControllerTest {
         // 선택 시 검사는 통과했지만 압축에서 실패(예: 5MB 미만으로 줄지 않음).
         TimetableUploadController<String> c = new TimetableUploadController<>(
                 repo.repository(), recognizer.repository(), background::add, direct, image -> null,
-                image -> "b".equals(image)
+                (image, limit) -> "b".equals(image)
                         ? TimetableImageCompressor.Result.fail(Code.COMPRESSED_TOO_LARGE)
                         : TimetableImageCompressor.Result.ok(new byte[1]),
                 screens::add);
@@ -375,5 +424,132 @@ public class TimetableUploadControllerTest {
         assertNull(controller.takeRecognition());
         assertNull(last().recognitionFailure);
         assertFalse(last().recognizing);
+    }
+
+    // ── [BT-026 P4] 장수별 압축 상한 ───────────────────────────────
+
+    @Test
+    public void compressionLimit_followsSelectedCount() {
+        long mib = 1024L * 1024;
+        long[] expected = {0, 5 * mib, 5 * mib, 14 * mib / 3, 14 * mib / 4, 14 * mib / 5};
+        for (int count = 1; count <= 5; count++) {
+            List<String> pick = new ArrayList<>();
+            for (int i = 0; i < count; i++) pick.add("n" + count + "-" + i);
+            controller.select(pick);
+            runBackground();
+            limits.clear();
+            controller.analyze();
+            runBackground();
+            assertEquals(count, limits.size());
+            for (long limit : limits) {
+                assertEquals("count=" + count, expected[count], limit);
+                // 모든 장이 상한 미만이면 합계가 서버 상한(14MiB) 이하다.
+                assertTrue(count * (limit - 1) <= TimetableImageValidator.MAX_TOTAL_UPLOAD_BYTES);
+                assertTrue(limit <= TimetableImagePaths.MAX_UPLOAD_BYTES);
+            }
+        }
+    }
+
+    // ── [BT-026 P4] 검수가 끝나면 이미지 삭제 ────────────────────────
+
+    @Test
+    public void reviewFinishedAfterSuccess_deletesBatchOnce_andScreenExitDoesNotDeleteAgain() {
+        uploadTwo();
+        assertNotNull(controller.takeRecognition());
+        assertEquals(2, repo.storedPaths().size());
+
+        controller.onReviewFinished();
+        assertTrue(repo.storedPaths().isEmpty());
+        assertEquals(1, deletes.size());
+        assertTrue(deletes.get(0).startsWith("batch:"));
+        assertTrue(controller.uploadedPaths().isEmpty());
+
+        // 다시 검수를 열어도 저장된 결과를 쓴다(업로드·인식·이미지 불필요).
+        assertEquals(TimetableUploadController.AnalyzeResult.OPEN_REVIEW, controller.analyze());
+        assertNotNull(controller.takeRecognition());
+        assertEquals(1, recognizer.calls());
+
+        controller.onReviewFinished(); // 두 번째 검수 종료
+        controller.clear();            // 화면 종료
+        assertEquals(1, deletes.size()); // deleteImages 와 겹치지 않는다
+    }
+
+    @Test
+    public void reviewFinished_afterRetryableFailure_keepsImagesForRetry() {
+        recognizer.failNext(RecognitionFailure.of(RecognitionFailure.Reason.AI_TIMEOUT));
+        uploadTwo();
+        controller.onReviewFinished();
+        assertEquals(2, repo.storedPaths().size());
+        assertTrue(deletes.isEmpty());
+
+        // 다시 시도는 같은 이미지로 인식만 다시 한다.
+        assertEquals(TimetableUploadController.AnalyzeResult.RECOGNIZING, controller.analyze());
+        assertEquals(2, recognizer.calls());
+    }
+
+    @Test
+    public void screenExitWithoutRecognition_stillDeletesWithDeleteImagesOnce() {
+        recognizer.failNext(RecognitionFailure.of(RecognitionFailure.Reason.AI_NOT_IMPLEMENTED));
+        uploadTwo();
+        controller.clear();
+        assertEquals(Collections.singletonList("images:2"), deletes);
+        assertTrue(repo.storedPaths().isEmpty());
+    }
+
+    // ── [BT-026 P4] 비동기 인식(실제 Callable 처럼) ────────────────────
+
+    private TimetableUploadController<String> asyncController(AsyncRecognizer async) {
+        return new TimetableUploadController<>(images, async, background::add, direct, image -> null,
+                (image, limit) -> TimetableImageCompressor.Result.ok(new byte[10]), screens::add);
+    }
+
+    @Test
+    public void asyncRecognition_showsRecognizing_thenResultOnce() {
+        AsyncRecognizer async = new AsyncRecognizer();
+        TimetableUploadController<String> c = asyncController(async);
+        c.select(Arrays.asList("a", "b"));
+        runBackground();
+        c.analyze();
+        runBackground();
+        assertTrue(last().recognizing);
+        assertFalse(last().canAnalyze);
+        c.onReviewFinished(); // 인식 중에는 지우지 않는다
+        assertTrue(deletes.isEmpty());
+
+        async.callbacks.get(0).onSuccess(RecognitionResultsForTest.empty(2));
+        assertFalse(last().recognizing);
+        assertNotNull(c.takeRecognition());
+        assertNull(c.takeRecognition());
+    }
+
+    @Test
+    public void asyncRecognition_lateResultAfterScreenExit_isDropped() {
+        AsyncRecognizer async = new AsyncRecognizer();
+        TimetableUploadController<String> c = asyncController(async);
+        c.select(Arrays.asList("a", "b"));
+        runBackground();
+        c.analyze();
+        runBackground();
+        // 인식 중에는 선택을 바꿀 수 없다.
+        assertFalse(c.select(Collections.singletonList("x")));
+        assertEquals(Arrays.asList("a", "b"), c.selection());
+
+        c.clear(); // 뒤로가기로 화면 종료 → 인식 결과 무시, 이미지 삭제
+        assertEquals(1, async.cancels);
+        assertEquals(Collections.singletonList("images:2"), deletes);
+        int published = screens.size();
+
+        async.callbacks.get(0).onSuccess(RecognitionResultsForTest.empty(2));
+        async.callbacks.get(0).onError(RecognitionFailure.of(RecognitionFailure.Reason.AI_TIMEOUT));
+        assertNull(c.takeRecognition());
+        assertEquals(published, screens.size()); // 늦은 결과로 화면을 바꾸지 않는다
+        assertEquals(1, deletes.size());
+    }
+
+    /** 테스트용 빈 인식 결과. */
+    private static final class RecognitionResultsForTest {
+        static RecognitionResult empty(int images) {
+            return new RecognitionResult(Collections.emptyList(), Collections.emptyList(), 0, images);
+        }
     }
 }
