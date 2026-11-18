@@ -51,6 +51,19 @@ public final class RecognitionParser {
         return new RecognitionResult(courses, warnings, dropped, imageCount);
     }
 
+    /**
+     * [P4] analyzeTimetable Callable 결과({@code {task, data:{courses, warnings}, meta}}, 서버 AiResponse) →
+     * 결과. {@code data}를 꺼내 {@link #parse}로 검사한다. {@code meta}(requestId 등)는 읽지 않는다.
+     * 형식이 틀리거나, 수업이 하나도 남지 않았는데 버린 수업이 있으면(응답 전체가 틀림) null(→ AI_INVALID_OUTPUT).
+     * 수업이 원래 0개인 응답(인식 못 함)은 빈 결과다.
+     */
+    public static RecognitionResult parseCallable(Object result, int imageCount) {
+        if (!(result instanceof Map)) return null;
+        RecognitionResult parsed = parse(((Map<?, ?>) result).get("data"), imageCount);
+        if (parsed == null || (parsed.courses.isEmpty() && parsed.droppedCount > 0)) return null;
+        return parsed;
+    }
+
     static RecognizedCourse course(Object raw, int imageCount) {
         if (!(raw instanceof Map)) return null;
         Map<?, ?> m = (Map<?, ?>) raw;

@@ -42,6 +42,7 @@
     <string name="timetable_recognition_error_unavailable">지금은 이미지 분석을 쓸 수 없어요.</string>
     <string name="timetable_recognition_error_not_implemented">이미지 분석은 아직 준비 중이에요. 직접 입력해 주세요.</string>
     <string name="timetable_recognition_error_network">네트워크 연결을 확인한 뒤 다시 시도해 주세요.</string>
+    <string name="timetable_recognition_error_invalid_input">이미지를 확인할 수 없어요. 다른 사진으로 다시 시도해 주세요.</string>
     <string name="timetable_recognition_error_internal">분석하지 못했어요. 직접 입력해 주세요.</string>
 
     <!-- [BT-026] 검수 -->

@@ -7,8 +7,9 @@ import com.team4.bintime.auth.AuthRepositories;
 /**
  * [BT-026] 인식 저장소 선택.
  * <p>
- * <b>P3(현재): 항상 Mock이다.</b> analyzeTimetable 의 live 프롬프트가 아직 없어(서버가 AI_NOT_IMPLEMENTED) 실제
- * Callable 연결은 P4에서 한다. 이미지 업로드도 BT-025 P2 전에는 Mock 이라 실제 경로가 없다.
+ * [P4] 이미지 저장소({@code TimetableImageRepositories})와 같은 기준({@code AuthRepositories.isFirebaseEnabled})으로
+ * Firebase 빌드면 실제 analyzeTimetable Callable({@link FirebaseTimetableRecognitionRepository}), 아니면 Mock 을
+ * 고른다. 서버 live 프롬프트가 배포되기 전에는 실제 호출이 {@code AI_NOT_IMPLEMENTED}로 끝나고 화면은 직접 입력을 안내한다.
  * UID는 {@code AuthRepositories.get(context).getCurrentUid()}로 얻는다.
  */
 public final class TimetableRecognitionRepositories {
@@ -20,6 +21,7 @@ public final class TimetableRecognitionRepositories {
 
     public static TimetableRecognitionRepository get(Context context) {
         Context app = context.getApplicationContext();
+        if (AuthRepositories.isFirebaseEnabled(app)) return FirebaseTimetableRecognitionRepository.get(app);
         synchronized (TimetableRecognitionRepositories.class) {
             if (mock == null) {
                 mock = new MockTimetableRecognitionRepository(() -> AuthRepositories.get(app).getCurrentUid());

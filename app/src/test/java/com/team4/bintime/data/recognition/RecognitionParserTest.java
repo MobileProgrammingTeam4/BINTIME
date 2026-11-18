@@ -165,6 +165,57 @@ public class RecognitionParserTest {
         assertEquals(-1, r.courses.get(0).toString().indexOf("미래관"));
     }
 
+    // ── [P4] Callable 결과(감싼 응답) ─────────────────────────────
+
+    private static Map<String, Object> envelope(Object data) {
+        Map<String, Object> e = new HashMap<>();
+        e.put("task", "analyzeTimetable");
+        e.put("data", data);
+        e.put("meta", new HashMap<>());
+        return e;
+    }
+
+    @Test
+    public void parseCallable_unwrapsData() {
+        RecognitionResult r = RecognitionParser.parseCallable(envelope(response(Collections.singletonList(course()))), 1);
+        assertEquals(1, r.courses.size());
+        assertEquals("자료구조", r.courses.get(0).name);
+        assertEquals(Collections.singletonList("안내"), r.warnings);
+    }
+
+    @Test
+    public void parseCallable_unwrappedOrMissingData_isNull() {
+        assertNull(RecognitionParser.parseCallable(response(Collections.singletonList(course())), 1));
+        assertNull(RecognitionParser.parseCallable(new HashMap<>(), 1));
+        assertNull(RecognitionParser.parseCallable(envelope("x"), 1));
+        assertNull(RecognitionParser.parseCallable(null, 1));
+    }
+
+    @Test
+    public void parseCallable_allCoursesDropped_isNull_butEmptyResponseIsEmptyResult() {
+        Map<String, Object> bad = course();
+        bad.put("dayOfWeek", 9);
+        assertNull(RecognitionParser.parseCallable(envelope(response(Arrays.asList(bad, bad))), 1));
+
+        Map<String, Object> mixed = course();
+        RecognitionResult partly = RecognitionParser.parseCallable(envelope(response(Arrays.asList(bad, mixed))), 1);
+        assertEquals(1, partly.courses.size());
+        assertEquals(1, partly.droppedCount);
+
+        RecognitionResult empty = RecognitionParser.parseCallable(envelope(response(new ArrayList<>())), 1);
+        assertNotNull(empty);
+        assertEquals(0, empty.courses.size());
+        assertEquals(0, empty.droppedCount);
+    }
+
+    @Test
+    public void parseCallable_perCourseWarnings_ignored() {
+        Map<String, Object> c = course();
+        c.put("warnings", Collections.singletonList("x"));
+        assertEquals(1, RecognitionParser.parseCallable(envelope(response(Collections.singletonList(c))), 1)
+                .courses.size());
+    }
+
     private static String repeat(char ch, int n) {
         char[] chars = new char[n];
         Arrays.fill(chars, ch);
