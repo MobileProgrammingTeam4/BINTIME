@@ -51,7 +51,41 @@ final class TimetableReplaceCheck {
         void confirmUnknown();
     }
 
+    /**
+     * [BT-026 후속, B 제안 ②] 인터넷 연결 여부. 화면은 {@code NetworkStatus.isOnline}을 넘기고, 테스트는 바꿔 끼운다.
+     */
+    interface Network {
+        boolean isOnline();
+    }
+
+    /** 저장 시작 관문을 받는 화면. 교체 확인 결과({@link Screen})에 더해 오프라인 안내와 바로 저장을 받는다. */
+    interface Start extends Screen {
+        /** 오프라인이다. 안내만 하고 서버 읽기·확인 창·저장을 시작하지 않는다. */
+        void offline();
+
+        /** 교체 확인이 필요 없거나 이미 받았다. 저장을 시작한다. */
+        void proceed();
+    }
+
     private TimetableReplaceCheck() {
+    }
+
+    /**
+     * "다음"(저장 시작)과 [다시 확인]의 관문. 오프라인이면 {@link Start#offline()}만 부르고 끝낸다(서버 읽기 0회).
+     * 온라인이면 확인이 필요할 때 서버 수업 수를 읽고({@link #check}), 아니면 {@link Start#proceed()}.
+     * 읽기 실패 창은 이제 온라인인데 서버 읽기가 실패한 경우에만 뜬다.
+     */
+    static void begin(Network network, boolean needsReplaceCheck, AsyncTimetableRepository repository,
+                      Start start) {
+        if (!network.isOnline()) {
+            start.offline();
+            return;
+        }
+        if (!needsReplaceCheck) {
+            start.proceed();
+            return;
+        }
+        check(repository, start);
     }
 
     static Decision decide(Integer serverCount, TimetableFailure failure) {

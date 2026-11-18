@@ -14,6 +14,7 @@ import com.team4.bintime.R;
 import com.team4.bintime.common.ConfirmDialog;
 import com.team4.bintime.data.repository.FreeSlotValidator;
 import com.team4.bintime.data.repository.TimetableRepositories;
+import com.team4.bintime.profile.NetworkStatus;
 
 import java.util.Collections;
 
@@ -30,6 +31,11 @@ import java.util.Collections;
  * 읽기 실패 확인({@link ReplaceCheckFailedDialog})은 별도 문구와 [다시 확인]을 갖는다. 다시 확인은 서버에서 다시
  * 읽어 성공하면 수를 보여 주는 확인(0개면 바로 저장)으로, 실패하면 같은 창을 다시 띄운다. 읽기 실패는 사용자가
  * [교체하기]를 누르지 않는 한 저장으로 이어지지 않는다.
+ * <p>
+ * [BT-026 후속, B 제안 ②] 저장 시작("다음"·확인 창의 교체·[다시 확인]) 전에 인터넷 연결을 본다(#101
+ * {@link NetworkStatus#isOnline}). 오프라인이면 서버 읽기·확인 창·저장을 시작하지 않고 안내만 한다. 그래서 읽기 실패
+ * 창은 온라인인데 서버 읽기가 실패한 경우에만 뜬다. 판단은 {@link TimetableReplaceCheck#begin}이 하고, 연결 확인은
+ * {@link #network}로 주입한다.
  */
 public class TimetableRegistrationActivity extends AppCompatActivity {
     private static final String CONFIRM_REPLACE = "timetable_confirm_replace";
@@ -42,6 +48,10 @@ public class TimetableRegistrationActivity extends AppCompatActivity {
     private TimetableSaveViewModel saver;
     private View complete;
     private OnBackPressedCallback blockBackWhileSaving;
+    /** 인터넷 연결 확인. 기본은 #101 NetworkStatus. */
+    TimetableReplaceCheck.Network network = () -> NetworkStatus.isOnline(this);
+    /** 연타·회전해도 오프라인 안내가 쌓이지 않도록 직전 안내를 바꿔 끼운다(앱 Context 로 만들어 화면을 붙잡지 않음). */
+    private static Toast offlineToast;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -81,21 +91,18 @@ public class TimetableRegistrationActivity extends AppCompatActivity {
         showSaving(saver.isSaving());
 
         findViewById(R.id.btnBack).setOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
-        complete.setOnClickListener(v -> save());
-        getSupportFragmentManager().setFragmentResultListener(CONFIRM_REPLACE, this, (key, result) -> {
-            replaceConfirmed = true;
-            save();
-        });
+        complete.setOnClickListener(v -> save(false));
+        // 확인 창의 교체도 저장 시작이라 연결을 다시 본다. 오프라인이면 교체 확인을 기억하지 않는다.
+        getSupportFragmentManager().setFragmentResultListener(CONFIRM_REPLACE, this,
+                (key, result) -> save(true));
         getSupportFragmentManager().setFragmentResultListener(ReplaceCheckFailedDialog.KEY_CONFIRM, this,
-                (key, result) -> {
-                    replaceConfirmed = true;
-                    save();
-                });
+                (key, result) -> save(true));
         getSupportFragmentManager().setFragmentResultListener(ReplaceCheckFailedDialog.KEY_RETRY, this,
-                (key, result) -> confirmReplace());
+                (key, result) -> startSave(false));
     }
 
-    private void save() {
+    /** @param confirmedNow 방금 확인 창에서 교체를 눌렀다. */
+    private void save(boolean confirmedNow) {
         if (saver.isSaving()) return;
         draft.discardOccupiedFreeSlots();
         // 매칭 대상 공강 구간 상한(40개)은 저장 전에 안내하고 거부한다.
@@ -103,29 +110,39 @@ public class TimetableRegistrationActivity extends AppCompatActivity {
             Toast.makeText(this, TimetableMessages.TOO_MANY_FREE_SLOTS, Toast.LENGTH_LONG).show();
             return;
         }
-        if (draft.replacesExisting() && !replaceConfirmed) {
-            confirmReplace();
-            return;
-        }
-        showSaving(true);
-        saver.save(TimetableRepositories.get(this),
-                TimetableDraftMapper.toCourses(draft), TimetableDraftMapper.toFreeSlots(draft));
+        startSave(confirmedNow);
     }
 
     /**
-     * 기존 수업 수를 서버에서 읽고, 있으면 교체 확인을 띄운다. 없으면 바로 저장한다. 읽지 못하면 [다시 확인]이 있는
-     * 실패 확인을 띄운다. 처음 확인과 [다시 확인] 모두 여기로 온다.
+     * 저장 시작 관문({@link TimetableReplaceCheck#begin}). 오프라인이면 안내만 한다. 온라인이면 교체 확인이 필요할 때
+     * 기존 수업 수를 서버에서 읽고, 있으면 교체 확인을, 없으면 바로 저장한다. 읽지 못하면 [다시 확인]이 있는 실패
+     * 확인을 띄운다. "다음"과 [다시 확인] 모두 여기로 온다.
      */
-    private void confirmReplace() {
-        if (checkingExisting) return;
+    private void startSave(boolean confirmedNow) {
+        if (checkingExisting || saver.isSaving()) return;
         checkingExisting = true;
         complete.setEnabled(false);
-        TimetableReplaceCheck.check(TimetableRepositories.get(this), new TimetableReplaceCheck.Screen() {
+        boolean needsCheck = draft.replacesExisting() && !replaceConfirmed && !confirmedNow;
+        TimetableReplaceCheck.begin(network, needsCheck, TimetableRepositories.get(this),
+                new TimetableReplaceCheck.Start() {
+            @Override
+            public void offline() {
+                if (!finishCheck()) return;
+                showOffline();
+            }
+
+            @Override
+            public void proceed() {
+                if (!finishCheck()) return;
+                if (confirmedNow) replaceConfirmed = true;
+                startSaving();
+            }
+
             @Override
             public void saveWithoutConfirm() {
                 if (!finishCheck()) return;
                 replaceConfirmed = true;
-                save();
+                startSaving();
             }
 
             @Override
@@ -141,6 +158,18 @@ public class TimetableRegistrationActivity extends AppCompatActivity {
                 ReplaceCheckFailedDialog.show(getSupportFragmentManager());
             }
         });
+    }
+
+    private void startSaving() {
+        showSaving(true);
+        saver.save(TimetableRepositories.get(this),
+                TimetableDraftMapper.toCourses(draft), TimetableDraftMapper.toFreeSlots(draft));
+    }
+
+    private void showOffline() {
+        if (offlineToast != null) offlineToast.cancel();
+        offlineToast = Toast.makeText(getApplicationContext(), R.string.timetable_save_offline, Toast.LENGTH_SHORT);
+        offlineToast.show();
     }
 
     /** 서버 읽기가 끝났다. 화면이 이미 닫혔으면 false(아무것도 하지 않는다). */

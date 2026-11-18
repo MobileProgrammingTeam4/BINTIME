@@ -67,4 +67,6 @@
     <string name="timetable_replace_confirm">교체하기</string>
     <string name="timetable_replace_retry">다시 확인</string>
     <string name="timetable_replace_cancel">취소</string>
+    <!-- [BT-026 B 제안 ②] 저장 전 오프라인 안내. 프로필 저장(profile_save_offline)과 같은 톤. -->
+    <string name="timetable_save_offline">네트워크 연결을 확인해 주세요. 연결된 뒤 다시 저장할 수 있어요</string>
 </resources>
