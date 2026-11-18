@@ -97,6 +97,12 @@ public class RequestFlowDeviceTest {
                             : tab == RequestRepository.Tab.RECEIVED ? R.id.tabReceived : R.id.tabDone;
                     activity.findViewById(tabId).performClick();
                     controller[0].show(tab);
+                    // 메인 루프를 넘기기 전에도 동기 반환된 사진이 채워져 있어야 한다.
+                    LinearLayout cards = activity.findViewById(R.id.requestCards);
+                    android.widget.ImageView avatar = cards.getChildAt(0).findViewById(R.id.requestAvatar);
+                    assertTrue(avatar.getDrawable() instanceof android.graphics.drawable.BitmapDrawable);
+                    Bitmap displayed = ((android.graphics.drawable.BitmapDrawable) avatar.getDrawable()).getBitmap();
+                    assertEquals(android.graphics.Color.MAGENTA, displayed.getPixel(0, 0));
                 });
                 idle();
                 main.onActivity(activity -> {

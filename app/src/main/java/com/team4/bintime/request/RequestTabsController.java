@@ -249,16 +249,24 @@ public final class RequestTabsController {
         avatar.setTag(path);
         avatar.setImageResource(R.drawable.img_default_profile);
         if (path == null || path.isEmpty()) return;
+        boolean[] binding = {true};
         ProfileRepositories.get(avatar.getContext()).loadProfilePhoto(path, new ProfileRepository.Callback<Bitmap>() {
             @Override public void onSuccess(Bitmap bitmap) {
-                // 캐시 적중 콜백은 카드가 부모에 추가되기 전에도 동기 실행될 수 있다.
+                if (bitmap == null) return;
+                // 동기 캐시는 카드 부착 전 채워 기본 이미지가 먼저 그려지는 것을 막는다.
+                if (binding[0]) {
+                    if (canShowFeedback() && path.equals(avatar.getTag())) avatar.setImageBitmap(bitmap);
+                    return;
+                }
+                // 다운로드처럼 늦게 온 결과는 제거된 카드나 종료된 화면에 적용하지 않는다.
                 root.post(() -> {
-                    if (bitmap != null && canShowFeedback() && avatar.isAttachedToWindow()
+                    if (canShowFeedback() && avatar.isAttachedToWindow()
                             && path.equals(avatar.getTag())) avatar.setImageBitmap(bitmap);
                 });
             }
             @Override public void onError(String message) { /* 사진 실패는 기본 이미지를 유지한다. */ }
         });
+        binding[0] = false;
     }
 
     private static String publicName(UserProfile profile) {
