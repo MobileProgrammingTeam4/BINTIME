@@ -1,5 +1,6 @@
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import { defineSecret } from "firebase-functions/params";
 import { FirestoreMatchAccess } from "./access";
 import { resolveMode } from "./config";
@@ -53,6 +54,15 @@ export function defaultDeps(): AiDeps {
     now: () => new Date(),
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     allowedEmailSuffixes: parseAllowedEmailSuffixes(process.env[ALLOWED_EMAIL_SUFFIXES_ENV]),
+    readImage: async (path, maxBytes) => {
+      const file = getStorage(app).bucket().file(path);
+      const [metadata] = await file.getMetadata();
+      const size = Number(metadata.size ?? 0);
+      const contentType = metadata.contentType ?? undefined;
+      if (!Number.isFinite(size) || size > maxBytes) return { contentType, size };
+      const [bytes] = await file.download();
+      return { contentType, size: bytes.length, bytes };
+    },
   };
   return cached;
 }
