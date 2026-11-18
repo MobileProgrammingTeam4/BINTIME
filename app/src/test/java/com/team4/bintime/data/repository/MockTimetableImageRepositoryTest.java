@@ -127,6 +127,52 @@ public class MockTimetableImageRepositoryTest {
         };
     }
 
+    @Test
+    public void deleteBatch_removesOnlyThatBatch_andIsIdempotent() {
+        repo.uploadBatch(BATCH, Arrays.asList(new byte[1], new byte[2]), new Recorder());
+        repo.uploadBatch("batch-2", Collections.singletonList(new byte[3]), new Recorder());
+        int[] ok = {0};
+        TimetableImageRepository.Callback<Void> callback = new TimetableImageRepository.Callback<Void>() {
+            @Override
+            public void onSuccess(Void result) {
+                ok[0]++;
+            }
+
+            @Override
+            public void onError(TimetableImageFailure failure) {
+                throw new AssertionError(failure.toString());
+            }
+        };
+        repo.deleteBatch(BATCH, callback);
+        repo.deleteBatch(BATCH, callback); // 이미 없음 → 성공
+        assertEquals(2, ok[0]);
+        assertEquals(Collections.singletonList("timetableImages/uid-me/batch-2/0.jpg"), repo.storedPaths());
+    }
+
+    @Test
+    public void deleteBatch_invalidOrSignedOut_fails() {
+        repo.uploadBatch(BATCH, Collections.singletonList(new byte[1]), new Recorder());
+        TimetableImageFailure[] got = {null};
+        TimetableImageRepository.Callback<Void> callback = new TimetableImageRepository.Callback<Void>() {
+            @Override
+            public void onSuccess(Void result) {
+                throw new AssertionError("success");
+            }
+
+            @Override
+            public void onError(TimetableImageFailure failure) {
+                got[0] = failure;
+            }
+        };
+        repo.deleteBatch("../x", callback);
+        assertEquals(TimetableImageFailure.Code.UNKNOWN, got[0].getCode());
+        uid = null;
+        repo.deleteBatch(BATCH, callback);
+        assertEquals(TimetableImageFailure.Code.NOT_SIGNED_IN, got[0].getCode());
+        uid = "uid-me";
+        assertEquals(1, repo.storedPaths().size());
+    }
+
     private static final class Recorder implements TimetableImageRepository.UploadListener {
         final List<String> progress = new ArrayList<>();
         List<String> paths;

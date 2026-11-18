@@ -108,7 +108,8 @@ public class TimetableImageValidatorTest {
             TimetableUploadMessages.of(code); // 예외 없이 문구가 있어야 한다
         }
         for (Code code : new Code[]{Code.UNSUPPORTED_TYPE, Code.SOURCE_TOO_LARGE, Code.CORRUPT, Code.TOO_SMALL,
-                Code.COMPRESSED_TOO_LARGE, Code.READ_FAILED, Code.NETWORK, Code.PERMISSION_DENIED}) {
+                Code.COMPRESSED_TOO_LARGE, Code.READ_FAILED, Code.NETWORK, Code.PERMISSION_DENIED,
+                Code.QUOTA_EXCEEDED}) {
             assertNotEquals(code.name(), R.string.timetable_upload_error_unknown, TimetableUploadMessages.of(code));
         }
     }

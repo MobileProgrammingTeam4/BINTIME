@@ -12,7 +12,7 @@ import java.util.List;
  *   <li>Firebase 구현(P2)의 콜백은 메인 스레드, Mock은 호출한 스레드에서 즉시 부른다.</li>
  *   <li>이미지 바이트·경로·URI를 로그에 남기지 않는다.</li>
  * </ul>
- * 구현체: {@link MockTimetableImageRepository}(P1). Firebase Storage 구현은 B의 Rules 게시 후 P2.
+ * 구현체: {@link MockTimetableImageRepository}(P1), {@link FirebaseTimetableImageRepository}(P2, 실제 Storage).
  */
 public interface TimetableImageRepository {
 
@@ -55,4 +55,14 @@ public interface TimetableImageRepository {
      * 검수를 마치거나 취소했을 때, 선택을 바꿨을 때 부른다.
      */
     void deleteImages(List<String> paths, Callback<Void> callback);
+
+    /**
+     * [BT-025 P2] batchId 묶음의 이미지를 지운다(최선 시도). 목록 조회 없이 알려진 경로
+     * {@link TimetableImagePaths#imagePath}(uid, batchId, 0..{@link TimetableImagePaths#MAX_IMAGES}-1)를 지우며,
+     * 없는 파일은 성공으로 본다(멱등). 잘못된 batchId면 아무것도 지우지 않고 onError.
+     * <p>
+     * 분석이 끝난 뒤 이 메서드를 부를지는 E 의 답변(서버가 분석 후 이미지를 지우는지)을 기다린다. P2 에서는 호출을
+     * 연결하지 않았다(docs/BT-025.md).
+     */
+    void deleteBatch(String batchId, Callback<Void> callback);
 }
