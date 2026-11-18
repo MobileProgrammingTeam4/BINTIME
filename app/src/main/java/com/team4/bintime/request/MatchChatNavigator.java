@@ -6,15 +6,17 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.Lifecycle;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.functions.FirebaseFunctions;
 import com.team4.bintime.R;
+import com.team4.bintime.chat.ChatLinkLauncher;
 import com.team4.bintime.chat.ChatRoomActivity;
 import com.team4.bintime.chat.MockChatRepository;
-import java.util.Collections;
-import java.util.Map;
 import java.util.Objects;
 
-/** 성사 화면·완료 카드가 같은 서버 방 준비/재시도 경로를 사용한다. */
+/**
+ * 성사 화면·완료 카드가 같은 서버 방 준비/재시도 경로를 사용한다.
+ * 재시도 규칙(CHAT_PAIR_BUSY의 blockingMatchId 선준비, retryAfterMillis 대기, 중복 호출 방지)은
+ * chat/ChatLinkLauncher(BT-034, E)가 맡고, 여기서는 버튼 상태와 화면 이동만 다룬다.
+ */
 public final class MatchChatNavigator {
     private MatchChatNavigator() {}
     public static void open(AppCompatActivity owner, String matchId, View source) {
@@ -29,18 +31,45 @@ public final class MatchChatNavigator {
         String uid = FirebaseAuth.getInstance().getUid();
         if (uid == null) return;
         CharSequence label = source instanceof TextView ? ((TextView) source).getText() : null;
-        if (label != null) ((TextView) source).setText(R.string.chat_link_preparing);
-        source.setEnabled(false);
-        FirebaseFunctions.getInstance("asia-northeast3").getHttpsCallable("ensureMatchChat")
-                .call(Collections.singletonMap("matchId", matchId)).addOnCompleteListener(task -> {
-            if (owner.isFinishing() || owner.isDestroyed()) return;
-            source.setEnabled(true);
-            if (label != null) ((TextView) source).setText(label);
-            if (!Objects.equals(uid, FirebaseAuth.getInstance().getUid()) || !owner.getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.RESUMED)) return;
-            Object raw = task.isSuccessful() ? task.getResult().getData() : null;
-            if (raw instanceof Map && Boolean.TRUE.equals(((Map<?, ?>) raw).get("chatReady")) && ((Map<?, ?>) raw).get("chatRoomId") instanceof String) {
-                owner.startActivity(ChatRoomActivity.intent(owner, (String) ((Map<?, ?>) raw).get("chatRoomId")));
-            } else Toast.makeText(owner, task.isSuccessful() ? R.string.chat_archive_read_only : R.string.chat_link_failed, Toast.LENGTH_LONG).show();
+        ChatLinkLauncher.get(owner).start(uid, matchId, new ChatLinkLauncher.Listener() {
+            private boolean preparing;
+
+            @Override public void onPreparing() {
+                preparing = true;
+                if (label != null) ((TextView) source).setText(R.string.chat_link_preparing);
+                source.setEnabled(false);
+            }
+
+            @Override public void onReady(String chatRoomId) {
+                if (!restore()) return;
+                owner.startActivity(ChatRoomActivity.intent(owner, chatRoomId));
+            }
+
+            @Override public void onFailed(ChatLinkLauncher.Failure failure) {
+                if (!restore()) return;
+                Toast.makeText(owner, message(failure), Toast.LENGTH_LONG).show();
+            }
+
+            /** 버튼을 되돌리고, 이 화면에 결과를 보여도 되면 true. 화면 종료·계정 변경·백그라운드면 false. */
+            private boolean restore() {
+                if (owner.isFinishing() || owner.isDestroyed()) return false;
+                if (preparing) {
+                    source.setEnabled(true);
+                    if (label != null) ((TextView) source).setText(label);
+                }
+                return Objects.equals(uid, FirebaseAuth.getInstance().getUid())
+                        && owner.getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.RESUMED);
+            }
         });
+    }
+
+    private static int message(ChatLinkLauncher.Failure failure) {
+        switch (failure) {
+            case BUSY: return R.string.chat_link_wait;
+            case ARCHIVED: return R.string.chat_archive_read_only;
+            case PERMANENT: return R.string.chat_link_permanent_message;
+            case LOGIN_REQUIRED: return R.string.chat_login_required;
+            default: return R.string.chat_link_failed;
+        }
     }
 }

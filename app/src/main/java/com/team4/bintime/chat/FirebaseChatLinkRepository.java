@@ -10,7 +10,7 @@ import java.util.Objects;
 
 /**
  * ensureMatchChat Callable(asia-northeast3, BT-033). 매칭 참여자·학교 이메일·방 상태는 서버가 검증한다.
- * 호출 뒤 로그인 계정이 바뀌었거나 취소됐으면 결과를 버린다.
+ * 취소됐으면 결과를 버리고, 호출 뒤 로그인 계정이 바뀌었으면 결과 대신 UNAUTHENTICATED 로 끝낸다.
  */
 final class FirebaseChatLinkRepository implements ChatLinkRepository {
 
@@ -28,7 +28,12 @@ final class FirebaseChatLinkRepository implements ChatLinkRepository {
         FirebaseFunctions.getInstance(REGION).getHttpsCallable(FUNCTION)
                 .call(Collections.singletonMap("matchId", matchId))
                 .addOnCompleteListener(task -> {
-                    if (cancelled[0] || !Objects.equals(uid, FirebaseAuth.getInstance().getUid())) return;
+                    if (cancelled[0]) return;
+                    // 호출 중 계정이 바뀌면 결과를 쓰지 않는다. 버리기만 하면 호출한 쪽이 '준비 중'에 갇히므로 로그인 필요로 끝낸다.
+                    if (!Objects.equals(uid, FirebaseAuth.getInstance().getUid())) {
+                        callback.onFailure(ChatLinkFailure.from("UNAUTHENTICATED", null));
+                        return;
+                    }
                     if (task.isSuccessful()) {
                         Object raw = task.getResult() == null ? null : task.getResult().getData();
                         Map<?, ?> data = raw instanceof Map ? (Map<?, ?>) raw : null;
