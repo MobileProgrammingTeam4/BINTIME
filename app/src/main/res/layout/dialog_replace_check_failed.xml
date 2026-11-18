@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- [BT-026] 교체 확인에서 기존 수업 수를 읽지 못했을 때. 공통 Modal 모양에 [다시 확인]을 더한다. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_dialog"
+    android:orientation="vertical"
+    android:paddingHorizontal="20dp"
+    android:paddingVertical="24dp">
+
+    <TextView
+        android:id="@+id/replaceFailedTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="@string/timetable_replace_unknown_title"
+        android:textAppearance="@style/TextAppearance.BinTime.H2" />
+
+    <TextView
+        android:id="@+id/replaceFailedMessage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center"
+        android:text="@string/timetable_replace_message_unknown"
+        android:textAppearance="@style/TextAppearance.BinTime.BodyS"
+        android:textColor="@color/text_secondary" />
+
+    <TextView
+        android:id="@+id/replaceFailedRetry"
+        style="@style/Widget.BinTime.ButtonOutline"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:layout_marginTop="16dp"
+        android:text="@string/timetable_replace_retry" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/replaceFailedCancel"
+            style="@style/Widget.BinTime.ButtonOutline"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1"
+            android:text="@string/timetable_replace_cancel" />
+
+        <TextView
+            android:id="@+id/replaceFailedConfirm"
+            style="@style/Widget.BinTime.ButtonPrimary"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:text="@string/timetable_replace_confirm" />
+    </LinearLayout>
+</LinearLayout>
