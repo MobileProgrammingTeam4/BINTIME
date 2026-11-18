@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory;
 
 import com.team4.bintime.R;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -135,17 +136,33 @@ public class MockProfileRepository implements ProfileRepository {
         publicProfiles.put(profile.getUid(), ProfileDocuments.toPublicProfile(profile));
     }
 
-    @Override
-    public void generateAiBio(String timetableContext, Callback<String> callback) {
-        String generated = "같이 공부할 친구 찾아요!\n(스터디, 산책, 카페 다 좋아해요 😊)";
-        if (callback != null) {
-            callback.onSuccess(generated);
-        }
-    }
+    /** Mock 추천 후보. 이미 고른 활동은 빼고 앞에서부터 3개를 추천한다. */
+    private static final List<String> MOCK_TAG_POOL =
+            Arrays.asList("코딩스터디", "도서관", "밥먹기", "카페", "산책", "운동");
 
+    /**
+     * Mock AI(BT-029): Gemini 없이 입력으로 정해진 초안을 만든다. 서버 generateProfile 의 Mock 과 같은 성격으로,
+     * 시연·테스트에서 화면 흐름(초안 표시·태그 선택·오류 시 직접 입력)을 확인하는 용도다.
+     */
     @Override
-    public List<String> getAiRecommendedTags() {
-        return Arrays.asList("코딩스터디", "교구구매·꿀아이템", "밥먹기·근처", "길산책");
+    public void generateAiProfile(AiProfileRequest request, Callback<AiProfileDraft> callback) {
+        String invalid = AiProfileMapper.validate(request);
+        if (invalid != null) {
+            if (callback != null) callback.onError(invalid);
+            return;
+        }
+        String course = request.courseNames.isEmpty() ? null : request.courseNames.get(0);
+        String bio = request.department.trim() + " " + request.grade + "학년이에요. "
+                + (course != null ? "'" + course + "' 같이 공부하거나 " : "공강에 같이 공부하거나 ")
+                + "카페에서 이야기 나눌 친구를 찾고 있어요!";
+        if (bio.length() > ProfileValidator.BIO_MAX_LENGTH) bio = bio.substring(0, ProfileValidator.BIO_MAX_LENGTH);
+        List<String> tags = new ArrayList<>();
+        for (String tag : MOCK_TAG_POOL) {
+            if (request.preferredActivities.contains(tag)) continue;
+            tags.add(tag);
+            if (tags.size() == 3) break;
+        }
+        if (callback != null) callback.onSuccess(new AiProfileDraft(bio, tags));
     }
 
     @Override

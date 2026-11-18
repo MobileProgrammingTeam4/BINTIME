@@ -45,6 +45,8 @@ export interface AiTask<I, O> {
   timeoutMs: number;
   /** 사용자별 하루 최대 호출 수(Asia/Seoul 날짜 기준) */
   dailyLimit: number;
+  /** 같은 사용자의 같은 작업 연속 호출 최소 간격(ms). 없으면 간격 제한 없음. 위반 시 AI_RATE_LIMITED */
+  minIntervalMs?: number;
   /** 소유권·참여자 검사. 실패하면 AiError("PERMISSION_DENIED") 를 던진다. */
   authorize?: (input: I, ctx: AiContext, deps: AiDeps) => Promise<void>;
   /** 스키마로 표현하기 어려운 규칙(중복, 허용 목록 등). 위반하면 AiError("AI_INVALID_OUTPUT") 를 던진다. */
