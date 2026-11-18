@@ -62,6 +62,62 @@ public class RequestFlowDeviceTest {
         MockAuthRepository.shared().signOut();
     }
 
+    @Test public void cachedPhotoAppearsInAllRequestTabs() throws Exception {
+        Bitmap photo = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888);
+        photo.eraseColor(android.graphics.Color.MAGENTA);
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        photo.compress(Bitmap.CompressFormat.PNG, 100, bytes);
+        String[] path = {null};
+        com.team4.bintime.profile.ProfileRepositories.get(context).uploadProfilePhoto("avatar-qa", bytes.toByteArray(),
+                new com.team4.bintime.profile.ProfileRepository.Callback<String>() {
+                    @Override public void onSuccess(String value) { path[0] = value; }
+                    @Override public void onError(String message) { fail(message); }
+                });
+        assertNotNull(path[0]);
+        MockRequestRepository local = new MockRequestRepository(AuthRepositories.get(context).getCurrentUid(), true);
+        RequestRepository requests = (RequestRepository) java.lang.reflect.Proxy.newProxyInstance(
+                RequestRepository.class.getClassLoader(), new Class<?>[]{RequestRepository.class},
+                (proxy, method, args) -> method.getName().equals("isMock") ? false : method.invoke(local, args));
+        RequestTabsController[] controller = {null};
+        try (ActivityScenario<MainActivity> main = ActivityScenario.launch(MainActivity.class)) {
+            main.onActivity(activity -> {
+                activity.findViewById(R.id.tabReceived).performClick();
+                Fragment matching = activity.getSupportFragmentManager().getFragments().stream()
+                        .filter(f -> f instanceof MatchingFragment).findFirst().orElseThrow(AssertionError::new);
+                controller[0] = new RequestTabsController(matching, activity.findViewById(R.id.requestContent), requests,
+                        intent -> fail("사진만 확인한다"), (uid, callback) -> {
+                    com.team4.bintime.profile.UserProfile profile = com.team4.bintime.profile.UserProfile.empty();
+                    profile.setUid(uid); profile.setNickname("사진 검증"); profile.setPhotoPath(path[0]);
+                    callback.onSuccess(profile);
+                });
+            });
+            for (RequestRepository.Tab tab : RequestRepository.Tab.values()) {
+                main.onActivity(activity -> {
+                    int tabId = tab == RequestRepository.Tab.SENT ? R.id.tabSent
+                            : tab == RequestRepository.Tab.RECEIVED ? R.id.tabReceived : R.id.tabDone;
+                    activity.findViewById(tabId).performClick();
+                    controller[0].show(tab);
+                    // 메인 루프를 넘기기 전에도 동기 반환된 사진이 채워져 있어야 한다.
+                    LinearLayout cards = activity.findViewById(R.id.requestCards);
+                    android.widget.ImageView avatar = cards.getChildAt(0).findViewById(R.id.requestAvatar);
+                    assertTrue(avatar.getDrawable() instanceof android.graphics.drawable.BitmapDrawable);
+                    Bitmap displayed = ((android.graphics.drawable.BitmapDrawable) avatar.getDrawable()).getBitmap();
+                    assertEquals(android.graphics.Color.MAGENTA, displayed.getPixel(0, 0));
+                });
+                idle();
+                main.onActivity(activity -> {
+                    LinearLayout cards = activity.findViewById(R.id.requestCards);
+                    assertTrue("카드가 있어야 한다: " + tab, cards.getChildCount() > 0);
+                    android.widget.ImageView avatar = cards.getChildAt(0).findViewById(R.id.requestAvatar);
+                    assertTrue(avatar.getDrawable() instanceof android.graphics.drawable.BitmapDrawable);
+                    Bitmap displayed = ((android.graphics.drawable.BitmapDrawable) avatar.getDrawable()).getBitmap();
+                    assertEquals(android.graphics.Color.MAGENTA, displayed.getPixel(0, 0));
+                });
+                screenshot("avatar-" + tab.name());
+            }
+        }
+    }
+
     @Test public void profileReadRecoversAndRealDataDialogsDescribeTheirActions() throws Exception {
         // 실제 데이터 표시 분기만 선택하는 로컬 대역. Firebase/Functions에는 연결하지 않는다.
         MockRequestRepository local = new MockRequestRepository(AuthRepositories.get(context).getCurrentUid(), true);
