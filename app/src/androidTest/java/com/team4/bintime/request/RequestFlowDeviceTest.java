@@ -92,7 +92,12 @@ public class RequestFlowDeviceTest {
                 });
             });
             for (RequestRepository.Tab tab : RequestRepository.Tab.values()) {
-                main.onActivity(activity -> controller[0].show(tab));
+                main.onActivity(activity -> {
+                    int tabId = tab == RequestRepository.Tab.SENT ? R.id.tabSent
+                            : tab == RequestRepository.Tab.RECEIVED ? R.id.tabReceived : R.id.tabDone;
+                    activity.findViewById(tabId).performClick();
+                    controller[0].show(tab);
+                });
                 idle();
                 main.onActivity(activity -> {
                     LinearLayout cards = activity.findViewById(R.id.requestCards);
