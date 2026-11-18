@@ -8,7 +8,11 @@ import { AiError, describeError, toHttpsError } from "./errors";
 import { runAiTask } from "./gateway";
 import type { AiDeps, AiResponse, AiTask } from "./types";
 
-type ExtraOptions = Pick<CallableOptions, "timeoutSeconds" | "memory">;
+/**
+ * 작업별로 바꿀 수 있는 배포 옵션. concurrency 를 넘기지 않으면 키를 넣지 않아 플랫폼 기본값(CPU 1 이상이면 80)을 쓴다.
+ * 큰 요청을 메모리에 올리는 작업(analyzeTimetable)만 낮춘다.
+ */
+type ExtraOptions = Pick<CallableOptions, "timeoutSeconds" | "memory" | "concurrency">;
 
 /**
  * 작업 하나를 앱용 Callable 로 연다. 인증은 Auth 토큰(request.auth)으로만 확인한다.
@@ -26,6 +30,7 @@ export function createAiCallable<I, O>(
       secrets: [GEMINI_API_KEY],
       timeoutSeconds: options.timeoutSeconds ?? 30,
       memory: options.memory ?? "256MiB",
+      ...(options.concurrency !== undefined ? { concurrency: options.concurrency } : {}),
       // 비용 폭주를 막는 상한. 필요하면 기능별로 조정한다.
       maxInstances: 10,
       // App Check 는 앱 등록 후 별도 이슈에서 켠다.
