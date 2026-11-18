@@ -14,7 +14,7 @@ import com.team4.bintime.R;
 import com.team4.bintime.common.ConfirmDialog;
 import com.team4.bintime.data.repository.FreeSlotValidator;
 import com.team4.bintime.data.repository.TimetableRepositories;
-import com.team4.bintime.profile.NetworkStatus;
+import com.team4.bintime.common.NetworkStatus;
 
 import java.util.Collections;
 
