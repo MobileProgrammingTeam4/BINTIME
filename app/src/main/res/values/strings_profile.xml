@@ -14,6 +14,8 @@
     <string name="profile_bio_label">자기소개</string>
     <string name="profile_bio_hint">같이 공부할 친구 찾아요!\n(스터디, 산책, 카페 다 좋아해요 😊)</string>
     <string name="profile_ai_write_button">AI로 작성하기</string>
+    <string name="profile_ai_writing">작성 중…</string>
+    <string name="profile_ai_done">AI 초안을 넣었어요. 자유롭게 고쳐 주세요</string>
     <!-- Figma 문구 그대로 (따옴표 위치 포함) -->
     <string name="profile_ai_feedback">시간표의 ‘자료구조’, 월요일 오후 공강’을 분석해 작성했어요</string>
 
@@ -29,6 +31,7 @@
     <string name="profile_photo_load_failed">사진을 불러오지 못했어요. 다른 사진을 골라 주세요</string>
     <string name="profile_load_failed">프로필을 불러오지 못했어요</string>
     <string name="profile_not_loaded_retry">프로필을 불러온 뒤에 저장할 수 있어요. 다시 불러올게요</string>
+    <string name="profile_save_offline">네트워크 연결을 확인해 주세요. 연결된 뒤 다시 저장할 수 있어요</string>
     <string name="profile_saving_wait">프로필을 저장하고 있어요. 잠시만 기다려 주세요</string>
 
     <string name="profile_start_button">시작하기</string>
