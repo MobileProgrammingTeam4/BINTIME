@@ -74,7 +74,16 @@ public final class FirebaseProfileRepository implements ProfileRepository {
             photoDecoder,
             mainHandler::post);
 
-    private FirebaseProfileRepository() {}
+    /**
+     * BT-030: 저장 중 연결이 끊기면 사진 업로드가 기본 10분 동안 재시도해 화면이 묶인다.
+     * 이 시간이 지나면 ERROR_RETRY_LIMIT_EXCEEDED → "네트워크 연결을 확인해 주세요"로 끝낸다.
+     */
+    static final long STORAGE_RETRY_MILLIS = 20_000L;
+
+    private FirebaseProfileRepository() {
+        storage.setMaxUploadRetryTimeMillis(STORAGE_RETRY_MILLIS);
+        storage.setMaxDownloadRetryTimeMillis(STORAGE_RETRY_MILLIS);
+    }
 
     @Override
     public void getProfile(String uid, Callback<UserProfile> callback) {
@@ -161,6 +170,12 @@ public final class FirebaseProfileRepository implements ProfileRepository {
                 fail(callback, message(task.getException()));
             }
         });
+    }
+
+    /** BT-030: 로그아웃 시 사진 캐시를 비운다(다음 계정이 이전 계정에서 받은 사진을 캐시로 보지 않게). */
+    @Override
+    public void clearSessionCaches() {
+        photoLoader.invalidateAll();
     }
 
     @Override

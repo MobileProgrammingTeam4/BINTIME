@@ -41,6 +41,9 @@ public interface ProfileRepository {
     /** 프로필 생성을 마친 계정인지. 앱 재시작·재로그인 시 가입 단계 복귀 여부를 정한다. */
     void hasCompletedProfile(String uid, Callback<Boolean> callback);
 
+    /** BT-030: 로그아웃 시 계정별로 남은 캐시(사진 등)를 비운다. 다음 계정이 이전 계정 데이터를 보지 않게 한다. */
+    default void clearSessionCaches() {}
+
     /** 압축된 JPEG 를 업로드하고 저장 경로(예: profileImages/{uid}/profile.jpg)를 돌려준다. */
     void uploadProfilePhoto(String uid, byte[] jpegBytes, Callback<String> callback);
 

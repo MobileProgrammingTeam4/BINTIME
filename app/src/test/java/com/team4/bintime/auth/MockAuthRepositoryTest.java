@@ -62,6 +62,26 @@ public class MockAuthRepositoryTest {
         assertFalse(repository.isSignedIn());
     }
 
+    /** BT-030: 기본 세션 확인은 로그인 여부를 따른다(Mock 은 서버가 없으므로 만료되지 않음). */
+    @Test public void checkSession_followsSignInState() {
+        Recorder<AuthRepository.SessionState> signedOut = new Recorder<>();
+        repository.checkSession(signedOut);
+        assertEquals(AuthRepository.SessionState.EXPIRED, signedOut.result);
+
+        repository.restoreSession("mock_uid_saved");
+        Recorder<AuthRepository.SessionState> signedIn = new Recorder<>();
+        repository.checkSession(signedIn);
+        assertEquals(AuthRepository.SessionState.VALID, signedIn.result);
+    }
+
+    /** BT-030: 링크를 보낸 뒤 앱을 다시 열면 보낸 이메일로 '메일 확인' 화면을 복원하고, 로그아웃하면 지운다. */
+    @Test public void pendingEmail_keptUntilSignOut() {
+        sendLink(EMAIL);
+        assertEquals(EMAIL, repository.getPendingEmail());
+        repository.signOut();
+        assertNull(repository.getPendingEmail());
+    }
+
     private String sendLink(String email) {
         Recorder<Void> sent = new Recorder<>();
         repository.sendSignInLink(email, sent);

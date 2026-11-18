@@ -29,6 +29,7 @@
     <string name="profile_photo_load_failed">사진을 불러오지 못했어요. 다른 사진을 골라 주세요</string>
     <string name="profile_load_failed">프로필을 불러오지 못했어요</string>
     <string name="profile_not_loaded_retry">프로필을 불러온 뒤에 저장할 수 있어요. 다시 불러올게요</string>
+    <string name="profile_save_offline">네트워크 연결을 확인해 주세요. 연결된 뒤 다시 저장할 수 있어요</string>
     <string name="profile_saving_wait">프로필을 저장하고 있어요. 잠시만 기다려 주세요</string>
 
     <string name="profile_start_button">시작하기</string>
