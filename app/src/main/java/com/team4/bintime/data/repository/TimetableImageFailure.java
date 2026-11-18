@@ -31,6 +31,12 @@ public final class TimetableImageFailure {
         NETWORK,
         /** 사용자가 취소했거나 화면이 종료됐다. */
         CANCELED,
+        /**
+         * [BT-025 P2] Storage 프로젝트(버킷) 할당량 초과({@code ERROR_QUOTA_EXCEEDED}). 파일 하나의 5MB 초과는
+         * {@link #COMPRESSED_TOO_LARGE}(업로드 전)·{@link #PERMISSION_DENIED}(Rules 거부)다. 바로 다시 시도해도
+         * 소용없어 재시도 대상이 아니다.
+         */
+        QUOTA_EXCEEDED,
         UNKNOWN
     }
 

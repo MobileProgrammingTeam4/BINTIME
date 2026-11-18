@@ -91,6 +91,27 @@ public final class MockTimetableImageRepository implements TimetableImageReposit
         if (callback != null) callback.onSuccess(null);
     }
 
+    @Override
+    public synchronized void deleteBatch(String batchId, Callback<Void> callback) {
+        String uid = currentUid.get();
+        if (uid == null) {
+            if (callback != null) {
+                callback.onError(TimetableImageFailure.of(TimetableImageFailure.Code.NOT_SIGNED_IN, "no uid"));
+            }
+            return;
+        }
+        if (!TimetableImagePaths.isValidBatchId(batchId)) {
+            if (callback != null) {
+                callback.onError(TimetableImageFailure.of(TimetableImageFailure.Code.UNKNOWN, "invalid batchId"));
+            }
+            return;
+        }
+        for (int i = 0; i < TimetableImagePaths.MAX_IMAGES; i++) {
+            stored.remove(TimetableImagePaths.imagePath(uid, batchId, i));
+        }
+        if (callback != null) callback.onSuccess(null);
+    }
+
     /** 실제 구현도 같은 검사를 한다. 통과하면 null. */
     static TimetableImageFailure validateBatch(String batchId, List<byte[]> jpegs) {
         if (!TimetableImagePaths.isValidBatchId(batchId)) {

@@ -32,6 +32,8 @@ final class TimetableUploadMessages {
                 return R.string.timetable_upload_error_permission;
             case NETWORK:
                 return R.string.timetable_upload_error_network;
+            case QUOTA_EXCEEDED:
+                return R.string.timetable_upload_error_quota;
             default:
                 return R.string.timetable_upload_error_unknown;
         }
