@@ -26,6 +26,10 @@ import java.util.Collections;
  * replaceCourses 가 기존 수업을 모두 바꾸므로, 기존 수업이 있으면 저장 전에 "기존 수업이 새 시간표로 교체됩니다"
  * 확인을 받는다. 기존 수업 수는 서버에서 읽은 값만 쓰고(캐시 0개를 믿지 않음), 읽지 못하면 수를 빼고 같은 확인을
  * 띄운다({@link TimetableReplaceCheck}).
+ * <p>
+ * 읽기 실패 확인({@link ReplaceCheckFailedDialog})은 별도 문구와 [다시 확인]을 갖는다. 다시 확인은 서버에서 다시
+ * 읽어 성공하면 수를 보여 주는 확인(0개면 바로 저장)으로, 실패하면 같은 창을 다시 띄운다. 읽기 실패는 사용자가
+ * [교체하기]를 누르지 않는 한 저장으로 이어지지 않는다.
  */
 public class TimetableRegistrationActivity extends AppCompatActivity {
     private static final String CONFIRM_REPLACE = "timetable_confirm_replace";
@@ -82,6 +86,13 @@ public class TimetableRegistrationActivity extends AppCompatActivity {
             replaceConfirmed = true;
             save();
         });
+        getSupportFragmentManager().setFragmentResultListener(ReplaceCheckFailedDialog.KEY_CONFIRM, this,
+                (key, result) -> {
+                    replaceConfirmed = true;
+                    save();
+                });
+        getSupportFragmentManager().setFragmentResultListener(ReplaceCheckFailedDialog.KEY_RETRY, this,
+                (key, result) -> confirmReplace());
     }
 
     private void save() {
@@ -101,34 +112,49 @@ public class TimetableRegistrationActivity extends AppCompatActivity {
                 TimetableDraftMapper.toCourses(draft), TimetableDraftMapper.toFreeSlots(draft));
     }
 
-    /** 기존 수업 수를 서버에서 한 번 읽고, 있으면 교체 확인을 띄운다. 없으면 바로 저장한다. */
+    /**
+     * 기존 수업 수를 서버에서 읽고, 있으면 교체 확인을 띄운다. 없으면 바로 저장한다. 읽지 못하면 [다시 확인]이 있는
+     * 실패 확인을 띄운다. 처음 확인과 [다시 확인] 모두 여기로 온다.
+     */
     private void confirmReplace() {
         if (checkingExisting) return;
         checkingExisting = true;
         complete.setEnabled(false);
-        TimetableReplaceCheck.run(TimetableRepositories.get(this), decision -> {
-            checkingExisting = false;
-            if (isFinishing() || isDestroyed()) return;
-            complete.setEnabled(!saver.isSaving());
-            switch (decision.kind) {
-                case SAVE:
-                    replaceConfirmed = true;
-                    save();
-                    break;
-                case CONFIRM_WITH_COUNT:
-                    showReplaceDialog(getString(R.string.timetable_replace_message, decision.existingCount));
-                    break;
-                default:
-                    showReplaceDialog(getString(R.string.timetable_replace_message_unknown));
-                    break;
+        TimetableReplaceCheck.check(TimetableRepositories.get(this), new TimetableReplaceCheck.Screen() {
+            @Override
+            public void saveWithoutConfirm() {
+                if (!finishCheck()) return;
+                replaceConfirmed = true;
+                save();
+            }
+
+            @Override
+            public void confirmWithCount(int count) {
+                if (!finishCheck()) return;
+                showReplaceDialog(getString(
+                        TimetableReplaceCheck.messageRes(TimetableReplaceCheck.Kind.CONFIRM_WITH_COUNT), count));
+            }
+
+            @Override
+            public void confirmUnknown() {
+                if (!finishCheck()) return;
+                ReplaceCheckFailedDialog.show(getSupportFragmentManager());
             }
         });
+    }
+
+    /** 서버 읽기가 끝났다. 화면이 이미 닫혔으면 false(아무것도 하지 않는다). */
+    private boolean finishCheck() {
+        checkingExisting = false;
+        if (isFinishing() || isDestroyed()) return false;
+        complete.setEnabled(!saver.isSaving());
+        return true;
     }
 
     private void showReplaceDialog(String message) {
         if (getSupportFragmentManager().findFragmentByTag(CONFIRM_REPLACE) != null) return;
         ConfirmDialog.show(getSupportFragmentManager(), CONFIRM_REPLACE,
-                getString(R.string.timetable_replace_title), message,
+                getString(TimetableReplaceCheck.titleRes(TimetableReplaceCheck.Kind.CONFIRM_WITH_COUNT)), message,
                 getString(R.string.timetable_replace_confirm));
     }
 

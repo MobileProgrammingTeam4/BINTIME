@@ -61,6 +61,10 @@
     <string name="timetable_review_empty_recognition">인식된 수업이 없어요. 수업을 추가하거나 다시 시도해 주세요.</string>
     <string name="timetable_replace_title">기존 수업이 새 시간표로 교체됩니다</string>
     <string name="timetable_replace_message">지금 등록된 수업 %1$d개는 모두 지워지고 새 시간표로 바뀌어요. 계속할까요?</string>
-    <string name="timetable_replace_message_unknown">지금 등록된 수업이 있다면 모두 지워지고 새 시간표로 바뀌어요. 계속할까요?</string>
+    <!-- 기존 수업 수를 서버에서 읽지 못했을 때. 수를 아는 경우와 구분되게, 확인하지 못했다는 사실을 먼저 말한다. -->
+    <string name="timetable_replace_unknown_title">기존 시간표를 확인하지 못했어요</string>
+    <string name="timetable_replace_message_unknown">저장된 수업이 있으면 모두 지워지고 새 시간표로 바뀌어요. 다시 확인하거나 그대로 교체할 수 있어요.</string>
     <string name="timetable_replace_confirm">교체하기</string>
+    <string name="timetable_replace_retry">다시 확인</string>
+    <string name="timetable_replace_cancel">취소</string>
 </resources>
