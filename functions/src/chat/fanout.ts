@@ -114,7 +114,7 @@ export interface RootRef {
 
 export type FanoutResult = "applied" | "invalid-message" | "not-member";
 
-/** 트리거 본문. 멤버마다 별도 트랜잭션이라 한쪽 실패가 다른 쪽을 되돌리지 않는다(재전송 시 lastMessageId 로 멱등). */
+/** 트리거 본문. 멤버마다 별도 트랜잭션이라 한쪽 실패가 다른 쪽을 되돌리지 않는다(재전송 시 멤버별 recentMessageIds 로 멱등). */
 export async function fanOutMessage(root: RootRef, matchId: string, messageId: string,
   value: unknown): Promise<FanoutResult> {
   const message = parseMessage(value);
