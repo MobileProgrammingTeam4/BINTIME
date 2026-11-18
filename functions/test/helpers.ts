@@ -49,6 +49,7 @@ export function makeDeps(options: {
       sleeps.push(ms);
     },
     allowedEmailSuffixes: options.allowedEmailSuffixes ?? [".ac.kr", ".edu"],
+    readImage: async () => { throw new Error("readImage is not configured in this test"); },
     usageStore,
     client,
     sleeps,

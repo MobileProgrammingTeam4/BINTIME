@@ -31,6 +31,18 @@ export interface AiDeps {
   sleep: (ms: number) => Promise<void>;
   /** 학교 이메일 허용 접미사(ALLOWED_EMAIL_SUFFIXES). 비어 있으면 Callable 호출을 모두 거부한다. */
   allowedEmailSuffixes: readonly string[];
+  /**
+   * 기본 버킷의 파일을 읽는다(analyzeTimetable). 크기가 maxBytes 를 넘으면 내려받지 않고 bytes 없이 돌려준다.
+   * Storage 오류는 바꾸지 않고 그대로 던진다(작업이 AiError 로 바꾼다).
+   */
+  readImage: (path: string, maxBytes: number) => Promise<StoredImage>;
+}
+
+/** Storage 파일 메타데이터와 내용. bytes 는 크기 상한 이내일 때만 있다. */
+export interface StoredImage {
+  contentType: string | undefined;
+  size: number;
+  bytes?: Buffer;
 }
 
 /**

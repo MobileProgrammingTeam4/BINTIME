@@ -1,12 +1,13 @@
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import { defineSecret } from "firebase-functions/params";
 import { FirestoreMatchAccess } from "./access";
 import { resolveMode } from "./config";
 import { ALLOWED_EMAIL_SUFFIXES_ENV, parseAllowedEmailSuffixes } from "./emailPolicy";
 import { AiError } from "./errors";
 import { GenAiModelClient, type ModelClient } from "./gemini";
-import type { AiDeps } from "./types";
+import type { AiDeps, StoredImage } from "./types";
 import { FirestoreUsageStore } from "./usage";
 
 /**
@@ -26,6 +27,35 @@ export function normalizeApiKey(raw: string | undefined): string {
     throw new AiError("AI_UNAVAILABLE", "GEMINI_API_KEY contains invalid characters", { retryable: false });
   }
   return key;
+}
+
+/** readStorageImage 가 쓰는 Storage 파일의 최소 모양(테스트에서 가짜로 바꾼다). */
+export interface StorageImageFile {
+  getMetadata(): Promise<[{ size?: string | number | null; contentType?: string | null }, ...unknown[]]>;
+  download(): Promise<[Buffer, ...unknown[]]>;
+}
+
+/**
+ * AiDeps.readImage 실제 구현. 메타데이터 크기가 maxBytes 를 넘거나 크기를 모르면 내려받지 않는다.
+ * 에뮬레이터인데 Storage 에뮬레이터 주소가 없으면 Admin SDK 가 운영 버킷을 읽게 되므로 파일을 열기 전에 거부한다.
+ */
+export async function readStorageImage(
+  openFile: () => StorageImageFile,
+  maxBytes: number,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<StoredImage> {
+  if (env.FUNCTIONS_EMULATOR === "true" && !env.FIREBASE_STORAGE_EMULATOR_HOST) {
+    throw new AiError("AI_UNAVAILABLE", "storage emulator required", { retryable: false });
+  }
+  const file = openFile();
+  const [metadata] = await file.getMetadata();
+  const rawSize = metadata.size;
+  // 크기를 모르면 받지 않는다(0 으로 두면 상한 검사를 지나 내려받게 된다).
+  const size = rawSize === undefined || rawSize === null || rawSize === "" ? Number.NaN : Number(rawSize);
+  const contentType = metadata.contentType ?? undefined;
+  if (!Number.isFinite(size) || size > maxBytes) return { contentType, size };
+  const [bytes] = await file.download();
+  return { contentType, size: bytes.length, bytes };
 }
 
 let cached: AiDeps | undefined;
@@ -53,6 +83,7 @@ export function defaultDeps(): AiDeps {
     now: () => new Date(),
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     allowedEmailSuffixes: parseAllowedEmailSuffixes(process.env[ALLOWED_EMAIL_SUFFIXES_ENV]),
+    readImage: (path, maxBytes) => readStorageImage(() => getStorage(app).bucket().file(path), maxBytes),
   };
   return cached;
 }

@@ -15,7 +15,7 @@ const matches = { "match-1": [me, "uid-other"] };
 
 const validInputs: Array<[AiTask<any, any>, unknown]> = [
   [aiPingTask, {}],
-  [analyzeTimetableTask, { imagePaths: [`timetableImages/${me}/a.jpg`, `timetableImages/${me}/b.jpg`] }],
+  [analyzeTimetableTask, { imagePaths: [`timetableImages/${me}/batch-1/0.jpg`, `timetableImages/${me}/batch-1/1.jpg`] }],
   [generateProfileTask, { department: "소프트웨어학과", grade: 2, preferredActivities: ["스터디"] }],
   [
     evaluateMatchTask,
@@ -53,7 +53,7 @@ describe("analyzeTimetable", () => {
   });
 
   it("시작 >= 종료나 없는 이미지 번호는 형식 오류", () => {
-    const input = { imagePaths: [`timetableImages/${me}/a.jpg`] };
+    const input = { imagePaths: [`timetableImages/${me}/batch-1/0.jpg`] };
     const base = { name: "A", dayOfWeek: 1, building: null, room: null, confidence: 0.9 };
     const deps = makeDeps();
     expect(() =>
