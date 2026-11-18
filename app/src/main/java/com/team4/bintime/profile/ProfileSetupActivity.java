@@ -31,6 +31,7 @@ import com.team4.bintime.common.ChipViews;
 import com.team4.bintime.common.ConfirmDialog;
 
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 프로필 최초 설정 및 프로필 수정 화면 (Figma 41:10218, 102:2684, 122:1959).
@@ -54,6 +55,8 @@ public class ProfileSetupActivity extends AppCompatActivity {
     private static final String STATE_PROFILE = "userProfile";
     private static final String STATE_SELECTED_TAGS = "selectedTags";
     private static final String STATE_AI_FEEDBACK = "aiFeedbackVisible";
+    private static final String STATE_AI_FEEDBACK_TEXT = "aiFeedbackText";
+    private static final String STATE_AI_TAGS = "aiSuggestedTags";
     private static final String STATE_PHOTO_URI = "selectedPhotoUri";
     private static final String STATE_PROFILE_LOADED = "profileLoaded";
     private static final String KEY_CANCEL_EDIT = "profileCancelEdit";
@@ -71,6 +74,10 @@ public class ProfileSetupActivity extends AppCompatActivity {
     private ActivityResultLauncher<PickVisualMediaRequest> photoPicker;
     /** 저장 작업. 화면이 다시 만들어져도 유지된다. */
     private ProfileSaveViewModel saveViewModel;
+    /** BT-029 AI 자기소개 요청. 화면이 다시 만들어져도 유지된다. */
+    private ProfileAiViewModel aiViewModel;
+    /** 마지막 AI 추천 태그(# 없이). 사용자가 골라야 selectedTags 에 들어간다. */
+    private final ArrayList<String> aiSuggestedTags = new ArrayList<>();
 
     private ImageView imgProfilePhoto;
     private TextView tvPhotoLabel;
@@ -86,6 +93,8 @@ public class ProfileSetupActivity extends AppCompatActivity {
     private EditText etBio;
     private TextView tvBioCount;
     private TextView tvAiFeedback;
+    private TextView btnAiBio;
+    private TextView tvAiTagsLabel;
     private ChipGroup chipGroupAiTags;
     private ChipGroup chipGroupDefaultTags;
     private TextView btnSubmit;
@@ -96,6 +105,7 @@ public class ProfileSetupActivity extends AppCompatActivity {
         setContentView(R.layout.activity_profile_setup);
         profileRepo = ProfileRepositories.get(this);
         saveViewModel = new ViewModelProvider(this).get(ProfileSaveViewModel.class);
+        aiViewModel = new ViewModelProvider(this).get(ProfileAiViewModel.class);
         photoPicker = registerForActivityResult(new ActivityResultContracts.PickVisualMedia(), uri -> {
             if (uri == null) return; // 선택 취소
             selectedPhotoUri = uri;
@@ -119,6 +129,8 @@ public class ProfileSetupActivity extends AppCompatActivity {
             UserProfile restoredProfile = (UserProfile) savedInstanceState.getSerializable(STATE_PROFILE);
             ArrayList<String> restoredTags = savedInstanceState.getStringArrayList(STATE_SELECTED_TAGS);
             selectedPhotoUri = savedInstanceState.getParcelable(STATE_PHOTO_URI);
+            ArrayList<String> restoredAiTags = savedInstanceState.getStringArrayList(STATE_AI_TAGS);
+            if (restoredAiTags != null) aiSuggestedTags.addAll(restoredAiTags);
             // 조회 완료 전에 회전한 경우 복원값은 초기 빈 프로필이므로 복원으로 보지 않고 다시 조회한다.
             if (restoredProfile != null && savedInstanceState.getBoolean(STATE_PROFILE_LOADED)) {
                 profile = restoredProfile;
@@ -135,6 +147,8 @@ public class ProfileSetupActivity extends AppCompatActivity {
             profileLoaded = true;
             bindPhoto();
             tvAiFeedback.setVisibility(savedInstanceState.getBoolean(STATE_AI_FEEDBACK) ? View.VISIBLE : View.GONE);
+            String feedback = savedInstanceState.getString(STATE_AI_FEEDBACK_TEXT);
+            if (feedback != null) tvAiFeedback.setText(feedback);
         } else if (mode == MODE_EDIT) {
             loadProfileData();
         } else {
@@ -145,6 +159,9 @@ public class ProfileSetupActivity extends AppCompatActivity {
         // 회전 전에 시작한 저장이 아직 진행 중이면 버튼을 막아 두고, 끝나면 결과를 받아 이동한다.
         btnSubmit.setEnabled(!saveViewModel.isSaving());
         saveViewModel.getResult().observe(this, this::onSaveResult);
+        // BT-029: 회전 전에 누른 AI 작성이 진행 중이면 버튼을 '작성 중'으로 두고, 끝나면 결과를 받는다.
+        setAiLoading(aiViewModel.isRunning());
+        aiViewModel.getResult().observe(this, this::onAiResult);
 
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
@@ -161,6 +178,8 @@ public class ProfileSetupActivity extends AppCompatActivity {
         outState.putSerializable(STATE_PROFILE, profile);
         outState.putStringArrayList(STATE_SELECTED_TAGS, selectedTags);
         outState.putBoolean(STATE_AI_FEEDBACK, tvAiFeedback.getVisibility() == View.VISIBLE);
+        outState.putString(STATE_AI_FEEDBACK_TEXT, tvAiFeedback.getText().toString());
+        outState.putStringArrayList(STATE_AI_TAGS, aiSuggestedTags);
         outState.putParcelable(STATE_PHOTO_URI, selectedPhotoUri);
         outState.putBoolean(STATE_PROFILE_LOADED, profileLoaded);
     }
@@ -181,6 +200,8 @@ public class ProfileSetupActivity extends AppCompatActivity {
         etBio = findViewById(R.id.etBio);
         tvBioCount = findViewById(R.id.tvBioCount);
         tvAiFeedback = findViewById(R.id.tvAiFeedback);
+        btnAiBio = findViewById(R.id.btnAiBio);
+        tvAiTagsLabel = findViewById(R.id.tvAiTagsLabel);
         chipGroupAiTags = findViewById(R.id.chipGroupAiTags);
         chipGroupDefaultTags = findViewById(R.id.chipGroupDefaultTags);
         btnSubmit = findViewById(R.id.btnSubmit);
@@ -308,16 +329,60 @@ public class ProfileSetupActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * 'AI 추천' 줄: 이번에 AI 가 추천한 태그 + 이미 고른 태그 중 기본 목록에 없는 것(예전에 AI 추천으로 고른 태그).
+     * 기본 목록에 없는 저장 태그가 화면에서 사라져 선택을 풀 수 없던 문제도 함께 막는다. 보여 줄 것이 없으면 줄을 숨긴다.
+     */
     private void setupTags() {
+        List<String> defaults = profileRepo.getDefaultTags();
+        List<String> aiRow = ProfileTagRows.aiRow(aiSuggestedTags, selectedTags, defaults);
         chipGroupAiTags.removeAllViews();
-        for (String tag : profileRepo.getAiRecommendedTags()) {
+        for (String tag : aiRow) {
             chipGroupAiTags.addView(createTagChip(tag));
         }
+        int aiVisibility = aiRow.isEmpty() ? View.GONE : View.VISIBLE;
+        tvAiTagsLabel.setVisibility(aiVisibility);
+        chipGroupAiTags.setVisibility(aiVisibility);
 
         chipGroupDefaultTags.removeAllViews();
-        for (String tag : profileRepo.getDefaultTags()) {
+        for (String tag : defaults) {
             chipGroupDefaultTags.addView(createTagChip(tag));
         }
+    }
+
+    /** AI 작성 중에는 버튼을 막고 '작성 중'으로 바꾼다(중복 요청 방지). */
+    private void setAiLoading(boolean loading) {
+        btnAiBio.setEnabled(!loading);
+        btnAiBio.setAlpha(loading ? 0.5f : 1f);
+        btnAiBio.setText(loading ? R.string.profile_ai_writing : R.string.profile_ai_write_button);
+    }
+
+    private void requestAiBio() {
+        String department = tvDepartment.getText() != null ? tvDepartment.getText().toString() : "";
+        Object grade = spinnerGrade.getSelectedItem();
+        setAiLoading(true);
+        aiViewModel.generate(getApplicationContext(), profileRepo, department,
+                AiProfileMapper.gradeNumber(grade != null ? grade.toString() : null),
+                new ArrayList<>(selectedTags), etBio.getText() != null ? etBio.getText().toString() : "");
+        // 학과가 없는 등 바로 끝난 경우 결과 관찰자가 버튼을 되돌린다.
+    }
+
+    /** AI 결과: 성공이면 초안을 입력칸에 넣고(수정 가능) 추천 태그를 보여 준다. 실패해도 직접 입력은 그대로 할 수 있다. */
+    private void onAiResult(ProfileAiViewModel.Result result) {
+        if (result == null || !result.consume()) return;
+        setAiLoading(false);
+        if (!result.isSuccess()) {
+            Toast.makeText(this, result.message, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        etBio.setText(result.draft.bio);
+        etBio.setSelection(etBio.getText().length());
+        tvAiFeedback.setText(AiProfileMapper.feedbackText(result.courseNames));
+        tvAiFeedback.setVisibility(View.VISIBLE);
+        aiSuggestedTags.clear();
+        aiSuggestedTags.addAll(result.draft.suggestedTags);
+        setupTags();
+        Toast.makeText(this, R.string.profile_ai_done, Toast.LENGTH_SHORT).show();
     }
 
     /** 공통 Figma Chip(Type=Interest). 선택 상태는 View.setSelected 로 표현한다. */
@@ -354,20 +419,8 @@ public class ProfileSetupActivity extends AppCompatActivity {
             @Override public void afterTextChanged(Editable s) {}
         });
 
-        // AI로 자기소개 작성하기 버튼 클릭
-        findViewById(R.id.btnAiBio).setOnClickListener(v -> {
-            profileRepo.generateAiBio("자료구조, 월요일 공강", new ProfileRepository.Callback<String>() {
-                @Override
-                public void onSuccess(String result) {
-                    etBio.setText(result);
-                    tvAiFeedback.setVisibility(View.VISIBLE);
-                    Toast.makeText(ProfileSetupActivity.this, "AI 자기소개가 작성되었어요!", Toast.LENGTH_SHORT).show();
-                }
-
-                @Override
-                public void onError(String message) {}
-            });
-        });
+        // AI로 자기소개 작성하기 (BT-029): 학과·학년·고른 태그·시간표 수업 이름·작성 중인 소개로 초안을 만든다.
+        btnAiBio.setOnClickListener(v -> requestAiBio());
 
         // 프로필 사진 변경 클릭 시 토스트
         // 시스템 사진 선택기: 저장소 권한 없이 사용자가 고른 사진 1장만 접근한다.

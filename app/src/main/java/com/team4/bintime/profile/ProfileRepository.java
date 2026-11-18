@@ -50,9 +50,13 @@ public interface ProfileRepository {
     /** {@link UserProfile#getPhotoPath()} 경로의 사진을 불러온다. */
     void loadProfilePhoto(String photoPath, Callback<Bitmap> callback);
 
-    void generateAiBio(String timetableContext, Callback<String> callback);
+    /**
+     * AI 자기소개 초안과 추천 태그(BT-029). Firebase 는 generateProfile Callable(asia-northeast3), Mock 은 고정 규칙.
+     * 결과는 초안일 뿐 저장하지 않는다. 실패하면 onError 에 사용자 문구({@link AiProfileMapper#errorMessage})를 준다.
+     * 콜백은 정확히 한 번, 메인 스레드로 온다.
+     */
+    void generateAiProfile(AiProfileRequest request, Callback<AiProfileDraft> callback);
 
-    List<String> getAiRecommendedTags();
-
+    /** 기본 활동 태그(# 없이). */
     List<String> getDefaultTags();
 }

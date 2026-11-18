@@ -7,7 +7,7 @@ import type { AiContext, AiDeps, AiResponse, AiTask } from "./types";
 
 /**
  * 모든 AI 기능의 공통 처리 순서.
- * 1 입력 검증 → 2 권한 검사 → 3 하루 호출량 → 4 Mock 또는 Gemini 호출(제한 시간·재시도) → 5 응답 형식·규칙 검증 → 6 기록.
+ * 1 입력 검증 → 2 권한 검사 → 3 하루 호출량·최소 호출 간격 → 4 Mock 또는 Gemini 호출(제한 시간·재시도) → 5 응답 형식·규칙 검증 → 6 기록.
  * 인증(uid 확인)은 Callable 래퍼가 먼저 하고, 내부 호출은 서버가 uid 를 넣는다.
  */
 export async function runAiTask<I, O>(
@@ -26,8 +26,17 @@ export async function runAiTask<I, O>(
     const input = parseInput(task, rawInput);
     if (task.authorize) await task.authorize(input, ctx, deps);
 
-    const allowed = await deps.usage.consume(ctx.uid, task.name, task.dailyLimit, seoulDateKey(deps.now()));
-    if (!allowed) throw new AiError("QUOTA_EXCEEDED");
+    const now = deps.now();
+    const usage = await deps.usage.consume(
+      ctx.uid,
+      task.name,
+      { dailyLimit: task.dailyLimit, minIntervalMs: task.minIntervalMs },
+      seoulDateKey(now),
+      now.getTime(),
+    );
+    if (usage === "DAILY_LIMIT") throw new AiError("QUOTA_EXCEEDED");
+    // 연속 클릭·동시 요청. 잠시 후 다시 시도하면 되므로 retryable(AI_RATE_LIMITED 기본값)로 둔다.
+    if (usage === "TOO_SOON") throw new AiError("AI_RATE_LIMITED", "min interval");
 
     let data: O;
     if (deps.mode === "mock") {

@@ -355,7 +355,9 @@
                 android:layout_marginTop="2dp"
                 android:text="@string/profile_tags_subtitle" />
 
+            <!-- BT-029: AI 추천 태그가 있거나, 기본 목록에 없는 태그를 골랐을 때만 표시 -->
             <TextView
+                android:id="@+id/tvAiTagsLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"

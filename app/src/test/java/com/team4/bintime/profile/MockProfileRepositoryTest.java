@@ -284,24 +284,36 @@ public class MockProfileRepositoryTest {
 
     // ---- 기존 목업 기능 ----
 
+    // BT-029: Mock AI 초안 — 입력으로 정해진 초안, # 없는 추천 태그, 이미 고른 활동은 다시 추천하지 않음
     @Test
-    public void generateAiBio_success() {
-        AtomicReference<String> bioRef = new AtomicReference<>();
-        repository.generateAiBio("시간표 데이터", new ProfileRepository.Callback<String>() {
-            @Override public void onSuccess(String result) { bioRef.set(result); }
+    public void generateAiProfile_mockDraftUsesInputs() {
+        AtomicReference<AiProfileDraft> draftRef = new AtomicReference<>();
+        repository.generateAiProfile(new AiProfileRequest("소프트웨어학과", 2, Arrays.asList("카페"),
+                Arrays.asList("자료구조"), ""), new ProfileRepository.Callback<AiProfileDraft>() {
+            @Override public void onSuccess(AiProfileDraft result) { draftRef.set(result); }
             @Override public void onError(String message) {}
         });
 
-        assertNotNull(bioRef.get());
-        assertTrue(bioRef.get().length() > 0);
+        AiProfileDraft draft = draftRef.get();
+        assertNotNull(draft);
+        assertTrue(draft.bio.contains("소프트웨어학과 2학년"));
+        assertTrue(draft.bio.contains("자료구조"));
+        assertTrue(draft.bio.length() <= ProfileValidator.BIO_MAX_LENGTH);
+        assertFalse(draft.suggestedTags.contains("카페"));
+        assertEquals(3, draft.suggestedTags.size());
+        for (String tag : draft.suggestedTags) assertFalse(tag.startsWith("#"));
+    }
+
+    @Test
+    public void generateAiProfile_missingDepartment_failsWithMessage() {
+        Recorder<AiProfileDraft> recorder = new Recorder<>();
+        repository.generateAiProfile(new AiProfileRequest(" ", 2, Arrays.asList(), Arrays.asList(), null), recorder);
+        assertFalse(recorder.success);
+        assertEquals("학과를 먼저 선택해 주세요", recorder.errorMessage);
     }
 
     @Test
     public void tagsList_containsExpectedOptions() {
-        List<String> aiTags = repository.getAiRecommendedTags();
-        assertTrue(aiTags.contains("코딩스터디"));
-        assertTrue(aiTags.contains("길산책"));
-
         List<String> defaultTags = repository.getDefaultTags();
         assertTrue(defaultTags.contains("스터디"));
         assertTrue(defaultTags.contains("카페"));
