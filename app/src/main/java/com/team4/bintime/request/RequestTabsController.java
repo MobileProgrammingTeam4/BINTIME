@@ -2,10 +2,12 @@ package com.team4.bintime.request;
 
 import android.view.LayoutInflater;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -24,6 +26,7 @@ import com.team4.bintime.matching.ProfileDetailActivity;
 import com.team4.bintime.model.MatchCandidate;
 import com.team4.bintime.model.MatchFilter;
 import com.team4.bintime.profile.ProfileRepositories;
+import com.team4.bintime.profile.ProfileRepository;
 import com.team4.bintime.profile.UserProfile;
 
 import java.util.Collections;
@@ -107,6 +110,7 @@ public final class RequestTabsController {
         MatchCandidate profile = repository.isMock() ? MockMatchRepository.find(item.profileUid) : null;
         if (!repository.isMock()) profiles.load(item.profileUid);
         UserProfile actual = profiles.get(item.profileUid);
+        bindAvatar(card.findViewById(R.id.requestAvatar), actual == null ? profile == null ? null : profile.photoPath : actual.getPhotoPath());
         boolean profileFailed = profiles.failed(item.profileUid);
         boolean profileMissing = profiles.missing(item.profileUid);
         text(card, R.id.requestName, actual != null ? publicName(actual) : profile == null
@@ -239,6 +243,22 @@ public final class RequestTabsController {
 
     private static void text(View root, int id, String value) {
         ((TextView) root.findViewById(id)).setText(value);
+    }
+
+    private void bindAvatar(ImageView avatar, String path) {
+        avatar.setTag(path);
+        avatar.setImageResource(R.drawable.img_default_profile);
+        if (path == null || path.isEmpty()) return;
+        ProfileRepositories.get(avatar.getContext()).loadProfilePhoto(path, new ProfileRepository.Callback<Bitmap>() {
+            @Override public void onSuccess(Bitmap bitmap) {
+                // 캐시 적중 콜백은 카드가 부모에 추가되기 전에도 동기 실행될 수 있다.
+                root.post(() -> {
+                    if (bitmap != null && canShowFeedback() && avatar.isAttachedToWindow()
+                            && path.equals(avatar.getTag())) avatar.setImageBitmap(bitmap);
+                });
+            }
+            @Override public void onError(String message) { /* 사진 실패는 기본 이미지를 유지한다. */ }
+        });
     }
 
     private static String publicName(UserProfile profile) {
