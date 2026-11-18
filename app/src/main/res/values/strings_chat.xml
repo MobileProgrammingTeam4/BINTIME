@@ -52,4 +52,11 @@
     <string name="chat_close">닫기</string>
     <!-- BT-021: 상대 공개 프로필을 아직 읽지 못했을 때 표시할 이름 -->
     <string name="chat_partner_fallback_name">상대</string>
+    <!-- BT-034: 채팅방 준비 중·연결 실패 재시도 (ensureMatchChat) -->
+    <string name="chat_link_preparing_title">채팅방을 준비하고 있어요</string>
+    <string name="chat_link_preparing_message">준비가 끝나면 바로 대화할 수 있어요.\n오래 걸리면 다시 시도해주세요.</string>
+    <string name="chat_link_failed_message">채팅방을 준비하지 못했어요.\n잠시 후 다시 시도해주세요.</string>
+    <string name="chat_link_permanent_message">채팅방 연결 정보에 문제가 있어요.\n운영자 확인이 필요해요.</string>
+    <string name="chat_link_unavailable_message">이 채팅방은 지금 사용할 수 없어요.</string>
+    <string name="chat_link_retry_wait">다시 시도 (%1$d초)</string>
 </resources>
