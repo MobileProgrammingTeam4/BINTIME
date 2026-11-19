@@ -72,6 +72,18 @@ public class RecognitionCallableErrorsTest {
     }
 
     @Test
+    public void resourceExhausted_withoutDetails_isRateLimited_butServerReasonWins() {
+        RecognitionFailure noDetails = RecognitionCallableErrors.fromParts("RESOURCE_EXHAUSTED", null, null);
+        assertEquals(Reason.AI_RATE_LIMITED, noDetails.getReason());
+        assertTrue(noDetails.isRetryable());
+
+        RecognitionFailure quota = RecognitionCallableErrors.fromParts("RESOURCE_EXHAUSTED",
+                details("QUOTA_EXCEEDED", null), null);
+        assertEquals(Reason.QUOTA_EXCEEDED, quota.getReason());
+        assertFalse(quota.isRetryable());
+    }
+
+    @Test
     public void nonFunctionsExceptions() {
         assertEquals(Reason.NETWORK, RecognitionCallableErrors.fromException(new IOException(new SocketTimeoutException("x"))).getReason());
         assertEquals(Reason.NETWORK, RecognitionCallableErrors.fromException(new IOException("x")).getReason());

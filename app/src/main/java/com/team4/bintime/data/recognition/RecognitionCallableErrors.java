@@ -12,7 +12,8 @@ import java.util.Map;
  *   <li>서버 오류 details({@code {reason, retryable, requestId}}, docs/BT-024.md)가 있으면 그대로 따른다
  *       ({@link RecognitionFailure#fromServer}). 모르는 reason 은 INTERNAL.</li>
  *   <li>details 가 없으면 Callable 코드로 본다: DEADLINE_EXCEEDED(앱 타임아웃) → AI_TIMEOUT,
- *       UNAVAILABLE 이나 원인에 네트워크 오류 → NETWORK, UNAUTHENTICATED → UNAUTHENTICATED, 그 밖 INTERNAL.</li>
+ *       UNAVAILABLE 이나 원인에 네트워크 오류 → NETWORK, UNAUTHENTICATED → UNAUTHENTICATED, RESOURCE_EXHAUSTED(Cloud Run 동시 처리 한도 429) → AI_RATE_LIMITED,
+ *       그 밖 INTERNAL.</li>
  * </ol>
  * 메시지·requestId 는 로그에 남기지 않는다. Firebase 예외 객체를 만들 수 없는 JVM 테스트를 위해 판정은
  * {@link #fromParts}에 둔다.
@@ -54,6 +55,10 @@ final class RecognitionCallableErrors {
         }
         if ("UNAUTHENTICATED".equals(code)) {
             return RecognitionFailure.of(RecognitionFailure.Reason.UNAUTHENTICATED);
+        }
+        if ("RESOURCE_EXHAUSTED".equals(code)) {
+            // details 없는 429(Cloud Run 동시 처리 한도 초과). 서버 reason(QUOTA_EXCEEDED 등)은 위에서 먼저 처리된다.
+            return RecognitionFailure.of(RecognitionFailure.Reason.AI_RATE_LIMITED);
         }
         return RecognitionFailure.of(RecognitionFailure.Reason.INTERNAL);
     }
