@@ -15,6 +15,8 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.firestore.WriteBatch;
+import com.google.firebase.functions.FirebaseFunctions;
+import com.google.firebase.functions.FirebaseFunctionsException;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageException;
 import com.google.firebase.storage.StorageMetadata;
@@ -45,8 +47,8 @@ public final class FirebaseProfileRepository implements ProfileRepository {
     private final FirebaseAuth auth = FirebaseAuth.getInstance();
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private final FirebaseStorage storage = FirebaseStorage.getInstance();
-    /** AI 추천은 BT-041 등 후속 이슈 범위라 기존 목업 데이터를 그대로 쓴다. */
-    private final MockProfileRepository suggestions = new MockProfileRepository();
+    /** BT-024 AI 게이트웨이 리전 */
+    private final FirebaseFunctions functions = FirebaseFunctions.getInstance("asia-northeast3");
 
     /** 다른 사용자가 같은 경로에 사진을 바꿨을 때 반영되기까지의 최대 시간. */
     static final long PHOTO_CACHE_TTL_MILLIS = 5L * 60 * 1000;
@@ -74,7 +76,16 @@ public final class FirebaseProfileRepository implements ProfileRepository {
             photoDecoder,
             mainHandler::post);
 
-    private FirebaseProfileRepository() {}
+    /**
+     * BT-030: 저장 중 연결이 끊기면 사진 업로드가 기본 10분 동안 재시도해 화면이 묶인다.
+     * 이 시간이 지나면 ERROR_RETRY_LIMIT_EXCEEDED → "네트워크 연결을 확인해 주세요"로 끝낸다.
+     */
+    static final long STORAGE_RETRY_MILLIS = 20_000L;
+
+    private FirebaseProfileRepository() {
+        storage.setMaxUploadRetryTimeMillis(STORAGE_RETRY_MILLIS);
+        storage.setMaxDownloadRetryTimeMillis(STORAGE_RETRY_MILLIS);
+    }
 
     @Override
     public void getProfile(String uid, Callback<UserProfile> callback) {
@@ -163,6 +174,12 @@ public final class FirebaseProfileRepository implements ProfileRepository {
         });
     }
 
+    /** BT-030: 로그아웃 시 사진 캐시를 비운다(다음 계정이 이전 계정에서 받은 사진을 캐시로 보지 않게). */
+    @Override
+    public void clearSessionCaches() {
+        photoLoader.invalidateAll();
+    }
+
     @Override
     public void hasCompletedProfile(String uid, Callback<Boolean> callback) {
         if (uid == null) {
@@ -220,14 +237,46 @@ public final class FirebaseProfileRepository implements ProfileRepository {
         photoLoader.load(photoPath, callback);
     }
 
+    /** BT-029: generateProfile Callable. 이름·이메일·UID 는 보내지 않는다(토큰으로 서버가 사용자를 안다). */
     @Override
-    public void generateAiBio(String timetableContext, Callback<String> callback) {
-        suggestions.generateAiBio(timetableContext, callback);
+    public void generateAiProfile(AiProfileRequest request, Callback<AiProfileDraft> callback) {
+        String invalid = AiProfileMapper.validate(request);
+        if (invalid != null) {
+            fail(callback, invalid);
+            return;
+        }
+        if (auth.getCurrentUser() == null) {
+            fail(callback, AiProfileMapper.errorMessage("UNAUTHENTICATED"));
+            return;
+        }
+        functions.getHttpsCallable("generateProfile")
+                .call(AiProfileMapper.toCallableData(request))
+                .addOnCompleteListener(task -> {
+                    if (!task.isSuccessful()) {
+                        fail(callback, aiErrorMessage(task.getException()));
+                        return;
+                    }
+                    AiProfileDraft draft = AiProfileMapper.fromCallableResult(
+                            task.getResult() != null ? task.getResult().getData() : null);
+                    if (draft == null) fail(callback, AiProfileMapper.MSG_GENERIC);
+                    else if (callback != null) callback.onSuccess(draft);
+                });
     }
 
-    @Override
-    public List<String> getAiRecommendedTags() {
-        return suggestions.getAiRecommendedTags();
+    /** FirebaseFunctionsException.details.reason(docs/BT-024.md) → 사용자 문구. 네트워크 오류도 구분한다. */
+    private static String aiErrorMessage(Exception e) {
+        if (e instanceof FirebaseFunctionsException) {
+            Object details = ((FirebaseFunctionsException) e).getDetails();
+            if (details instanceof Map) {
+                Object reason = ((Map<?, ?>) details).get("reason");
+                return AiProfileMapper.errorMessage(reason instanceof String ? (String) reason : null);
+            }
+            if (((FirebaseFunctionsException) e).getCode() == FirebaseFunctionsException.Code.UNAVAILABLE) {
+                return "네트워크 연결을 확인해 주세요.";
+            }
+        }
+        if (e instanceof FirebaseNetworkException) return "네트워크 연결을 확인해 주세요.";
+        return AiProfileMapper.MSG_GENERIC;
     }
 
     @Override

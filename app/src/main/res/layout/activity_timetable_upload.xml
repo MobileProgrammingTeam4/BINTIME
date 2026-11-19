@@ -142,6 +142,44 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal" />
             </HorizontalScrollView>
+
+            <!-- [BT-025] 업로드 진행률 -->
+            <ProgressBar
+                android:id="@+id/timetable_upload_progress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="6dp"
+                android:layout_marginTop="12dp"
+                android:max="100"
+                android:progressTint="@color/action_primary"
+                android:visibility="gone" />
+
+            <!-- [BT-025] 이미지별 오류 안내 -->
+            <TextView
+                android:id="@+id/timetable_upload_errors"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:accessibilityLiveRegion="polite"
+                android:lineSpacingExtra="3dp"
+                android:textColor="@color/action_primary"
+                android:textSize="12sp"
+                android:visibility="gone" />
+
+            <!-- [BT-026] 인식 실패 시 수동 입력으로 이어 가기 -->
+            <TextView
+                android:id="@+id/timetable_upload_manual"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:layout_marginTop="4dp"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:text="@string/timetable_upload_manual_input"
+                android:textAppearance="@style/TextAppearance.BinTime.ButtonL"
+                android:textColor="@color/action_primary"
+                android:visibility="gone" />
             <!-- 유의사항 팁 박스 -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -150,6 +188,18 @@
                 android:background="@drawable/bg_notice_box"
                 android:orientation="vertical"
                 android:padding="16dp">
+
+                <!-- [BT-025] 개인정보 안내 -->
+                <TextView
+                    android:id="@+id/timetable_upload_privacy_notice"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:lineSpacingExtra="3dp"
+                    android:text="@string/timetable_upload_privacy_notice"
+                    android:textColor="@color/action_primary"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:layout_width="match_parent"

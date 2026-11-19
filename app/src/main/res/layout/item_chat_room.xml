@@ -60,6 +60,13 @@
                 tools:text="김지민" />
 
             <TextView
+                android:id="@+id/chatArchiveBadge"
+                android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp"
+                android:paddingHorizontal="8dp" android:paddingVertical="4dp" android:background="@drawable/bg_pill_page"
+                android:text="@string/chat_archive_badge" android:textAppearance="@style/TextAppearance.BinTime.CaptionBold"
+                android:textColor="@color/text_secondary" android:visibility="gone" />
+
+            <TextView
                 android:id="@+id/chatRoomTime"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

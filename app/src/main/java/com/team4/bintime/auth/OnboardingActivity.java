@@ -35,6 +35,8 @@ public class OnboardingActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_onboarding);
+        // 직접 로그아웃 뒤 온보딩에 도착했다. 이후 로그인 세션 감시는 다시 '만료'를 알린다.
+        SessionGuard.resetUserSignOut();
 
         btnStart = findViewById(R.id.btnStart);
         centerContent = findViewById(R.id.layoutCenterContent);
@@ -63,9 +65,48 @@ public class OnboardingActivity extends AppCompatActivity {
         bottomAction.setVisibility(visibility);
     }
 
+    /**
+     * BT-030: 기기에 남은 로그인이 서버에서도 유효한지 먼저 본다. 계정 삭제·비활성화·토큰 무효면 이미 로그아웃됐으므로
+     * 온보딩을 그대로 보여 주고 "다시 로그인"을 안내한다(메인↔온보딩을 오가는 무한 루프 없음).
+     * 네트워크로 확인하지 못하면 기기의 로그인으로 계속 진행한다.
+     */
     private void routeSignedInUser(AuthRepository auth) {
-        // 프로필 확인 중에는 버튼을 누르지 못하게 한다(중복 요청 방지).
+        // 확인 중에는 버튼을 누르지 못하게 한다(중복 요청 방지).
         btnStart.setEnabled(false);
+        auth.checkSession(new AuthRepository.Callback<AuthRepository.SessionState>() {
+            @Override
+            public void onSuccess(AuthRepository.SessionState state) {
+                if (isFinishing() || isDestroyed()) return;
+                if (state == AuthRepository.SessionState.DISABLED) {
+                    showSignedOut(false);
+                    Toast.makeText(OnboardingActivity.this, R.string.account_disabled, Toast.LENGTH_LONG).show();
+                    return;
+                }
+                if (state == AuthRepository.SessionState.EXPIRED || !auth.isSignedIn()) {
+                    showSignedOut(true);
+                    return;
+                }
+                routeByProfile(auth);
+            }
+
+            @Override
+            public void onError(String message) {
+                if (isFinishing() || isDestroyed()) return;
+                routeByProfile(auth);
+            }
+        });
+    }
+
+    /** 로그인 전 온보딩 상태로 되돌린다. expired 면 "다시 로그인" 안내를 띄운다. */
+    private void showSignedOut(boolean expired) {
+        if (expired) Toast.makeText(this, R.string.session_expired, Toast.LENGTH_SHORT).show();
+        retryMode = false;
+        btnStart.setText(R.string.onboarding_start_button);
+        btnStart.setEnabled(true);
+        setContentShown(true);
+    }
+
+    private void routeByProfile(AuthRepository auth) {
         ProfileRepositories.get(this).hasCompletedProfile(auth.getCurrentUid(), new ProfileRepository.Callback<Boolean>() {
             @Override
             public void onSuccess(Boolean completed) {

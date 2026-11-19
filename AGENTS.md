@@ -59,7 +59,10 @@
 ### 요청·채팅·종료
 
 - 요청 상태: `PENDING`, `ACCEPTED`, `REJECTED`, `CANCELED`.
+- BT-032 상충/만료 정리는 `docs/BT-032.md`를 따른다. `matchCleanupJobs`는 서버 전용이며 자동 정리는 직접 취소 cooldown을 변경하지 않는다. 5분 주기 예약 코드와 실제 운영 활성화를 구분한다.
 - 매칭 상태: `ACTIVE`, `ENDED`.
+- BT-033부터 개별 matchId와 실제 chatRoomId를 구분합니다. 서버 전용 chatPairs/chatLinkJobs, 현재 참여자 읽기 전용 chatRoomLinks 및 방의 archived/writable 계약은 `docs/BT-034.md`를 따릅니다. 여러 약속의 대표·종료/후기 선택과 비활성 MessageComposer는 `docs/BT-035.md`의 제공 컴포넌트를 재사용합니다.
+- 둘 다 나간 방은 목록 hidden·멤버 제거로 양측 접근을 차단하고 서버에만 보관한다. 보관 기간·최종 삭제는 신고 담당·SM 후속 합의 전 자동 실행하지 않는다. 한 명 이탈 방의 남은 사람 읽기 권한은 유지한다.
 - 서버가 요청 수락/거절/취소를 검증하고 **동시 수락과 상충 요청**을 트랜잭션/멱등 처리로 보호합니다.
 - 매칭 자동 종료는 **확정된 겹침 시간 종료 시점**을 기준으로 하며, 채팅 옵션의 수동 종료도 지원합니다.
 - **ACTIVE 매칭은 채팅방 나가기 불가**. **ENDED 이후에만 나가기 허용**. 매칭 종료 후에도 채팅을 계속 사용할 수 있으며, 종료 이벤트로 기록을 삭제하거나 전송을 막지 않습니다.
@@ -140,9 +143,10 @@ reports/{reportId}
 aiUsage/{uid}_{YYYY-MM-DD}
 
 Realtime Database
-chatRooms/{matchId}/members/{uid}
-chatRooms/{matchId}/messages/{messageId}
-userChatRooms/{uid}/{matchId}
+chatRooms/{chatRoomId}/members/{uid}
+chatRooms/{chatRoomId}/messages/{messageId}
+chatRooms/{chatRoomId}/control: {chatReady, writable, archived}
+userChatRooms/{uid}/{chatRoomId}
 ```
 
 | 데이터 | 필수 계약 또는 검증 |
@@ -157,11 +161,12 @@ userChatRooms/{uid}/{matchId}
 | `matchRequests` | `fromUid`, `toUid`, `status`, `meetingDate`, `startMinute`, `endMinute`, `overlapMinutes` 등 **시간 스냅샷** |
 | 요청 생성 계약 | `createMatchRequest({candidateId, clientRequestId})`: 상대 UID와 재시도 UUID만 입력. 검색자가 선택한 최소 겹침, 프로필·차단·시간표·확정 매칭 충돌을 같은 서버 트랜잭션에서 검증. 같은 방향 PENDING 중복은 서버 전용 `matchRequestGuards`로 막음. 계약은 `docs/BT-019.md` |
 | 요청 목록·취소 계약 | UID별 발신/수신 Firestore 리스너, `cancelMatchRequest(requestId)`, 두 복합 인덱스와 검증 범위는 `docs/BT-020.md`를 따릅니다. |
+| 요청 수락·제한 계약 | `respondToMatchRequest({requestId, action})`, action은 `ACCEPTED` 또는 `REJECTED`. 토큰 수신자만 처리. 보낸 유효 PENDING 3개·받은 5개, 직접 취소 후 신규 신청 60초 제한·역방향 차단. 기존 초과 요청 보존, UUID 재시도와 자동 취소는 제한을 새로 만들지 않음. 서버 전용 `requestUserGuards/{uid}`는 사용자 단위 경합과 cooldownUntil을 보호. 상세는 `docs/BT-031.md` |
 | `matches` | `participantUids`, `requestId`, `status`, `meetingDate`, `startMinute`, `endMinute`, `chatReady` 등 **확정 스냅샷** |
-| `chatRooms` | `matchId`를 룸 식별자로 사용, 메시지 발신자·권한 검증. Rules는 `database.rules.json`: 멤버만 읽기, 메시지는 새로 쓰기만(`senderId === auth.uid`, 서버 시각, 본문 1~1000자), `members`는 서버 전용. 계약은 `docs/BT-021.md` |
-| `userChatRooms` | 사용자별 목록/읽지 않음 수, 서버와 동기화. 앱은 본인 `unreadCount`를 0으로만 쓸 수 있고 `status`·`hidden`은 서버 전용 |
+| `chatRooms` | 실제 방 키는 `chatRoomId`, 개별 약속 `matchId`와 구분. Rules는 `database.rules.json`: 멤버만 메시지 읽기·새 쓰기(`senderId === auth.uid`, 서버 시각, 본문 1~1000자), `members` 쓰기와 `control {chatReady,writable,archived}` 읽기·쓰기는 서버 전용. Rules는 control을 내부 참조하며 앱은 직접 읽지 않음. `writable=false` 또는 `archived=true`면 전송 거부. 계약은 `docs/BT-021.md`·`docs/BT-034.md` |
+| `userChatRooms` | `userChatRooms/{uid}/{chatRoomId}`의 본인 목록/안읽음·방 단위 `chatReady/archived/hidden/status`. 앱은 본인 읽기 및 `unreadCount=0`만 쓰기 가능. 나머지는 서버 전용이며 표시 상태는 이 값과 참여자용 `chatRoomLinks`를 사용 |
 | `reviews` / `reports` | 참여·공개/작성 권한, 개인정보 최소 수집 |
-| `aiUsage` | BT-024 Gemini 게이트웨이의 사용자별 하루 호출 수(`uid`, `date`, `counts.{task}`, `total`, `updatedAt`). 날짜는 `Asia/Seoul`. **서버 전용**: Admin SDK만 쓰고 Rules는 앱 읽기·쓰기 모두 거부. 계약은 `docs/BT-024.md` |
+| `aiUsage` | BT-024 Gemini 게이트웨이의 사용자별 하루 호출 수(`uid`, `date`, `counts.{task}`, `lastCalledAtMs.{task}`, `total`, `updatedAt`). 날짜는 `Asia/Seoul`. **서버 전용**: Admin SDK만 쓰고 Rules는 앱 읽기·쓰기 모두 거부. 계약은 `docs/BT-024.md` |
 
 시간 규칙:
 

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { cancelInput, createInput } from "./contracts";
+import { cancelInput, createInput, respondInput } from "./contracts";
 import type { ZodType } from "zod";
 import { SearchCandidateResolver } from "./candidates";
 import { ALLOWED_EMAIL_SUFFIXES_ENV, checkSchoolEmail, parseAllowedEmailSuffixes } from "../ai/emailPolicy";
@@ -24,6 +24,11 @@ export function createRequestCallable(service: () => RequestService = defaultSer
 export function cancelRequestCallable(service: () => RequestService = defaultService,
   suffixes: () => readonly string[] = defaultSuffixes) {
   return requestCallable(cancelInput, (instance, uid, input) => instance.cancel(uid, input.requestId), service, suffixes);
+}
+
+export function respondRequestCallable(service: () => RequestService = defaultService,
+  suffixes: () => readonly string[] = defaultSuffixes) {
+  return requestCallable(respondInput, (instance, uid, input) => instance.respond(uid, input), service, suffixes);
 }
 
 function requestCallable<T>(schema: ZodType<T>,

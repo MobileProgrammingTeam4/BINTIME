@@ -8,6 +8,10 @@ export const createInput = z.object({
   clientRequestId: z.uuid(),
 }).strict();
 export const cancelInput = z.object({ requestId: z.string().regex(/^[a-f0-9]{64}$/) }).strict();
+export const respondInput = z.object({
+  requestId: z.string().regex(/^[a-f0-9]{64}$/), action: z.enum(["ACCEPTED", "REJECTED"]),
+}).strict();
+export type RespondInput = z.infer<typeof respondInput>;
 
 const date = z.iso.date();
 /** 클라이언트 입력이 아니다. BT-017 서버 적격성 검사기가 반환할 최소 스냅샷. */

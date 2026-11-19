@@ -183,6 +183,17 @@ public final class MockAsyncTimetableRepository implements AsyncTimetableReposit
         return availability.get(uid);
     }
 
+    /** Mock 은 서버가 따로 없으므로 저장된 수를 그대로 돌려준다. */
+    @Override
+    public void countCoursesFromServer(Callback<Integer> callback) {
+        String uid = uidSupplier.get();
+        if (uid == null) {
+            fail(callback, notSignedIn());
+            return;
+        }
+        if (callback != null) callback.onSuccess(currentCourses(uid).size());
+    }
+
     // ── 내부 ───────────────────────────────────────────
 
     private long[] cellsOf(String uid) {

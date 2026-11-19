@@ -20,7 +20,7 @@ import androidx.fragment.app.Fragment;
 import com.google.android.material.chip.ChipGroup;
 import com.team4.bintime.R;
 import com.team4.bintime.auth.AuthRepositories;
-import com.team4.bintime.auth.OnboardingActivity;
+import com.team4.bintime.auth.SessionGuard;
 import com.team4.bintime.common.ChipViews;
 import com.team4.bintime.common.ConfirmDialog;
 import com.team4.bintime.notification.NotificationSettingsActivity;
@@ -198,11 +198,9 @@ public class MyPageFragment extends Fragment {
                 getString(R.string.my_delete_confirm));
     }
 
+    /** BT-030: 캐시 정리 → 로그아웃 → 온보딩. 세션 감시가 이 로그아웃을 '만료'로 보지 않게 SessionGuard 로 한다. */
     private void logout() {
-        AuthRepositories.get(requireContext()).signOut();
         Toast.makeText(requireContext(), R.string.my_logout_done, Toast.LENGTH_SHORT).show();
-        Intent intent = new Intent(requireContext(), OnboardingActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
+        SessionGuard.signOutByUser(requireActivity());
     }
 }

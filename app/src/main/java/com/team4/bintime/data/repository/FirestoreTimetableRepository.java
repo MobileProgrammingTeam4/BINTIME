@@ -12,6 +12,7 @@ import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.firestore.Source;
 import com.google.firebase.firestore.Transaction;
 import com.team4.bintime.auth.AuthRepositories;
 import com.team4.bintime.data.availability.Availability;
@@ -437,6 +438,26 @@ public final class FirestoreTimetableRepository implements AsyncTimetableReposit
         Map<String, Object> doc = availability.toDocument();
         doc.put(Availability.F_UPDATED_AT, FieldValue.serverTimestamp());
         tx.set(ref, doc);
+    }
+
+    /**
+     * Source.SERVER: 캐시로 대신하지 않고, 오프라인이면 실패한다. 형식이 틀린 문서도 replaceCourses 가 지우므로
+     * 문서 수(size)를 센다.
+     */
+    @Override
+    public void countCoursesFromServer(Callback<Integer> callback) {
+        String uid = currentUid();
+        if (uid == null) {
+            fail(callback, notSignedIn());
+            return;
+        }
+        coursesRef(uid).get(Source.SERVER).addOnCompleteListener(task -> {
+            if (!task.isSuccessful() || task.getResult() == null) {
+                fail(callback, FirestoreFailures.from(task.getException()));
+                return;
+            }
+            if (callback != null) callback.onSuccess(task.getResult().size());
+        });
     }
 
     private static List<Course> readCourses(QuerySnapshot snapshot) {

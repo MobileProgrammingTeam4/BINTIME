@@ -119,6 +119,22 @@ final class PhotoLoader<V> {
         }
     }
 
+    /**
+     * BT-030: 로그아웃 시 전부 비운다. 진행 중인 다운로드 결과도 캐시에 넣지 않는다(기다리던 화면에는 전달).
+     * 다음 계정이 이전 계정에서 받은 사진을 캐시에서 보지 않게 한다.
+     */
+    void invalidateAll() {
+        synchronized (lock) {
+            for (String path : new java.util.ArrayList<>(inFlight.keySet())) {
+                generations.put(path, generationOf(path) + 1);
+            }
+            for (String path : new java.util.ArrayList<>(generations.keySet())) {
+                generations.put(path, generationOf(path) + 1);
+            }
+            cache.clear();
+        }
+    }
+
     private int generationOf(String path) {
         Integer g = generations.get(path);
         return g == null ? 0 : g;

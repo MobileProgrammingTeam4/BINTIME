@@ -287,4 +287,103 @@ public class FreeTimeCalculatorTest {
         assertEquals(1, FreeTimeCalculator.matchableFreeSlots(
                 Collections.singletonList(slot(MON, 600, 660))).size());
     }
+
+    // ── [BT-036] 경계값 보강 ─────────────────────────────
+
+    private static final int SAT = 6;
+    private static final int SUN = 7;
+
+    @Test
+    public void meetsMinOverlap_61_andMinPlusOne() {
+        assertTrue(FreeTimeCalculator.meetsMinOverlap(61, 60));
+        for (int min : new int[]{60, 90, 120, 150, 180}) {
+            assertFalse("min-1, min=" + min, FreeTimeCalculator.meetsMinOverlap(min - 1, min));
+            assertTrue("min, min=" + min, FreeTimeCalculator.meetsMinOverlap(min, min));
+            assertTrue("min+1, min=" + min, FreeTimeCalculator.meetsMinOverlap(min + 1, min));
+        }
+    }
+
+    @Test
+    public void matchableOverlaps_59_60_61() {
+        List<TimeSlot> mine = Collections.singletonList(slot(MON, 600, 900));
+        assertTrue(FreeTimeCalculator.matchableOverlaps(
+                mine, Collections.singletonList(slot(MON, 841, 1000)), 60).isEmpty());       // 59분
+        assertEquals(Collections.singletonList(slot(MON, 840, 900)), FreeTimeCalculator.matchableOverlaps(
+                mine, Collections.singletonList(slot(MON, 840, 1000)), 60));                // 60분
+        assertEquals(Collections.singletonList(slot(MON, 839, 900)), FreeTimeCalculator.matchableOverlaps(
+                mine, Collections.singletonList(slot(MON, 839, 1000)), 60));                // 61분
+    }
+
+    @Test
+    public void matchableOverlaps_filterMinPlusOne() {
+        List<TimeSlot> mine = Collections.singletonList(slot(MON, 0, 1440));
+        for (int min : new int[]{60, 90, 120, 150, 180}) {
+            assertEquals(Collections.singletonList(slot(MON, 600, 600 + min + 1)),
+                    FreeTimeCalculator.matchableOverlaps(
+                            mine, Collections.singletonList(slot(MON, 600, 600 + min + 1)), min));
+        }
+    }
+
+    @Test
+    public void matchableOverlaps_adjacentCellsMergedBeforeIntersect_gapNotBridged() {
+        // 30분 칸 두 개가 맞닿아 있으면 합친 뒤 60분 교집합
+        assertEquals(Collections.singletonList(slot(MON, 600, 660)), FreeTimeCalculator.matchableOverlaps(
+                Arrays.asList(slot(MON, 600, 630), slot(MON, 630, 660)),
+                Collections.singletonList(slot(MON, 600, 660)), 60));
+        // 사이에 30분 빈칸이 있으면 30분 + 30분이라 60분 필터를 통과하지 못한다
+        List<TimeSlot> split = Arrays.asList(slot(MON, 600, 630), slot(MON, 660, 690));
+        List<TimeSlot> theirs = Collections.singletonList(slot(MON, 600, 690));
+        assertEquals(Arrays.asList(slot(MON, 600, 630), slot(MON, 660, 690)),
+                FreeTimeCalculator.intersect(split, theirs));
+        assertTrue(FreeTimeCalculator.matchableOverlaps(split, theirs, 60).isEmpty());
+    }
+
+    @Test
+    public void intersect_sunday_lastHour() {
+        assertEquals(Collections.singletonList(slot(SUN, 1380, 1440)), FreeTimeCalculator.matchableOverlaps(
+                Collections.singletonList(slot(SUN, 1380, 1440)),
+                Collections.singletonList(slot(SUN, 1320, 1440)), 60));
+    }
+
+    @Test
+    public void intersect_doesNotWrapAcrossDaysOrWeek() {
+        // 같은 분이라도 요일이 다르면 0분
+        assertTrue(FreeTimeCalculator.intersect(
+                Collections.singletonList(slot(SAT, 600, 720)),
+                Collections.singletonList(slot(SUN, 600, 720))).isEmpty());
+        // 일 23:00~24:00 과 월 00:00~01:00 은 이어지지 않는다
+        assertEquals(Collections.singletonList(slot(SUN, 1410, 1440)), FreeTimeCalculator.intersect(
+                Arrays.asList(slot(SUN, 1380, 1440), slot(MON, 0, 60)),
+                Collections.singletonList(slot(SUN, 1410, 1440))));
+        assertTrue(FreeTimeCalculator.matchableOverlaps(
+                Collections.singletonList(slot(SUN, 1410, 1440)),
+                Arrays.asList(slot(SUN, 1380, 1440), slot(MON, 0, 60)), 60).isEmpty());
+        // 월~일 전 구간 vs 일요일만
+        List<TimeSlot> week = new ArrayList<>();
+        for (int d = MON; d <= SUN; d++) week.add(slot(d, 0, 1440));
+        assertEquals(Collections.singletonList(slot(SUN, 0, 1440)),
+                FreeTimeCalculator.intersect(week, Collections.singletonList(slot(SUN, 0, 1440))));
+    }
+
+    @Test
+    public void selectable_sunday_lastCell() {
+        long mask = FreeTimeCalculator.selectableCells(
+                Collections.singletonList(slot(SUN, 1410, 1440)), SUN);
+        assertFalse(cell(mask, 47));
+        assertTrue(cell(mask, 46));
+        assertTrue(cell(FreeTimeCalculator.selectableCells(
+                Collections.singletonList(slot(SUN, 1410, 1440)), SAT), 47));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void selectable_day8_throws() {
+        FreeTimeCalculator.selectableCells(null, 8);
+    }
+
+    @Test
+    public void selectable_midnightStartCourse_blocksFirstCellOnly() {
+        long mask = FreeTimeCalculator.selectableCells(Collections.singletonList(slot(MON, 0, 30)), MON);
+        assertFalse(cell(mask, 0));
+        assertTrue(cell(mask, 1));
+    }
 }

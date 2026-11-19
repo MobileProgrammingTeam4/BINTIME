@@ -39,7 +39,7 @@ public final class ChatRepositories {
         if (!(selected instanceof FirebaseChatRepository) || !Objects.equals(selectedUid, uid)) {
             if (selected instanceof FirebaseChatRepository) ((FirebaseChatRepository) selected).close();
             selectedUid = uid;
-            selected = new FirebaseChatRepository(uid, database(context), MatchInfoSource.UNAVAILABLE,
+            selected = new FirebaseChatRepository(uid, database(context), uid == null ? MatchInfoSource.UNAVAILABLE : new FirestoreMatchInfoSource(uid),
                     PartnerSource.UNAVAILABLE, context.getString(R.string.chat_partner_fallback_name));
         }
         return selected;
