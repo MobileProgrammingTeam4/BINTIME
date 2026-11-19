@@ -10,9 +10,11 @@ import {
   buildingOf,
   nearbyBuildings,
   type CachedScore,
+  inputHash,
   type PublicSide,
   rankByScore,
   SCORE_CACHE_TTL_MS,
+  SCORE_DEADLINE_MS,
   type ScoreData,
   toSide,
 } from "../src/matching/score";
@@ -143,6 +145,12 @@ describe("BT-028 점수 캐시·추천순", () => {
     expect(ev.calls).toBe(4);
   });
 
+  it("모델이 바뀌면 해시가 달라져 다시 평가한다 (#117 E 리뷰)", () => {
+    const input = { overlapMinutes: 90, purposes: [], commonCourses: [], searcher: side, candidate: side };
+    expect(inputHash(input, "gemini-a")).toBe(inputHash(input, "gemini-a"));
+    expect(inputHash(input, "gemini-a")).not.toBe(inputHash(input, "gemini-b"));
+  });
+
   it("Mock 점수는 저장하지 않고, 저장 실패해도 점수는 보여준다", async () => {
     const data = new MemoryData({ me: side, a: side });
     await addScores(data, fixed, "me", [cand("a")], now);
@@ -173,3 +181,17 @@ describe("BT-028 점수 캐시·추천순", () => {
     expect(rankByScore([{ ...cand("x"), score: 0 }, cand("y")]).map((c) => c.candidateId)).toEqual(["x", "y"]);
   });
 });
+
+describe("점수 마감 (#102 E 리뷰 1)", () => {
+  it("마감까지 끝나지 않은 후보는 점수 없이, 끝난 후보는 점수와 함께 돌려준다", async () => {
+    const slow: Evaluator = async (u, i) => {
+      if (i.overlapMinutes === 60) await new Promise((r) => setTimeout(r, 500));
+      return fixed(u, i);
+    };
+    const data = new MemoryData({ me: side, fast: side, slow: side });
+    const out = await addScores(data, slow, "me", [cand("fast"), cand("slow", 60)], Date.now(), 50);
+    expect(out.map((c) => c.score)).toEqual([77, undefined]);
+    expect(SCORE_DEADLINE_MS).toBeLessThan(30_000);
+  });
+});
+

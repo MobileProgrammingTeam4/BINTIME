@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AiError } from "../errors";
 import type { AiTask } from "../types";
 import { text } from "./shared";
 
@@ -11,7 +12,8 @@ import { text } from "./shared";
  * 점수는 추천 정렬용 내부 지표이며 성공 확률이 아니다. 캐시는 BT-028 matchScores(A).
  */
 
-const SYSTEM_INSTRUCTION = [
+/** 바뀌면 matchScores 캐시가 자동으로 다시 평가된다(score.ts inputHash). */
+export const SYSTEM_INSTRUCTION = [
   "너는 대학생 공강 매칭 앱의 추천 평가기다. 두 학생은 이미 공강 겹침·목적 같은 필수 조건을 통과했다.",
   "입력 JSON 만 근거로 두 학생이 이번 공강을 함께 보내기 좋은 정도를 score(0~100 정수)로 평가한다.",
   "기준: 겹친 시간(길수록 유리), 공통 관심 태그, 함께 듣는 수업, 공강 전후 수업 건물이 같거나 가까운지, 목적과 자기소개의 어울림.",
@@ -58,6 +60,18 @@ const output = z
 export type EvaluateMatchInput = z.input<typeof input>;
 export type EvaluateMatchOutput = z.infer<typeof output>;
 
+/** 프롬프트 금지 규칙을 모델이 어겨도 상대 수업 건물이 검색자 화면에 나오지 않게 하는 서버 검사. */
+const ACTIVITY_FALLBACK = "가까운 곳에서 함께 공강 보내기";
+export function stripBuildings(out: EvaluateMatchOutput, buildings: string[]): EvaluateMatchOutput {
+  const names = buildings.map((b) => b.trim()).filter(Boolean);
+  if (names.length === 0) return out;
+  const leaks = (s: string) => names.some((name) => s.includes(name));
+  const reasons = out.reasons.filter((r) => !leaks(r));
+  // temperature 0 이라 다시 불러도 같은 답이 나오므로 재시도하지 않는다(transient: false).
+  if (reasons.length === 0) throw new AiError("AI_INVALID_OUTPUT", "reasons mention buildings", { transient: false });
+  return { ...out, reasons, suggestedActivity: leaks(out.suggestedActivity) ? ACTIVITY_FALLBACK : out.suggestedActivity };
+}
+
 export const evaluateMatchTask: AiTask<z.infer<typeof input>, EvaluateMatchOutput> = {
   name: "evaluateMatch",
   input,
@@ -65,6 +79,7 @@ export const evaluateMatchTask: AiTask<z.infer<typeof input>, EvaluateMatchOutpu
   timeoutMs: 10_000,
   /** 검색한 사용자 기준. 후보마다 1회라 다른 기능보다 크게 잡는다(BT-028 캐시로 줄인다). */
   dailyLimit: 300,
+  verify: (out, input) => stripBuildings(out, [...input.searcher.nearbyBuildings, ...input.candidate.nearbyBuildings]),
   // 같은 입력이면 같은 점수가 나오도록 결정적으로 만든다.
   mock: ({ overlapMinutes, commonCourses, searcher, candidate }) => {
     const sharedTags = searcher.tags.filter((tag) => candidate.tags.includes(tag));

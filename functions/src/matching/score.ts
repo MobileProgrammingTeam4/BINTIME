@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { type Firestore, FieldValue, Timestamp } from "firebase-admin/firestore";
 import { evaluateMatch } from "../ai/internal";
-import type { EvaluateMatchInput, EvaluateMatchOutput } from "../ai/tasks/evaluateMatch";
+import { type EvaluateMatchInput, type EvaluateMatchOutput, SYSTEM_INSTRUCTION } from "../ai/tasks/evaluateMatch";
 import type { AiResponse } from "../ai/types";
 import { type Candidate, PURPOSE_ALL, type Slot } from "./eligibility";
 
@@ -13,8 +13,13 @@ import { type Candidate, PURPOSE_ALL, type Slot } from "./eligibility";
  */
 export const AI_SCORE_LIMIT = 5;
 export const SCORE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-/** 프롬프트나 입력 규칙이 바뀌면 올린다. 올리면 기존 캐시는 모두 다시 평가된다. */
-export const SCORE_CACHE_VERSION = 1;
+/**
+ * 프롬프트(SYSTEM_INSTRUCTION)와 모델(GEMINI_MODEL)은 해시에 들어가 바뀌면 자동으로 다시 평가된다.
+ * 그 밖의 규칙(출력 검사 verify 등)을 바꾸면 이 값을 올린다. 2: 건물명 출력 검사 추가(#102).
+ */
+export const SCORE_CACHE_VERSION = 2;
+/** searchMatches 30초 제한 안에서 검색 결과를 꼭 돌려주기 위한 점수 마감. 늦은 후보는 점수 없이 보낸다. */
+export const SCORE_DEADLINE_MS = 15_000;
 
 export interface ScoredCandidate extends Candidate {
   score?: number;
@@ -51,9 +56,11 @@ export interface ScoreData {
   saveCache(uid: string, candidateId: string, entry: CachedScore): Promise<void>;
 }
 
-/** 재평가 기준: 목적·겹침(30분 단위)·양쪽 프로필·수업 건물·공통 과목 중 하나라도 바뀌면 해시가 달라진다. */
-export function inputHash(input: EvaluateMatchInput): string {
-  return createHash("sha256").update(JSON.stringify({ v: SCORE_CACHE_VERSION, input })).digest("hex");
+/** 재평가 기준: 목적·겹침(30분 단위)·양쪽 프로필·수업 건물·공통 과목·프롬프트·모델·버전 중 하나라도 바뀌면 해시가 달라진다. */
+export function inputHash(input: EvaluateMatchInput, model: string = process.env.GEMINI_MODEL?.trim() ?? ""): string {
+  return createHash("sha256")
+    .update(JSON.stringify({ v: SCORE_CACHE_VERSION, prompt: SYSTEM_INSTRUCTION, model, input }))
+    .digest("hex");
 }
 
 const validCache = (c: CachedScore | null, hash: string, now: number): c is CachedScore =>
@@ -117,6 +124,7 @@ export async function addScores(
   uid: string,
   candidates: Candidate[],
   now: number = Date.now(),
+  deadlineMs: number = SCORE_DEADLINE_MS,
 ): Promise<ScoredCandidate[]> {
   const top = candidates.slice(0, AI_SCORE_LIMIT);
   if (top.length === 0) return candidates;
@@ -128,38 +136,43 @@ export async function addScores(
     return candidates;
   }
   if (!me) return candidates;
-  const scored = await Promise.all(
-    top.map(async (c): Promise<ScoredCandidate> => {
-      try {
-        const [them, theirCourses] = await Promise.all([data.profile(c.candidateId), data.courses(c.candidateId)]);
-        if (!them) return c;
-        const day = new Date(`${c.meetingDate}T00:00:00Z`).getUTCDay() || 7;
-        const input: EvaluateMatchInput = {
-          overlapMinutes: aiOverlap(c.overlapMinutes),
-          purposes: c.purpose === PURPOSE_ALL ? [] : [c.purpose],
-          commonCourses: commonCourses(myCourses, theirCourses),
-          searcher: { ...me, nearbyBuildings: nearbyBuildings(myCourses, day, c.startMinute, c.endMinute) },
-          candidate: { ...them, nearbyBuildings: nearbyBuildings(theirCourses, day, c.startMinute, c.endMinute) },
-        };
-        const hash = inputHash(input);
-        const hit = await data.cached(uid, c.candidateId).catch(() => null);
-        if (validCache(hit, hash, now)) {
-          return { ...c, score: hit.score, reasons: hit.reasons, suggestedActivity: hit.suggestedActivity };
-        }
-        const res = await evaluate(uid, input);
-        const out = res.data;
-        // Mock 점수는 저장하지 않는다(live 로 바꾼 뒤 가짜 점수가 남지 않게). 저장 실패는 점수 표시를 막지 않는다.
-        if (!res.meta.mock) {
-          await data
-            .saveCache(uid, c.candidateId, { inputHash: hash, ...out, expiresAt: now + SCORE_CACHE_TTL_MS })
-            .catch(() => undefined);
-        }
-        return { ...c, score: out.score, reasons: out.reasons, suggestedActivity: out.suggestedActivity };
-      } catch {
-        return c; // AI·읽기 실패는 점수 없이 보여준다
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), deadlineMs);
+  });
+  const scoreOne = async (c: Candidate): Promise<ScoredCandidate> => {
+    try {
+      const [them, theirCourses] = await Promise.all([data.profile(c.candidateId), data.courses(c.candidateId)]);
+      if (!them) return c;
+      const day = new Date(`${c.meetingDate}T00:00:00Z`).getUTCDay() || 7;
+      const input: EvaluateMatchInput = {
+        overlapMinutes: aiOverlap(c.overlapMinutes),
+        purposes: c.purpose === PURPOSE_ALL ? [] : [c.purpose],
+        commonCourses: commonCourses(myCourses, theirCourses),
+        searcher: { ...me, nearbyBuildings: nearbyBuildings(myCourses, day, c.startMinute, c.endMinute) },
+        candidate: { ...them, nearbyBuildings: nearbyBuildings(theirCourses, day, c.startMinute, c.endMinute) },
+      };
+      const hash = inputHash(input);
+      const hit = await data.cached(uid, c.candidateId).catch(() => null);
+      if (validCache(hit, hash, now)) {
+        return { ...c, score: hit.score, reasons: hit.reasons, suggestedActivity: hit.suggestedActivity };
       }
-    }),
-  );
+      const res = await evaluate(uid, input);
+      const out = res.data;
+      // Mock 점수는 저장하지 않는다(live 로 바꾼 뒤 가짜 점수가 남지 않게). 저장 실패는 점수 표시를 막지 않는다.
+      if (!res.meta.mock) {
+        await data
+          .saveCache(uid, c.candidateId, { inputHash: hash, ...out, expiresAt: now + SCORE_CACHE_TTL_MS })
+          .catch(() => undefined);
+      }
+      return { ...c, score: out.score, reasons: out.reasons, suggestedActivity: out.suggestedActivity };
+    } catch {
+      return c; // AI·읽기 실패는 점수 없이 보여준다
+    }
+  };
+  // 마감 뒤 끝난 호출 결과는 버린다(횟수는 이미 차감됨).
+  const scored = await Promise.all(top.map((c) => Promise.race([scoreOne(c), deadline]).then((r) => r ?? c)));
+  clearTimeout(timer);
   return [...rankByScore(scored), ...candidates.slice(AI_SCORE_LIMIT)];
 }
 
