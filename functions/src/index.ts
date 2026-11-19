@@ -30,7 +30,10 @@ export const ensureMatchChat = createChatLinkCallable();
 /** BT-024 연결 확인 */
 export const aiPing = createAiCallable(aiPingTask);
 /** C · BT-026 */
-export const analyzeTimetable = createAiCallable(analyzeTimetableTask, { timeoutSeconds: 120, memory: "512MiB" });
+// 요청 하나가 이미지 원본(최대 14MiB)·base64(약 19.6MB)·요청 본문으로 대략 50~70MB를 쓴다.
+// 기본 동시 실행 80이면 512MiB 인스턴스가 메모리 부족이 될 수 있어 4로 제한한다(4 × 70MB + 기본 사용량 < 512MiB).
+// 최대 인스턴스 10 × 4 = 동시 40건. 메모리 사용량이 높게 나오면 그때 1GiB를 검토한다(#112 리뷰 C).
+export const analyzeTimetable = createAiCallable(analyzeTimetableTask, { timeoutSeconds: 120, memory: "512MiB", concurrency: 4 });
 /** B · BT-029 */
 export const generateProfile = createAiCallable(generateProfileTask);
 /** E · BT-042 */

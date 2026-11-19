@@ -3,7 +3,7 @@ import { z } from "zod";
 import { MAX_ATTEMPTS, RETRY_DELAY_MS, seoulDateKey } from "./config";
 import { AiError, describeError } from "./errors";
 import type { ModelUsage } from "./gemini";
-import type { AiContext, AiDeps, AiResponse, AiTask } from "./types";
+import type { AiContext, AiDeps, AiResponse, AiTask, GeminiSchemaMode } from "./types";
 
 /**
  * 모든 AI 기능의 공통 처리 순서.
@@ -108,7 +108,7 @@ async function callModel<I, O>(task: AiTask<I, O>, input: I, ctx: AiContext, dep
 
   const request = await task.buildRequest(input, ctx, deps);
   const client = deps.modelClient();
-  const jsonSchema = toGeminiSchema(task.output);
+  const jsonSchema = toGeminiSchema(task.output, task.geminiSchema);
 
   let lastError: AiError = new AiError("AI_UNAVAILABLE");
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -133,9 +133,39 @@ async function callModel<I, O>(task: AiTask<I, O>, input: I, ctx: AiContext, dep
   throw lastError;
 }
 
-/** Gemini responseJsonSchema 로 보낼 JSON Schema. $schema 같은 메타 키는 뺀다. */
-export function toGeminiSchema(schema: z.ZodType): unknown {
+/**
+ * Gemini responseJsonSchema 로 보낼 JSON Schema. $schema 같은 메타 키는 뺀다.
+ * mode "typesOnly" 는 값 제약({@link VALUE_CONSTRAINT_KEYS})을 모든 하위 스키마에서 뺀다(AiTask.geminiSchema 참고).
+ */
+export function toGeminiSchema(schema: z.ZodType, mode: GeminiSchemaMode = "full"): unknown {
   const json = z.toJSONSchema(schema) as Record<string, unknown>;
   delete json.$schema;
+  if (mode === "typesOnly") stripValueConstraints(json);
   return json;
+}
+
+/** "typesOnly" 에서 빼는 값 제약 키워드. type·required·anyOf·additionalProperties 같은 구조는 남긴다. */
+const VALUE_CONSTRAINT_KEYS = [
+  "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf",
+  "minLength", "maxLength", "pattern", "format",
+  "minItems", "maxItems",
+] as const;
+
+/**
+ * 스키마 노드만 따라가며 값 제약 키워드를 지운다. properties 의 키는 필드 이름이므로
+ * (예: 필드 이름이 "maximum" 이어도) 지우지 않고 그 값(하위 스키마)만 따라간다.
+ */
+function stripValueConstraints(node: unknown): void {
+  if (!node || typeof node !== "object" || Array.isArray(node)) return;
+  const schema = node as Record<string, unknown>;
+  for (const key of VALUE_CONSTRAINT_KEYS) delete schema[key];
+  for (const key of ["properties", "$defs", "definitions"]) {
+    const map = schema[key];
+    if (map && typeof map === "object") Object.values(map).forEach(stripValueConstraints);
+  }
+  for (const key of ["items", "additionalProperties", "not"]) stripValueConstraints(schema[key]);
+  for (const key of ["anyOf", "oneOf", "allOf", "prefixItems"]) {
+    const list = schema[key];
+    if (Array.isArray(list)) list.forEach(stripValueConstraints);
+  }
 }
