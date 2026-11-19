@@ -11,6 +11,7 @@ import com.team4.bintime.chat.ChatLinkLauncher;
 import com.team4.bintime.chat.ChatRoomActivity;
 import com.team4.bintime.chat.MockChatRepository;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
 
 /**
  * 성사 화면·완료 카드가 같은 서버 방 준비/재시도 경로를 사용한다.
@@ -19,7 +20,17 @@ import java.util.Objects;
  */
 public final class MatchChatNavigator {
     private MatchChatNavigator() {}
+
+    /** 화면 자체가 진입점인 경우(성사 화면). 화면 종료·백그라운드만 검사한다. */
     public static void open(AppCompatActivity owner, String matchId, View source) {
+        open(owner, matchId, source, () -> true);
+    }
+
+    /**
+     * stillShowing 은 응답이 늦게 왔을 때 버튼을 누른 화면(탭)이 아직 보이는지 답한다.
+     * false 면 채팅방으로 이동하거나 실패 안내를 띄우지 않고 버튼만 되돌린다.
+     */
+    public static void open(AppCompatActivity owner, String matchId, View source, BooleanSupplier stillShowing) {
         if (!source.isEnabled()) return;
         RequestRepository requests = RequestRepositories.get(owner);
         if (requests.isMock()) {
@@ -50,7 +61,7 @@ public final class MatchChatNavigator {
                 Toast.makeText(owner, message(failure), Toast.LENGTH_LONG).show();
             }
 
-            /** 버튼을 되돌리고, 이 화면에 결과를 보여도 되면 true. 화면 종료·계정 변경·백그라운드면 false. */
+            /** 버튼을 되돌리고, 이 화면에 결과를 보여도 되면 true. 화면 종료·계정 변경·백그라운드·다른 탭이면 false. */
             private boolean restore() {
                 if (owner.isFinishing() || owner.isDestroyed()) return false;
                 if (preparing) {
@@ -58,7 +69,8 @@ public final class MatchChatNavigator {
                     if (label != null) ((TextView) source).setText(label);
                 }
                 return Objects.equals(uid, FirebaseAuth.getInstance().getUid())
-                        && owner.getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.RESUMED);
+                        && owner.getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.RESUMED)
+                        && stillShowing.getAsBoolean();
             }
         });
     }
