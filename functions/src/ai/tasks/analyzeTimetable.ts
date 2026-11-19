@@ -43,8 +43,8 @@ const course = z
     room: text(1, 40).nullable(),
     /** 0~1. 낮으면 검수 화면에서 강조한다. */
     confidence: z.number().min(0).max(1),
-    /** imagePaths 의 몇 번째 이미지에서 읽었는지 */
-    sourceImageIndex: z.number().int().min(0),
+    /** imagePaths 의 몇 번째 이미지에서 읽었는지. 실제 장수 범위는 verify 가 다시 본다. */
+    sourceImageIndex: z.number().int().min(0).max(MAX_IMAGES - 1),
   })
   .strict();
 
@@ -153,6 +153,10 @@ export const analyzeTimetableTask: AiTask<AnalyzeTimetableInput, AnalyzeTimetabl
   output,
   timeoutMs: 30_000,
   dailyLimit: 10,
+  // 수업 최대 60개 배열 안의 정수 범위(분 0~1440 등)·문자열 길이 제약을 그대로 보내면 Gemini 가
+  // 400 "too many states for serving" 으로 거부한다(2026-11-18 운영 1회, 로컬 재현). 구조만 보내고
+  // 범위·길이·개수는 위 output 스키마와 verify 가 검사한다.
+  geminiSchema: "typesOnly",
   authorize: async ({ imagePaths }, ctx, deps) => {
     checkPaths(imagePaths, ctx.uid);
     // mock 모드(에뮬레이터·앱 개발)는 Storage 를 읽지 않는다.

@@ -222,6 +222,8 @@ describe("analyzeTimetable live: 요청 본문", () => {
     expect(Object.keys(item.properties).sort()).toEqual(
       ["building", "confidence", "dayOfWeek", "endMinute", "name", "room", "sourceImageIndex", "startMinute"]);
     expect(schema.properties.warnings).toBeDefined();
+    // 게이트웨이가 typesOnly 로 보낸다: 값 제약이 있으면 Gemini 가 400 too many states 로 거부한다
+    expect(JSON.stringify(schema)).not.toMatch(/"(minimum|maximum|minLength|maxLength|minItems|maxItems)"/);
   });
 
   it("이미지는 한 번만 읽는다(형식 오류로 재시도해도 다시 읽지 않는다)", async () => {
