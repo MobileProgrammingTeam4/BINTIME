@@ -104,7 +104,7 @@ export async function searchMatches(store: MatchStore, uid: string, now: Date): 
       return candidate;
     }),
   );
-  // shortcut: AI 점수 정렬은 BT-028, 그 전에는 겹침이 긴 순, 같으면 이른 순.
+  // 겹침이 긴 순, 같으면 이른 순. AI 점수 순위는 score.ts rankByScore(BT-028)가 상위 5명 안에서 다시 매긴다.
   const candidates = results
     .filter((c): c is Candidate => c !== null)
     .sort((a, b) => b.overlapMinutes - a.overlapMinutes || a.startMinute - b.startMinute);

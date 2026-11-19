@@ -8,7 +8,7 @@ import { text } from "./shared";
  * 앱이 직접 부르면 필수 조건 검사를 우회할 수 있으므로 index.ts 에 export 하지 않는다.
  * 팀 결정으로 Callable 이 필요해지면 index.ts 에서 createAiCallable(evaluateMatchTask) 한 줄로 열 수 있다
  * (그때는 authorize 에 적격성 재검사를 반드시 넣는다).
- * 점수는 추천 정렬용 내부 지표이며 성공 확률이 아니다. 캐시는 BT-028(A).
+ * 점수는 추천 정렬용 내부 지표이며 성공 확률이 아니다. 캐시는 BT-028 matchScores(A).
  */
 
 const SYSTEM_INSTRUCTION = [

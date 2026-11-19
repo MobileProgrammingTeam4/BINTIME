@@ -147,6 +147,7 @@ userChatRooms/{uid}/{matchId}
 - `timetables/{uid}.freeCells`는 월~일 7개의 48비트 정수로 선택 원본을 보존합니다. 수업 변경은 `revision`을 증가시키고 공강 선택만 변경할 때는 유지합니다. `semester`는 없거나 null일 수 있습니다. `availability.slots`는 연속 칸을 병합한 60분 이상 구간이며, 서버는 원본 선택·수업·revision과 일치하는지 다시 검증합니다.
 - 매칭 검색은 `searchMatches()` Callable이 저장된 `matchSettings/{uid}`로 판정합니다. 지금 겹치는 공강, 없으면 가장 가까운 미래 공강 **하나**를 기준으로 양측 ON·검색자가 고른 최소 겹침·목적·차단을 확인하고, 상대 UID(`candidateId`)와 겹침 시간·목적만 돌려줍니다. 이름·사진은 앱이 `publicProfiles`에서 읽습니다. 상세 계약은 [`docs/BT-017.md`](./docs/BT-017.md)를 따릅니다.
 - AI 매칭률(BT-027)은 검색 서버가 조건을 통과한 상위 5명에게만 Gemini 점수·추천 이유를 붙이고, 실패하면 점수 없이 결과를 돌려줍니다. 앱은 Gemini를 직접 부르지 않습니다. 상세는 [`docs/BT-027.md`](./docs/BT-027.md)를 따릅니다.
+- AI 추천순(BT-028)은 점수가 붙은 후보를 점수 높은 순으로 앞에 두고, 같은 입력이면 24시간 동안 서버 전용 `matchScores` 캐시를 써서 Gemini를 다시 부르지 않습니다. 상세는 [`docs/BT-028.md`](./docs/BT-028.md)를 따릅니다.
 - 요청 생성 입력은 `{candidateId, clientRequestId}`이며 `candidateId`는 상대 UID, `clientRequestId`는 재시도 동안 유지하는 UUID입니다. 서버는 검색자가 선택한 최소 겹침, 프로필 완료·공개 프로필 존재, 차단·확정 매칭 충돌을 확인한 뒤 시간·목적 스냅샷을 정합니다. 상세 계약은 [`docs/BT-019.md`](./docs/BT-019.md)를 따릅니다.
 - `matches/{matchId}`가 **매칭의 기준 데이터**입니다. 채팅 생성은 별도 RTDB 작업이므로 재시도·부분 실패를 고려해 연결 상태를 관리합니다.
 - 개인 시간표 원본을 상대방에게 통째로 반환하지 않습니다. 검색 결과에는 필요한 겹침 시간 및 공개 가능한 프로필 정보만 담습니다.
