@@ -133,6 +133,7 @@ describe("evaluateMatch (서버 내부)", () => {
     expect(JSON.parse(call.contents as string)).toMatchObject({ overlapMinutes: input.overlapMinutes });
     expect(call.contents as string).not.toContain(me);
     expect(call.systemInstruction).toContain("건물 이름을 쓰지 않는다");
+    expect(call.systemInstruction).toContain("commonCourses 에 있는 것만");
   });
 
   it("범위 밖 점수는 형식 오류", async () => {

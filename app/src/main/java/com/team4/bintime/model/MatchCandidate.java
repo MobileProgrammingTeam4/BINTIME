@@ -12,7 +12,10 @@ public class MatchCandidate {
     public final String department;
     public final int grade;
     public final String gender;
-    public final int matchRate;          // AI 매칭률(%) — 3주차 Gemini 점수로 대체
+    /** AI 매칭률(%) 0~100. 점수가 없으면 {@link #NO_SCORE}. 표시·계산 전에는 {@link #hasScore()} 로 확인한다. */
+    public final int matchRate;
+    /** 서버가 점수를 주지 않음(상위 5명 밖·AI 실패). 0점과 구분한다(BT-027). */
+    public static final int NO_SCORE = -1;
     public final String matchReason;     // 배지 아래 근거 요약 (예: 공강 동선 과목일치)
     public final String overlapStart;    // "HH:mm"
     public final String overlapEnd;      // "HH:mm"
@@ -73,5 +76,10 @@ public class MatchCandidate {
     private static int toMinutes(String hhmm) {
         String[] p = hhmm.split(":");
         return Integer.parseInt(p[0]) * 60 + Integer.parseInt(p[1]);
+    }
+
+    /** 0점도 점수가 있는 것으로 본다. NO_SCORE 만 false. */
+    public boolean hasScore() {
+        return matchRate >= 0;
     }
 }

@@ -74,18 +74,22 @@ final class MatchSearchMapper {
 
     /**
      * 서버 후보 1건 + 공개 프로필 → 카드. BT-027: 서버가 붙인 AI score·reasons·suggestedActivity 를 쓴다.
-     * 점수가 없으면(상위 5명 밖·AI 실패) 0 이라 카드에서 매칭률을 숨긴다.
+     * 점수가 없으면(상위 5명 밖·AI 실패) NO_SCORE(-1)라 카드에서 매칭률을 숨기고, 0점은 0%로 보여준다.
      */
     static MatchCandidate toCandidate(Map<String, Object> raw, UserProfile profile, int dayOfWeek, String today) {
         List<String> tags = new ArrayList<>();
         if (profile.getInterestTags() != null) for (String t : profile.getInterestTags()) tags.add(t.startsWith("#") ? t : "#" + t);
-        int score = Math.max(0, Math.min(100, num(raw.get("score"))));
+        Object rawScore = raw.get("score");
+        int score = rawScore instanceof Number
+                ? Math.max(0, Math.min(100, ((Number) rawScore).intValue())) : MatchCandidate.NO_SCORE;
+        // 배지 아래(matchReason)는 짧은 태그 자리라 비우고, 문장인 추천 활동은 이유 칸 마지막 줄로 둔다(카드 배치 깨짐 방지).
+        List<String> reasons = strings(raw.get("reasons"));
         Object activity = raw.get("suggestedActivity");
-        String reason = activity instanceof String && !((String) activity).isEmpty() ? "추천 활동: " + activity : "";
+        if (activity instanceof String && !((String) activity).isEmpty()) reasons.add("추천 활동: " + activity);
         MatchCandidate c = new MatchCandidate((String) raw.get("candidateId"), profile.getNickname(),
-                profile.getDepartment(), gradeNumber(profile.getGrade()), profile.getGender(), score, reason,
+                profile.getDepartment(), gradeNumber(profile.getGrade()), profile.getGender(), score, "",
                 hhmm(num(raw.get("startMinute"))), hhmm(num(raw.get("endMinute"))), (String) raw.get("purpose"),
-                tags, strings(raw.get("reasons")), profile.getBio());
+                tags, reasons, profile.getBio());
         c.dayLabel = dayLabel((String) raw.get("meetingDate"), dayOfWeek, today);
         c.photoPath = profile.getPhotoPath();
         return c;
@@ -98,8 +102,8 @@ final class MatchSearchMapper {
     }
 
     static List<String> strings(Object value) {
-        if (!(value instanceof List)) return Collections.emptyList();
-        List<String> out = new ArrayList<>();
+        List<String> out = new ArrayList<>(); // 호출부가 줄을 더 붙이므로 수정 가능한 목록
+        if (!(value instanceof List)) return out;
         for (Object item : (List<?>) value) if (item instanceof String && !((String) item).isEmpty()) out.add((String) item);
         return out;
     }

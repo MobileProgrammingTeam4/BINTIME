@@ -6,6 +6,8 @@ import {
   commonCourses,
   type CourseInfo,
   type Evaluator,
+  aiOverlap,
+  buildingOf,
   nearbyBuildings,
   type PublicSide,
   type ScoreData,
@@ -44,8 +46,21 @@ describe("toSide", () => {
 
 describe("수업 기반 입력", () => {
   const courses = [course("자료구조", "공학관 201", 600, 690), course("운영체제", "본관 302", 960, 1050), course("영어", "인문관", 960, 1050, 2)];
-  it("공강 직전·직후 같은 요일 수업 강의실", () => {
-    expect(nearbyBuildings(courses, 1, 840, 930)).toEqual(["공학관 201", "본관 302"]);
+  it("공강 직전·직후 같은 요일 수업 건물(호실 제외)", () => {
+    expect(nearbyBuildings(courses, 1, 840, 930)).toEqual(["공학관", "본관"]);
+  });
+  it("AI 입력 겹침은 30분 단위로 내려 매분 바뀌지 않는다", () => {
+    expect(aiOverlap(196)).toBe(180);
+    expect(aiOverlap(195)).toBe(180);
+    expect(aiOverlap(90)).toBe(90);
+    expect(aiOverlap(60)).toBe(60);
+  });
+  it("건물명은 첫 숫자 앞까지, 숫자만 있으면 빈 값", () => {
+    expect(buildingOf("미래관 611호")).toBe("미래관");
+    expect(buildingOf("미래관611")).toBe("미래관");
+    expect(buildingOf("온라인")).toBe("온라인");
+    expect(buildingOf("611")).toBe("");
+    expect(buildingOf(undefined)).toBe("");
   });
   it("함께 듣는 수업 이름", () => {
     expect(commonCourses(courses, [course("운영체제", "", 0, 60), course("미적분", "", 0, 60)])).toEqual(["운영체제"]);

@@ -54,11 +54,25 @@ export function toSide(data: Record<string, unknown> | undefined): PublicSide | 
 }
 
 /** 공강 직전에 끝나는 수업과 직후에 시작하는 수업의 강의실(같은 요일, 각 1개). */
+/**
+ * 진행 중인 공강은 남은 시간이 매분 줄어 AI 입력이 계속 바뀐다. 30분 단위로 내려 입력을 고정한다.
+ * 후보는 이미 최소 60분을 통과했으므로 결과도 60 이상이다.
+ * shortcut: Gemini 자체 응답 흔들림은 남는다, BT-028 점수 캐시에서 해결.
+ */
+export function aiOverlap(minutes: number): number {
+  return Math.max(60, Math.floor(minutes / 30) * 30);
+}
+
+/** "미래관 611호" → "미래관". 호실은 AI 에 보내지 않는다(팀 결정, AGENTS §6 입력 최소화). 숫자만 있으면 빈 값. */
+export function buildingOf(classroom: unknown): string {
+  return clip(classroom, 40).replace(/[\s-]*\d.*$/, "").trim();
+}
+
 export function nearbyBuildings(courses: CourseInfo[], dayOfWeek: number, start: number, end: number): string[] {
   let before: { at: number; room: string } | null = null;
   let after: { at: number; room: string } | null = null;
   for (const c of courses) {
-    const room = clip(c.classroom, 40);
+    const room = buildingOf(c.classroom);
     if (!room) continue;
     for (const s of c.slots) {
       if (s.dayOfWeek !== dayOfWeek) continue;
@@ -97,7 +111,7 @@ export async function addScores(
         if (!them) return c;
         const day = new Date(`${c.meetingDate}T00:00:00Z`).getUTCDay() || 7;
         const { data: out } = await evaluate(uid, {
-          overlapMinutes: c.overlapMinutes,
+          overlapMinutes: aiOverlap(c.overlapMinutes),
           purposes: c.purpose === PURPOSE_ALL ? [] : [c.purpose],
           commonCourses: commonCourses(myCourses, theirCourses),
           searcher: { ...me, nearbyBuildings: nearbyBuildings(myCourses, day, c.startMinute, c.endMinute) },

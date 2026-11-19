@@ -34,8 +34,8 @@ public final class MatchSummaryBinder {
         text(summary, R.id.name, c.name);
         text(summary, R.id.info, c.department + " " + c.grade + "학년 · " + c.gender);
         text(summary, R.id.matchRate, "매칭률 " + c.matchRate + "%");
-        // AI 매칭률(BT-027/028) 연결 전 실데이터 후보는 0 이라 숨긴다
-        summary.findViewById(R.id.matchRate).setVisibility(c.matchRate > 0 ? View.VISIBLE : View.GONE);
+        // BT-027: 점수 없음(-1)만 숨기고 0점은 0%로 보여준다
+        summary.findViewById(R.id.matchRate).setVisibility(c.hasScore() ? View.VISIBLE : View.GONE);
         text(summary, R.id.matchReason, c.matchReason);
         text(summary, R.id.time, c.dayLabel + " " + c.overlapStart + " ~ " + c.overlapEnd);
         text(summary, R.id.duration, MatchFilter.formatDuration(c.overlapMinutes()) + " 겹침");
