@@ -10,6 +10,7 @@ import {
   buildingOf,
   nearbyBuildings,
   type PublicSide,
+  SCORE_DEADLINE_MS,
   type ScoreData,
   toSide,
 } from "../src/matching/score";
@@ -100,3 +101,17 @@ describe("addScores", () => {
     expect(seen).toMatchObject({ purposes: [], overlapMinutes: 90 });
   });
 });
+
+describe("점수 마감 (#102 E 리뷰 1)", () => {
+  it("마감까지 끝나지 않은 후보는 점수 없이, 끝난 후보는 점수와 함께 돌려준다", async () => {
+    const slow: Evaluator = async (u, i) => {
+      if (i.overlapMinutes === 60) await new Promise((r) => setTimeout(r, 500));
+      return fixed(u, i);
+    };
+    const data = new MemoryData({ me: side, fast: side, slow: side });
+    const out = await addScores(data, slow, "me", [cand("fast"), cand("slow", 60)], 50);
+    expect(out.map((c) => c.score)).toEqual([77, undefined]);
+    expect(SCORE_DEADLINE_MS).toBeLessThan(30_000);
+  });
+});
+

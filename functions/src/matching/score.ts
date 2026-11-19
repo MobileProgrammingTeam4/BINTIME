@@ -10,6 +10,8 @@ import { type Candidate, PURPOSE_ALL, type Slot } from "./eligibility";
  * AI 가 실패하거나 프로필이 모자라면 점수 없이 그대로 둔다(검색은 멈추지 않는다, BT-028 완료 조건).
  */
 export const AI_SCORE_LIMIT = 5;
+/** searchMatches 30초 제한 안에서 검색 결과를 꼭 돌려주기 위한 점수 마감. 늦은 후보는 점수 없이 보낸다. */
+export const SCORE_DEADLINE_MS = 15_000;
 
 export interface ScoredCandidate extends Candidate {
   score?: number;
@@ -93,6 +95,7 @@ export async function addScores(
   evaluate: Evaluator,
   uid: string,
   candidates: Candidate[],
+  deadlineMs: number = SCORE_DEADLINE_MS,
 ): Promise<ScoredCandidate[]> {
   const top = candidates.slice(0, AI_SCORE_LIMIT);
   if (top.length === 0) return candidates;
@@ -104,25 +107,30 @@ export async function addScores(
     return candidates;
   }
   if (!me) return candidates;
-  const scored = await Promise.all(
-    top.map(async (c): Promise<ScoredCandidate> => {
-      try {
-        const [them, theirCourses] = await Promise.all([data.profile(c.candidateId), data.courses(c.candidateId)]);
-        if (!them) return c;
-        const day = new Date(`${c.meetingDate}T00:00:00Z`).getUTCDay() || 7;
-        const { data: out } = await evaluate(uid, {
-          overlapMinutes: aiOverlap(c.overlapMinutes),
-          purposes: c.purpose === PURPOSE_ALL ? [] : [c.purpose],
-          commonCourses: commonCourses(myCourses, theirCourses),
-          searcher: { ...me, nearbyBuildings: nearbyBuildings(myCourses, day, c.startMinute, c.endMinute) },
-          candidate: { ...them, nearbyBuildings: nearbyBuildings(theirCourses, day, c.startMinute, c.endMinute) },
-        });
-        return { ...c, score: out.score, reasons: out.reasons, suggestedActivity: out.suggestedActivity };
-      } catch {
-        return c; // AI·읽기 실패는 점수 없이 보여준다
-      }
-    }),
-  );
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), deadlineMs);
+  });
+  const scoreOne = async (c: Candidate): Promise<ScoredCandidate> => {
+    try {
+      const [them, theirCourses] = await Promise.all([data.profile(c.candidateId), data.courses(c.candidateId)]);
+      if (!them) return c;
+      const day = new Date(`${c.meetingDate}T00:00:00Z`).getUTCDay() || 7;
+      const { data: out } = await evaluate(uid, {
+        overlapMinutes: aiOverlap(c.overlapMinutes),
+        purposes: c.purpose === PURPOSE_ALL ? [] : [c.purpose],
+        commonCourses: commonCourses(myCourses, theirCourses),
+        searcher: { ...me, nearbyBuildings: nearbyBuildings(myCourses, day, c.startMinute, c.endMinute) },
+        candidate: { ...them, nearbyBuildings: nearbyBuildings(theirCourses, day, c.startMinute, c.endMinute) },
+      });
+      return { ...c, score: out.score, reasons: out.reasons, suggestedActivity: out.suggestedActivity };
+    } catch {
+      return c; // AI·읽기 실패는 점수 없이 보여준다
+    }
+  };
+  // 마감 뒤 끝난 호출 결과는 버린다(횟수는 이미 차감됨).
+  const scored = await Promise.all(top.map((c) => Promise.race([scoreOne(c), deadline]).then((r) => r ?? c)));
+  clearTimeout(timer);
   return [...scored, ...candidates.slice(AI_SCORE_LIMIT)];
 }
 
