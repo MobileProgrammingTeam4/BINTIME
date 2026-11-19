@@ -12,7 +12,11 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.team4.bintime.R;
 
-/** Field bindings shared by direct input and course editing. */
+/**
+ * Field bindings shared by direct input and course editing.
+ * [BT-026] 강의실 필수 여부·빈 값 처리는 {@link CourseFormRules}. 기본은 필수이고, 원래 강의실이 없던 수업을
+ * 수정할 때만 {@link #allowEmptyClassroom()}으로 비워 둘 수 있다. 빈 강의실은 null 로 돌려준다.
+ */
 final class CourseFields {
     private final AppCompatActivity activity;
     private final EditText name;
@@ -20,6 +24,7 @@ final class CourseFields {
     private final TextView day;
     private final TextView start;
     private final TextView end;
+    private boolean classroomOptional;
 
     CourseFields(AppCompatActivity activity, Course initial, Runnable onChange) {
         this.activity = activity;
@@ -60,8 +65,15 @@ final class CourseFields {
         });
     }
 
+    /** 원래 강의실이 없던 수업 수정: 강의실을 비워 둘 수 있다. */
+    void allowEmptyClassroom() {
+        classroomOptional = true;
+    }
+
+    /** 화면 값. 빈 강의실은 null(저장 시 키 없음). */
     Course value() {
-        return new Course(name.getText().toString().trim(), classroom.getText().toString().trim(),
+        return new Course(name.getText().toString().trim(),
+                CourseFormRules.normalizeClassroom(classroom.getText().toString()),
                 day.getText().toString().substring(0, 1), start.getText().toString(), end.getText().toString());
     }
 
@@ -85,7 +97,7 @@ final class CourseFields {
             name.requestFocus();
             return null;
         }
-        if (course.getClassroom().isEmpty()) {
+        if (CourseFormRules.missingClassroom(course.getClassroom(), classroomOptional)) {
             classroom.setError("강의실을 입력해 주세요.");
             classroom.requestFocus();
             return null;

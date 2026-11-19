@@ -65,7 +65,8 @@ public class RequestCreationTest {
     }
 
     @Test public void cancelNotifiesObserversAndAllowsNewRequestWithoutChangingOldSnapshot() {
-        MockRequestRepository repo = new MockRequestRepository("sender", false);
+        long[] clock = {1_000};
+        MockRequestRepository repo = new MockRequestRepository("sender", false, () -> clock[0]);
         repo.create(RequestDraft.mock("receiver", "스터디", "2026-11-12", 600, 720), callback);
         Item original = result;
         int[] calls = {0};
@@ -75,6 +76,7 @@ public class RequestCreationTest {
         assertEquals(Status.CANCELED, original.status());
         assertFalse(repo.hasPendingRequest("receiver"));
         assertEquals(2, calls[0]);
+        clock[0] += 60_000;
         repo.create(RequestDraft.mock("receiver", "스터디", "2026-11-13", 900, 1020), callback);
         assertNotEquals(original.id, result.id);
         assertEquals(600, original.startMinute);

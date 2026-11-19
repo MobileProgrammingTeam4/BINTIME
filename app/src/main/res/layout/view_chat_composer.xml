@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 기존 Figma MessageComposer(27:1896). 상태는 ChatComposer.bind()에서 적용한다. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/chatComposer" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="8dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:background="@drawable/bg_pill_page" android:elevation="1dp" android:gravity="center_vertical"
+        android:orientation="horizontal" android:padding="8dp">
+        <ImageButton android:id="@+id/chatAttach" android:layout_width="36dp" android:layout_height="36dp"
+            android:background="@drawable/bg_circle_card" android:contentDescription="@string/chat_attach"
+            android:enabled="false" android:src="@drawable/ic_plus" />
+        <EditText android:id="@+id/chatInput" android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_marginStart="8dp" android:layout_weight="1" android:background="@null" android:hint="@string/chat_message_hint"
+            android:importantForAutofill="no" android:inputType="textMultiLine|textCapSentences" android:maxLines="4"
+            android:minHeight="36dp" android:paddingHorizontal="12dp" android:paddingVertical="8dp"
+            android:textAppearance="@style/TextAppearance.BinTime.BodyM" android:textColorHint="@color/text_tertiary" />
+        <ImageButton android:id="@+id/chatSend" android:layout_width="36dp" android:layout_height="36dp"
+            android:layout_marginStart="8dp" android:background="@drawable/bg_circle_primary" android:backgroundTint="@color/chat_send_background"
+            android:contentDescription="@string/chat_send" android:foreground="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_send" />
+    </LinearLayout>
+</FrameLayout>

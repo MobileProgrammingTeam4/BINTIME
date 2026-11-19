@@ -2,6 +2,7 @@ package com.team4.bintime.auth;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
@@ -32,6 +33,31 @@ public class FirebaseAuthErrorsTest {
     public void unknownOrNullCode_mapsToUnknown() {
         assertEquals(AuthRepository.Failure.UNKNOWN, FirebaseAuthErrors.fromCode("ERROR_SOMETHING_ELSE"));
         assertEquals(AuthRepository.Failure.UNKNOWN, FirebaseAuthErrors.fromCode(null));
+    }
+
+    /** BT-030: 계정 삭제·비활성화·토큰 무효만 "다시 로그인"이다. 네트워크·알 수 없음으로는 로그아웃시키지 않는다. */
+    @Test
+    public void sessionInvalid_onlyForAccountOrTokenProblems() {
+        for (String code : new String[]{"ERROR_USER_NOT_FOUND", "ERROR_USER_DISABLED",
+                "ERROR_USER_TOKEN_EXPIRED", "ERROR_INVALID_USER_TOKEN"}) {
+            assertTrue(code, FirebaseAuthErrors.isSessionInvalid(code));
+        }
+        for (String code : new String[]{null, "ERROR_NETWORK_REQUEST_FAILED", "ERROR_TOO_MANY_REQUESTS",
+                "ERROR_INVALID_ACTION_CODE", "ERROR_SOMETHING_ELSE"}) {
+            assertFalse(String.valueOf(code), FirebaseAuthErrors.isSessionInvalid(code));
+        }
+    }
+
+    /** BT-030(#101 실기기 확인): 사용 중지는 "만료"가 아니라 따로 안내한다. 로그인 시도·세션 확인 모두. */
+    @Test
+    public void userDisabled_isAccountDisabled_notExpired() {
+        assertEquals(AuthRepository.Failure.ACCOUNT_DISABLED, FirebaseAuthErrors.fromCode("ERROR_USER_DISABLED"));
+        assertTrue(FirebaseAuthErrors.message(AuthRepository.Failure.ACCOUNT_DISABLED).contains("사용이 중지된 계정"));
+        assertEquals(AuthRepository.SessionState.DISABLED, FirebaseAuthErrors.sessionStateFor("ERROR_USER_DISABLED"));
+        assertEquals(AuthRepository.SessionState.EXPIRED, FirebaseAuthErrors.sessionStateFor("ERROR_USER_NOT_FOUND"));
+        assertEquals(AuthRepository.SessionState.EXPIRED, FirebaseAuthErrors.sessionStateFor("ERROR_INVALID_USER_TOKEN"));
+        assertEquals(AuthRepository.SessionState.UNKNOWN, FirebaseAuthErrors.sessionStateFor("ERROR_NETWORK_REQUEST_FAILED"));
+        assertEquals(AuthRepository.SessionState.UNKNOWN, FirebaseAuthErrors.sessionStateFor(null));
     }
 
     @Test

@@ -54,6 +54,15 @@ final class FirebaseChatRepository implements ChatRepository {
     /** 구독으로 알게 된 내 방별 unreadCount. markRead 의 불필요한 쓰기를 줄인다. */
     private final Map<String, Integer> knownUnread = new HashMap<>();
     @Nullable private final DatabaseReference connectedRef;
+    @Nullable private final DatabaseReference serverTimeRef;
+    private long serverTimeOffset;
+    private final ValueEventListener serverTimeListener = new ValueEventListener() {
+        @Override public void onDataChange(@NonNull DataSnapshot snapshot) {
+            Object value = snapshot.getValue();
+            if (value instanceof Number) serverTimeOffset = ((Number) value).longValue();
+        }
+        @Override public void onCancelled(@NonNull DatabaseError error) { serverTimeOffset = 0; }
+    };
     private final ValueEventListener connectedListener = new ValueEventListener() {
         @Override
         public void onDataChange(@NonNull DataSnapshot snapshot) {
@@ -72,17 +81,21 @@ final class FirebaseChatRepository implements ChatRepository {
         this.uid = uid;
         this.database = database;
         this.matches = matches;
+        this.matches.useClock(this::nowMillis);
         this.partners = partners;
         this.fallbackName = fallbackName;
         // .info/connected: 서버와 연결됐는지. 오프라인 전송을 대기열에 넣지 않으려고 본다.
         connectedRef = ready() ? database.getReference(".info/connected") : null;
         if (connectedRef != null) connectedRef.addValueEventListener(connectedListener);
+        serverTimeRef = ready() ? database.getReference(".info/serverTimeOffset") : null;
+        if (serverTimeRef != null) serverTimeRef.addValueEventListener(serverTimeListener);
     }
 
     @Override
     public String currentUid() {
         return uid;
     }
+    @Override public long nowMillis() { return System.currentTimeMillis() + serverTimeOffset; }
 
     @Override
     public Registration observeRooms(Listener<List<ChatRoom>> listener) {
@@ -254,6 +267,7 @@ final class FirebaseChatRepository implements ChatRepository {
     /** 저장소를 바꿀 때(로그인 UID 변경) 연결 상태 구독을 해제한다. */
     void close() {
         if (connectedRef != null) connectedRef.removeEventListener(connectedListener);
+        if (serverTimeRef != null) serverTimeRef.removeEventListener(serverTimeListener);
     }
 
     /** D 의 매칭 종료 서버 함수(BT-038)를 호출한다. 그 전에는 실패로 알린다. */

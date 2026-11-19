@@ -9,19 +9,31 @@ import { analyzeTimetableTask } from "./ai/tasks/analyzeTimetable";
 import { generateProfileTask } from "./ai/tasks/generateProfile";
 import { recommendPlaceTask } from "./ai/tasks/recommendPlace";
 import { suggestChatRepliesTask } from "./ai/tasks/suggestChatReplies";
-import { cancelRequestCallable, createRequestCallable } from "./requests/callable";
+import { cancelRequestCallable, createRequestCallable, respondRequestCallable } from "./requests/callable";
 import { createSearchCallable } from "./matching/callable";
 import { createMessageTrigger } from "./chat/trigger";
+import { createRequestMaintenanceSchedule } from "./requests/scheduled";
+import { createChatLinkCallable, createChatLinkTrigger } from "./chat/linkCallable";
 
 /** D · BT-019 요청 생성. */
 export const createMatchRequest = createRequestCallable();
 /** D · BT-020. 발신자 본인의 PENDING 요청만 취소한다. */
 export const cancelMatchRequest = cancelRequestCallable();
+/** D · BT-031. 수신자만 수락·거절, 수락과 확정 매칭은 한 트랜잭션. */
+export const respondToMatchRequest = respondRequestCallable();
+/** D · BT-032. 배포 시 예약 작업이 생성되므로 운영 적용은 별도 승인 후 진행한다. */
+export const maintainMatchRequests = createRequestMaintenanceSchedule();
+/** D · BT-033. Firestore 매칭 → RTDB 방 연결과 참여자의 멱등 재시도. */
+export const chatOnMatchCreated = createChatLinkTrigger();
+export const ensureMatchChat = createChatLinkCallable();
 
 /** BT-024 연결 확인 */
 export const aiPing = createAiCallable(aiPingTask);
 /** C · BT-026 */
-export const analyzeTimetable = createAiCallable(analyzeTimetableTask, { timeoutSeconds: 120, memory: "512MiB" });
+// 요청 하나가 이미지 원본(최대 14MiB)·base64(약 19.6MB)·요청 본문으로 대략 50~70MB를 쓴다.
+// 기본 동시 실행 80이면 512MiB 인스턴스가 메모리 부족이 될 수 있어 4로 제한한다(4 × 70MB + 기본 사용량 < 512MiB).
+// 최대 인스턴스 10 × 4 = 동시 40건. 메모리 사용량이 높게 나오면 그때 1GiB를 검토한다(#112 리뷰 C).
+export const analyzeTimetable = createAiCallable(analyzeTimetableTask, { timeoutSeconds: 120, memory: "512MiB", concurrency: 4 });
 /** B · BT-029 */
 export const generateProfile = createAiCallable(generateProfileTask);
 /** E · BT-042 */

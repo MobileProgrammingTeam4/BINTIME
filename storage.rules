@@ -1,7 +1,7 @@
 rules_version = '2';
 
 // BIN TIME Cloud Storage Security Rules
-// BT-014: 프로필 사진만 정의한다. 시간표 이미지(BT-025) 등은 담당 이슈에서 추가한다.
+// BT-014: 프로필 사진, BT-025: 시간표 이미지. 그 밖의 경로는 규칙이 없어 기본 거부된다.
 service firebase.storage {
   match /b/{bucket}/o {
 
@@ -12,6 +12,23 @@ service firebase.storage {
       allow read: if request.auth != null;
       allow create, update: if request.auth != null
           && request.auth.uid == uid
+          && request.resource.size < 5 * 1024 * 1024
+          && request.resource.contentType == 'image/jpeg';
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // BT-025: 시간표 이미지 timetableImages/{uid}/{batchId}/{0~4}.jpg (docs/BT-025.md §3·§4).
+    // 본인만 읽기·생성·삭제. 앱은 분석할 때마다 새 batchId 를 만들므로 덮어쓰기(update)는 허용하지 않는다.
+    // 주의: Storage 에뮬레이터는 덮어쓰기도 create 로 판정해 이 차단을 재현하지 못한다(운영은 update 로 판정).
+    // resource == null 을 더하면 에뮬레이터에서 5MB 근처 분할(resumable) 업로드의 두 번째 조각부터 거부되므로 쓰지 않는다.
+    // 서버 analyzeTimetable 은 Admin SDK 로 읽어 Rules 와 무관하고, 경로 소유는 서버 authorize 가 따로 확인한다.
+    // 이메일 인증 여부는 프로필 사진 규칙과 같이 보지 않는다(이메일 링크 로그인 자체가 이메일 확인이다).
+    match /timetableImages/{uid}/{batchId}/{file} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null
+          && request.auth.uid == uid
+          && batchId.matches('^[A-Za-z0-9-]{1,64}$')
+          && file.matches('^[0-4][.]jpg$')
           && request.resource.size < 5 * 1024 * 1024
           && request.resource.contentType == 'image/jpeg';
       allow delete: if request.auth != null && request.auth.uid == uid;

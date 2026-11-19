@@ -65,4 +65,10 @@ public interface RequestRepository {
 
     /** 기존 BT-007 수락/거절 시연용. 실제 상태 변경은 BT-031 서버 API에서 연결한다. */
     boolean respond(String id, Status next);
+
+    /** BT-031 실제 수락/거절. Mock의 동기 시연 경로도 같은 콜백으로 감싼다. */
+    default void respond(String id, Status next, Callback callback) {
+        if (respond(id, next)) callback.onSuccess(find(id));
+        else callback.onError("이미 처리되었거나 처리할 수 없는 요청이에요.");
+    }
 }

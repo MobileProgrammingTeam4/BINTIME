@@ -145,4 +145,43 @@ public class FreeCellsTest {
         for (int d = 0; d < 5; d++) m[d] = mask;
         assertEquals(80, FreeCells.matchable(m).size());
     }
+
+    // ── [BT-036] 경계값 보강 ─────────────────────────────
+
+    @Test
+    public void fullDay_roundTrip_isOneSlot() {
+        long[] m = FreeCells.fromSlots(Collections.singletonList(slot(MON, 0, 1440)));
+        assertEquals(FreeCells.FULL_DAY, m[0]);
+        assertEquals(Collections.singletonList(slot(MON, 0, 1440)), FreeCells.toSlots(m));
+        assertEquals(Collections.singletonList(slot(MON, 0, 1440)), FreeCells.matchable(m));
+        assertArrayEquals(m, FreeCells.fromList(FreeCells.toList(m)));
+    }
+
+    @Test
+    public void lastCells_60Matchable_30NotMatchable() {
+        assertEquals(Collections.singletonList(slot(SUN, 1380, 1440)),
+                FreeCells.matchable(FreeCells.fromSlots(Collections.singletonList(slot(SUN, 1380, 1440)))));
+        long[] last = FreeCells.fromSlots(Collections.singletonList(slot(SUN, 1410, 1440)));
+        assertEquals(Collections.singletonList(slot(SUN, 1410, 1440)), FreeCells.toSlots(last)); // 원본엔 남음
+        assertTrue(FreeCells.matchable(last).isEmpty());
+    }
+
+    @Test
+    public void sundayLastCell_andMondayFirstCell_notJoined() {
+        long[] m = FreeCells.fromSlots(Arrays.asList(slot(SUN, 1410, 1440), slot(MON, 0, 30)));
+        assertEquals(Arrays.asList(slot(MON, 0, 30), slot(SUN, 1410, 1440)), FreeCells.toSlots(m));
+        assertTrue(FreeCells.matchable(m).isEmpty());
+    }
+
+    @Test
+    public void reselect_sameCellsAfterClear_restoresSameMask() {
+        long[] first = FreeCells.fromSlots(Collections.singletonList(slot(TUE, 600, 720)));
+        long[] cleared = first.clone();
+        cleared[TUE - 1] &= ~(1L << 21); // 10:30 칸 해제 → 10:00~10:30 / 11:00~12:00
+        assertEquals(Arrays.asList(slot(TUE, 600, 630), slot(TUE, 660, 720)), FreeCells.toSlots(cleared));
+        assertEquals(Collections.singletonList(slot(TUE, 660, 720)), FreeCells.matchable(cleared));
+        cleared[TUE - 1] |= 1L << 21;    // 다시 선택
+        assertArrayEquals(first, cleared);
+        assertEquals(Collections.singletonList(slot(TUE, 600, 720)), FreeCells.matchable(cleared));
+    }
 }

@@ -186,6 +186,26 @@ service cloud.firestore {
     match /matchRequestGuards/{guardId} {
       allow read, write: if false;
     }
+    match /requestUserGuards/{uid} {
+      allow read, write: if false;
+    }
+    match /matchCleanupJobs/{matchId} {
+      allow read, write: if false;
+    }
+    match /chatLinkJobs/{matchId} {
+      allow read, write: if false;
+    }
+    match /chatPairs/{pairId} {
+      allow read, write: if false;
+    }
+    match /chatRoomLinks/{roomId} {
+      allow read: if request.auth != null && request.auth.uid in resource.data.participantUids;
+      allow write: if false;
+    }
+    match /matches/{matchId} {
+      allow read: if request.auth != null && request.auth.uid in resource.data.participantUids;
+      allow write: if false;
+    }
     // A · BT-017 매칭 설정: 본인만 읽고 쓴다. 검색 서버(Admin)가 읽어 판정하므로 다른 사용자는 읽지 않는다.
     match /matchSettings/{uid} {
       allow read: if isOwner(uid);

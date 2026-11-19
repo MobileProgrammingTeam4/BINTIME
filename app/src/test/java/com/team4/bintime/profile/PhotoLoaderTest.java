@@ -268,6 +268,27 @@ public class PhotoLoaderTest {
         assertEquals(2, fetcher.paths.size()); // 지나면 다시 받음
     }
 
+    /** BT-030: 로그아웃 시 전부 비우고, 진행 중이던 다운로드 결과도 캐시에 넣지 않는다(기다리던 화면에는 전달). */
+    @Test
+    public void invalidateAll_clearsCacheAndDropsInFlightResults() {
+        loader.load("p/a.jpg", new Result());
+        respond(0, "A");
+        background.runAll();
+        main.runAll();
+
+        Result waiting = new Result();
+        loader.load("p/b.jpg", waiting);         // 다운로드 진행 중
+        loader.invalidateAll();                  // 로그아웃
+        respond(1, "B");
+        background.runAll();
+        main.runAll();
+        assertEquals(List.of("B"), waiting.values);
+
+        loader.load("p/a.jpg", new Result());
+        loader.load("p/b.jpg", new Result());
+        assertEquals(4, fetcher.paths.size());   // 둘 다 캐시에 없어 새로 받는다
+    }
+
     // ---- PhotoMemoryCache ----
 
     @Test

@@ -14,9 +14,20 @@ final class UserChatRoomEntry {
     final ChatRoom.Status status;
     /** 채팅방 나가기(BT-043). true 면 내 목록에서 뺀다. */
     final boolean hidden;
+    final boolean archived;
+    /** null은 BT-033 이전의 필드 없는 방이다. 명시적 false는 매칭 문서보다 우선한다. */
+    final Boolean chatReady;
 
     UserChatRoomEntry(String matchId, String otherUid, String lastMessage, long lastMessageAt,
                       int unreadCount, ChatRoom.Status status, boolean hidden) {
+        this(matchId, otherUid, lastMessage, lastMessageAt, unreadCount, status, hidden, false);
+    }
+    UserChatRoomEntry(String matchId, String otherUid, String lastMessage, long lastMessageAt,
+                      int unreadCount, ChatRoom.Status status, boolean hidden, boolean archived) {
+        this(matchId, otherUid, lastMessage, lastMessageAt, unreadCount, status, hidden, archived, null);
+    }
+    UserChatRoomEntry(String matchId, String otherUid, String lastMessage, long lastMessageAt,
+                      int unreadCount, ChatRoom.Status status, boolean hidden, boolean archived, Boolean chatReady) {
         this.matchId = matchId;
         this.otherUid = otherUid;
         this.lastMessage = lastMessage;
@@ -24,5 +35,7 @@ final class UserChatRoomEntry {
         this.unreadCount = unreadCount;
         this.status = status;
         this.hidden = hidden;
+        this.archived = archived;
+        this.chatReady = chatReady;
     }
 }

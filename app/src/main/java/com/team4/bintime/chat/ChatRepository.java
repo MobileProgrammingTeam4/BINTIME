@@ -25,6 +25,8 @@ public interface ChatRepository {
     }
 
     String currentUid();
+    /** 표시용 서버 시각 보정. 상태 전환 권한은 서버에만 있다. */
+    default long nowMillis() { return System.currentTimeMillis(); }
 
     /** 최근 메시지 순으로 전달한다. */
     Registration observeRooms(Listener<List<ChatRoom>> listener);

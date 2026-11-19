@@ -91,8 +91,10 @@ describe("live 모드", () => {
 
   it("프롬프트가 아직 없는 작업은 AI_NOT_IMPLEMENTED", async () => {
     const deps = makeDeps({ mode: "live" });
+    // BT-029 에서 generateProfile 프롬프트가 생겨, 프롬프트(buildRequest)를 뺀 사본으로 검사한다.
+    const withoutPrompt = { ...generateProfileTask, buildRequest: undefined };
     await expectReason(
-      runAiTask(generateProfileTask, { department: "소프트웨어학과", grade: 3 }, ctx(), deps),
+      runAiTask(withoutPrompt, { department: "소프트웨어학과", grade: 3 }, ctx(), deps),
       "AI_NOT_IMPLEMENTED",
     );
   });

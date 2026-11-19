@@ -15,6 +15,7 @@ public interface AuthRepository {
         LINK_ALREADY_USED, // 이미 인증에 사용된 링크
         EMAIL_MISMATCH,  // 링크를 요청한 이메일과 입력한 이메일이 다름
         TOO_MANY_REQUESTS, // 발송 요청이 너무 잦음 (서버 제한)
+        ACCOUNT_DISABLED, // 관리자가 사용 중지한 계정 (BT-030). 다시 로그인해도 안 되므로 "만료"와 구분한다
         NETWORK,         // 네트워크 오류
         UNKNOWN          // 그 밖의 실패
     }
@@ -64,4 +65,24 @@ public interface AuthRepository {
 
     /** 로그아웃 */
     void signOut();
+
+    /** BT-030 세션 확인 결과. */
+    enum SessionState {
+        /** 로그인이 유효하다. */
+        VALID,
+        /** 계정이 삭제됐거나 토큰이 무효다. 이미 로그아웃 처리됐으니 다시 로그인해야 한다. */
+        EXPIRED,
+        /** 관리자가 계정을 사용 중지했다. 로그아웃 처리됐고, 다시 로그인해도 막히므로 "만료"와 다르게 안내한다. */
+        DISABLED,
+        /** 네트워크 등으로 확인하지 못했다. 기기에 남은 로그인으로 계속 진행한다(오프라인에서 막지 않음). */
+        UNKNOWN
+    }
+
+    /**
+     * 기기에 남은 로그인이 서버에서도 유효한지 확인한다(BT-030). 앱 시작 라우팅에서 쓴다.
+     * 기본 구현(Mock)은 로그인 여부만 본다. 콜백은 정확히 한 번 호출된다.
+     */
+    default void checkSession(Callback<SessionState> callback) {
+        if (callback != null) callback.onSuccess(isSignedIn() ? SessionState.VALID : SessionState.EXPIRED);
+    }
 }

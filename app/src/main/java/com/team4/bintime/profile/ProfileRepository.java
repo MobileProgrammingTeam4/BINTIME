@@ -41,15 +41,22 @@ public interface ProfileRepository {
     /** 프로필 생성을 마친 계정인지. 앱 재시작·재로그인 시 가입 단계 복귀 여부를 정한다. */
     void hasCompletedProfile(String uid, Callback<Boolean> callback);
 
+    /** BT-030: 로그아웃 시 계정별로 남은 캐시(사진 등)를 비운다. 다음 계정이 이전 계정 데이터를 보지 않게 한다. */
+    default void clearSessionCaches() {}
+
     /** 압축된 JPEG 를 업로드하고 저장 경로(예: profileImages/{uid}/profile.jpg)를 돌려준다. */
     void uploadProfilePhoto(String uid, byte[] jpegBytes, Callback<String> callback);
 
     /** {@link UserProfile#getPhotoPath()} 경로의 사진을 불러온다. */
     void loadProfilePhoto(String photoPath, Callback<Bitmap> callback);
 
-    void generateAiBio(String timetableContext, Callback<String> callback);
+    /**
+     * AI 자기소개 초안과 추천 태그(BT-029). Firebase 는 generateProfile Callable(asia-northeast3), Mock 은 고정 규칙.
+     * 결과는 초안일 뿐 저장하지 않는다. 실패하면 onError 에 사용자 문구({@link AiProfileMapper#errorMessage})를 준다.
+     * 콜백은 정확히 한 번, 메인 스레드로 온다.
+     */
+    void generateAiProfile(AiProfileRequest request, Callback<AiProfileDraft> callback);
 
-    List<String> getAiRecommendedTags();
-
+    /** 기본 활동 태그(# 없이). */
     List<String> getDefaultTags();
 }
