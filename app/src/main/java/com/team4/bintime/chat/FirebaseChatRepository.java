@@ -55,13 +55,10 @@ final class FirebaseChatRepository implements ChatRepository {
     private final Map<String, Integer> knownUnread = new HashMap<>();
     @Nullable private final DatabaseReference connectedRef;
     @Nullable private final DatabaseReference serverTimeRef;
-    private long serverTimeOffset;
+    private final ServerClock serverClock = new ServerClock();
     private final ValueEventListener serverTimeListener = new ValueEventListener() {
-        @Override public void onDataChange(@NonNull DataSnapshot snapshot) {
-            Object value = snapshot.getValue();
-            if (value instanceof Number) serverTimeOffset = ((Number) value).longValue();
-        }
-        @Override public void onCancelled(@NonNull DatabaseError error) { serverTimeOffset = 0; }
+        @Override public void onDataChange(@NonNull DataSnapshot snapshot) { serverClock.onOffset(snapshot.getValue()); }
+        @Override public void onCancelled(@NonNull DatabaseError error) { serverClock.onCancelled(); }
     };
     private final ValueEventListener connectedListener = new ValueEventListener() {
         @Override
@@ -95,7 +92,7 @@ final class FirebaseChatRepository implements ChatRepository {
     public String currentUid() {
         return uid;
     }
-    @Override public long nowMillis() { return System.currentTimeMillis() + serverTimeOffset; }
+    @Override public long nowMillis() { return serverClock.nowMillis(); }
 
     @Override
     public Registration observeRooms(Listener<List<ChatRoom>> listener) {
