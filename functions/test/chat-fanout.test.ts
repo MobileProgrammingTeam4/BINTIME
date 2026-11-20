@@ -67,6 +67,10 @@ describe("BT-022 userChatRooms 갱신", () => {
     expect(applyMessage(entry({ hidden: true }), "other", "-b", message())?.hidden).toBe(true);
   });
 
+  it("linkedAt·chatReady·archived 등 연결 함수가 쓴 필드는 그대로 둔다(BT-034)", () => {
+    const next = applyMessage(entry({ linkedAt: 50, chatReady: true, archived: false }), "other", "-b", message());
+    expect(next).toMatchObject({ linkedAt: 50, chatReady: true, archived: false, lastMessageAt: 200, unreadCount: 1 });
+  });
   it("잘못된 unreadCount 는 0 으로 보고 1 부터 센다", () => {
     expect(applyMessage(entry({ unreadCount: -3 }), "other", "-b", message())?.unreadCount).toBe(1);
     expect(applyMessage(entry({ unreadCount: "x" }), "other", "-b", message())?.unreadCount).toBe(1);

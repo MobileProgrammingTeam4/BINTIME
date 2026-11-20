@@ -82,8 +82,12 @@ public class ChatRoomActivity extends AppCompatActivity {
     private LinearLayout replyChips;
     private ArrayList<String> replies;
     private boolean actionInProgress, leaving, sending;
-    private boolean messagesLoaded, messagesEmpty;
+    private boolean messagesLoaded, messagesEmpty, messagesError;
     private View sendButton;
+    /** BT-034: 준비 안 된 방의 명시적 재시도. 방 키 = 첫 매칭 ID 라 ensureMatchChat 에 그대로 넘긴다. */
+    private ChatLinkRetry linkRetry;
+    @Nullable private ChatLinkFailure linkFailure;
+    private boolean linkUnavailable;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -102,6 +106,7 @@ public class ChatRoomActivity extends AppCompatActivity {
             finish();
             return;
         }
+        linkRetry = new ChatLinkRetry(ChatLinkRepositories.get(this), android.os.SystemClock::elapsedRealtime, matchId);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(R.layout.activity_chat_room);
         applyWindowInsets(findViewById(R.id.chatRoomRoot));
@@ -183,32 +188,127 @@ public class ChatRoomActivity extends AppCompatActivity {
         if (roomRegistration != null) roomRegistration.remove();
         if (messageRegistration != null) messageRegistration.remove();
         if (replyRequest != null) replyRequest.cancel();
+        if (linkRetry != null) linkRetry.cancel(); // 늦게 온 준비 결과로 닫힌 화면을 바꾸지 않는다
         ticker.removeCallbacks(tick);
         super.onDestroy();
     }
 
     private void subscribeMessages() {
         if (messageRegistration != null) messageRegistration.remove();
-        stateView.showLoading();
+        messagesLoaded = false;
+        messagesError = false;
+        renderBody();
         messageRegistration = repository.observeMessages(matchId, new ChatRepository.Listener<List<ChatMessage>>() {
             @Override
             public void onData(List<ChatMessage> data) {
-                messagesLoaded = true; messagesEmpty = data.isEmpty();
+                messagesLoaded = true; messagesEmpty = data.isEmpty(); messagesError = false;
                 adapter.submit(data);
-                if (data.isEmpty() && (room == null || !room.archived)) {
-                    stateView.showEmpty(getString(R.string.chat_messages_empty_title),
-                            getString(R.string.chat_messages_empty_message));
-                } else {
-                    stateView.hide();
-                    scrollToLast();
-                }
+                renderBody();
+                if (!data.isEmpty()) scrollToLast();
                 if (isResumedNow()) repository.markRead(matchId);
             }
 
             @Override
             public void onError() {
-                stateView.showError(getString(R.string.chat_messages_error))
-                        .primary(getString(R.string.chat_retry), v -> subscribeMessages());
+                messagesError = true;
+                renderBody();
+            }
+        });
+    }
+
+    /**
+     * 메시지 영역의 상태 화면. 우선순위: 방 준비 안 됨(BT-034) → 메시지 오류 → 불러오는 중 → 빈 방 → 숨김.
+     * 1초 갱신(tick)에서도 불러 재시도 대기 시간을 줄여 보여 준다.
+     */
+    private void renderBody() {
+        boolean linkPending = room != null && !room.archived && !room.chatReady;
+        // StateView 배경이 투명이라 기존 메시지와 겹치지 않게 준비 중에는 목록을 가린다(공통 StateView 는 그대로).
+        messageList.setVisibility(linkPending ? View.INVISIBLE : View.VISIBLE);
+        if (linkPending) {
+            renderLinkState();
+        } else if (messagesError) {
+            stateView.showError(getString(R.string.chat_messages_error))
+                    .primary(getString(R.string.chat_retry), v -> subscribeMessages());
+        } else if (!messagesLoaded) {
+            stateView.showLoading();
+        } else if (messagesEmpty && (room == null || !room.archived)) {
+            stateView.showEmpty(getString(R.string.chat_messages_empty_title),
+                    getString(R.string.chat_messages_empty_message));
+        } else {
+            stateView.hide();
+        }
+    }
+
+    // ---- 채팅방 준비 (BT-034 §3) ----
+
+    /** 준비 중·실패·영구 오류를 기존 StateView 로 표시한다. 자동으로 다시 부르지 않고 버튼으로만 재시도한다. */
+    private void renderLinkState() {
+        boolean inFlight = linkRetry.inFlight();
+        ChatLinkFailure failure = inFlight ? null : linkFailure;
+        if (linkUnavailable && !inFlight) {
+            stateView.showError(getString(R.string.chat_link_unavailable_message));
+            return;
+        }
+        if (failure != null && failure.kind == ChatLinkFailure.Kind.PERMANENT) {
+            stateView.showError(getString(R.string.chat_link_permanent_message));
+            return;
+        }
+        if (failure != null && failure.kind == ChatLinkFailure.Kind.UNAUTHENTICATED) {
+            stateView.showError(getString(R.string.chat_login_required));
+            return;
+        }
+        String label;
+        if (inFlight) {
+            label = getString(R.string.chat_link_preparing);
+        } else {
+            long waitMillis = linkRetry.retryAtMillis() - android.os.SystemClock.elapsedRealtime();
+            label = waitMillis > 0
+                    ? getString(R.string.chat_link_retry_wait, (int) ((waitMillis + 999) / 1000))
+                    : getString(R.string.chat_retry);
+        }
+        StateView shown = failure == null
+                ? stateView.showEmpty(getString(R.string.chat_link_preparing_title), getString(R.string.chat_link_preparing_message))
+                : stateView.showError(getString(R.string.chat_link_failed_message));
+        shown.primary(label, v -> retryLink());
+        // 공통 StateView 를 고치지 않고 버튼만 잠근다: 요청 중·서버가 준 대기 시간 전에는 누를 수 없다.
+        stateView.findViewById(R.id.statePrimary).setEnabled(linkRetry.canStart());
+    }
+
+    private void retryLink() {
+        if (room == null || room.archived || room.chatReady) return;
+        linkRetry.start(new ChatLinkRetry.Listener() {
+            @Override
+            public void onPreparing() {
+                linkFailure = null;
+                linkUnavailable = false;
+                renderBody();
+            }
+
+            @Override
+            public void onReady(String chatRoomId) {
+                if (isFinishing() || isDestroyed()) return;
+                // 같은 방이면 userChatRooms 구독이 chatReady=true 를 전달하며 입력창이 열린다.
+                if (!chatRoomId.equals(matchId) && isResumedNow()) {
+                    // 서버가 기존 방을 재사용했다. 실제 방으로 옮긴다.
+                    startActivity(intent(ChatRoomActivity.this, chatRoomId));
+                    finish();
+                    return;
+                }
+                renderBody();
+            }
+
+            @Override
+            public void onUnavailable() {
+                if (isFinishing() || isDestroyed()) return;
+                linkUnavailable = true;
+                renderBody();
+            }
+
+            @Override
+            public void onFailed(ChatLinkFailure failure, long retryAtMillis) {
+                if (isFinishing() || isDestroyed()) return;
+                linkFailure = failure;
+                renderBody();
             }
         });
     }
@@ -223,7 +323,7 @@ public class ChatRoomActivity extends AppCompatActivity {
         boolean hasMatchTime = room.meetingDate != null && (room.appointments.isEmpty() || MatchAppointmentPolicy.representative(room.appointments, repository.nowMillis()) != null);
         findViewById(R.id.chatMatchInfo).setVisibility(active && hasMatchTime ? View.VISIBLE : View.GONE);
         findViewById(R.id.chatEndedBanner).setVisibility(active ? View.GONE : View.VISIBLE);
-        if (room.archived && messagesLoaded && messagesEmpty) stateView.hide();
+        renderBody();
         if (active && hasMatchTime) bindMatchInfo();
         else bindReviewLink();
     }

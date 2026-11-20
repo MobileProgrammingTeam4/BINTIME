@@ -169,6 +169,40 @@ public class ChatRtdbMapperTest {
         assertEquals("m-empty", visible.get(2).matchId);
     }
 
+    @Test
+    public void visibleRooms_emptyRoomUsesLinkedAtAndLegacyRoomGoesLast() {
+        // 메시지 있는 방(300), 방금 연결한 메시지 없는 방(linkedAt 500), linkedAt 없는 이전 빈 방(0)
+        UserChatRoomEntry withMessage = new UserChatRoomEntry("m-msg", OTHER, "b", 300L, 0, ChatRoom.Status.ACTIVE, false, false, true, 100L);
+        UserChatRoomEntry fresh = new UserChatRoomEntry("m-fresh", OTHER, "", 0L, 0, ChatRoom.Status.ACTIVE, false, false, true, 500L);
+        UserChatRoomEntry legacy = new UserChatRoomEntry("m-legacy", OTHER, "", 0L, 0, ChatRoom.Status.ACTIVE, false);
+        UserChatRoomEntry olderFresh = new UserChatRoomEntry("m-older", OTHER, "", 0L, 0, ChatRoom.Status.ACTIVE, false, false, true, 200L);
+        List<UserChatRoomEntry> visible = ChatRtdbMapper.visibleRooms(Arrays.asList(legacy, withMessage, olderFresh, fresh));
+        assertEquals(Arrays.asList("m-fresh", "m-msg", "m-older", "m-legacy"),
+                Arrays.asList(visible.get(0).matchId, visible.get(1).matchId, visible.get(2).matchId, visible.get(3).matchId));
+    }
+
+    @Test
+    public void sortTime_prefersLastMessageThenLinkedAt() {
+        assertEquals(300L, ChatRtdbMapper.sortTime(300L, 900L)); // 메시지가 있으면 linkedAt 보다 메시지 시각
+        assertEquals(900L, ChatRtdbMapper.sortTime(0L, 900L));
+        assertEquals(0L, ChatRtdbMapper.sortTime(0L, 0L));
+        assertEquals(0L, ChatRtdbMapper.sortTime(0L, -5L));
+    }
+
+    @Test
+    public void userChatRoom_readsLinkedAtAndToleratesMissingOrInvalid() {
+        Map<String, Object> node = roomNode(OTHER, "ACTIVE");
+        node.put("linkedAt", 1_700_000_000_000L);
+        assertEquals(1_700_000_000_000L, ChatRtdbMapper.userChatRoom(MATCH, node).linkedAt);
+        Map<String, Object> legacy = roomNode(OTHER, "ACTIVE");
+        assertEquals(0L, ChatRtdbMapper.userChatRoom(MATCH, legacy).linkedAt);
+        Map<String, Object> invalid = roomNode(OTHER, "ACTIVE");
+        invalid.put("linkedAt", "어제");
+        UserChatRoomEntry parsed = ChatRtdbMapper.userChatRoom(MATCH, invalid);
+        assertEquals(0L, parsed.linkedAt); // 잘못된 값은 0, 방 자체는 정상 표시
+        assertEquals(OTHER, parsed.otherUid);
+    }
+
     // ---- ChatRoom 조립 ----
 
     @Test public void roomLevelNotReadyOverridesPreviouslyReadyMatchAndRecovers() {

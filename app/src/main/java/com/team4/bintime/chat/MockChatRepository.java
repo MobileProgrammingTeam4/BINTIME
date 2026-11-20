@@ -56,6 +56,7 @@ public final class MockChatRepository implements ChatRepository {
                 "", 0, 0, null);
         rooms.put(item.id, room.withAppointments(Collections.singletonList(new com.team4.bintime.request.MatchAppointment(item.id, item.id,
                 item.meetingDate, item.startMinute, item.endMinute, item.purpose, com.team4.bintime.request.MatchAppointment.Status.ACTIVE, null, false)), false));
+        linkedAt.put(item.id, clock.millis()); // 서버 linkedAt 과 같이 처음 연결할 때 한 번만
         messages.put(item.id, new ArrayList<>()); notifyRoomChanged(item.id);
     }
 
@@ -80,6 +81,8 @@ public final class MockChatRepository implements ChatRepository {
 
     private final Scheduler scheduler;
     private final Clock clock;
+    /** BT-034: 시연 중 새로 연결한 방의 연결 시각. 기본 Mock 방에는 없다(0). */
+    private final java.util.Map<String, Long> linkedAt = new java.util.HashMap<>();
     private final Map<String, ChatRoom> rooms = new LinkedHashMap<>();
     private final Map<String, List<ChatMessage>> messages = new HashMap<>();
     /** 내가 나간 방. 메시지는 지우지 않고 내 목록과 방 구독에서만 뺀다. */
@@ -239,7 +242,9 @@ public final class MockChatRepository implements ChatRepository {
         for (ChatRoom room : rooms.values()) {
             if (!leftRooms.contains(room.matchId)) sorted.add(room);
         }
-        sorted.sort(Comparator.comparingLong((ChatRoom room) -> room.lastMessageAt).reversed());
+        // Firebase 와 같은 규칙: 메시지가 없는 방은 연결 시각(linkedAt)으로 정렬한다.
+        sorted.sort(Comparator.comparingLong((ChatRoom room) -> ChatRtdbMapper.sortTime(room.lastMessageAt,
+                linkedAt.getOrDefault(room.matchId, 0L))).reversed().thenComparing(room -> room.matchId));
         subscription.listener.onData(sorted);
     }
 
