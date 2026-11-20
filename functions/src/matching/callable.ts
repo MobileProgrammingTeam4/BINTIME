@@ -5,13 +5,23 @@ import { logger } from "firebase-functions";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { REGION } from "../ai/config";
 import { ALLOWED_EMAIL_SUFFIXES_ENV, checkSchoolEmail, parseAllowedEmailSuffixes } from "../ai/emailPolicy";
+import { GEMINI_API_KEY } from "../ai/deps";
+import type { Candidate } from "./eligibility";
+import { addScores, defaultEvaluator, FirestoreScoreData, type ScoredCandidate } from "./score";
 import { FirestoreMatchStore, type MatchStore, searchMatches } from "./search";
 
-function defaultStore(): MatchStore {
+function defaultDb() {
   // 이름 있는 앱만 있을 때도 기본 앱을 쓰도록 ai/deps.ts 와 같은 방식(#89 D 리뷰 1번).
   const app = getApps().find((existing) => existing.name === "[DEFAULT]") ?? initializeApp();
-  return new FirestoreMatchStore(getFirestore(app));
+  return getFirestore(app);
 }
+
+const defaultStore = (): MatchStore => new FirestoreMatchStore(defaultDb());
+
+export type Scorer = (uid: string, candidates: Candidate[]) => Promise<ScoredCandidate[]>;
+
+/** BT-027 상위 후보 AI 점수. 실패해도 후보는 그대로 돌아온다. */
+const defaultScorer: Scorer = (uid, candidates) => addScores(new FirestoreScoreData(defaultDb()), defaultEvaluator, uid, candidates);
 
 const defaultSuffixes = () => parseAllowedEmailSuffixes(process.env[ALLOWED_EMAIL_SUFFIXES_ENV]);
 
@@ -23,8 +33,10 @@ export function createSearchCallable(
   store: () => MatchStore = defaultStore,
   now: () => Date = () => new Date(),
   suffixes: () => readonly string[] = defaultSuffixes,
+  scorer: Scorer = defaultScorer,
 ) {
-  return onCall({ region: REGION, timeoutSeconds: 30, maxInstances: 10 }, async (request) => {
+  // evaluateMatch 가 Gemini 를 부르므로 AI Callable 과 같은 비밀값을 연결한다.
+  return onCall({ region: REGION, timeoutSeconds: 30, maxInstances: 10, secrets: [GEMINI_API_KEY] }, async (request) => {
     if (!request.auth?.uid) {
       throw new HttpsError("unauthenticated", "로그인이 필요합니다.", { reason: "UNAUTHENTICATED", retryable: false });
     }
@@ -34,7 +46,9 @@ export function createSearchCallable(
       throw new HttpsError("permission-denied", "학교 이메일 인증이 필요합니다.", { reason: "PERMISSION_DENIED", retryable: false });
     }
     try {
-      return await searchMatches(store(), request.auth.uid, now());
+      const result = await searchMatches(store(), request.auth.uid, now());
+      if (result.status !== "OK") return result;
+      return { ...result, candidates: await scorer(request.auth.uid, result.candidates) };
     } catch (error) {
       const requestId = randomUUID();
       logger.error("search_matches_failed", { requestId, message: error instanceof Error ? error.message : String(error) });
