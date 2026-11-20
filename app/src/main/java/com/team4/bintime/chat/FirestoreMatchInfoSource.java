@@ -3,7 +3,6 @@ package com.team4.bintime.chat;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.team4.bintime.request.MatchAppointment;
-import com.team4.bintime.request.MatchAppointmentPolicy;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -38,7 +37,8 @@ final class FirestoreMatchInfoSource implements MatchInfoSource {
                     if (participants != null && !new java.util.HashSet<>(participants).equals(new java.util.HashSet<>(uids))) throw new IllegalArgumentException();
                     participants = new ArrayList<>(uids);
                 }
-                MatchAppointment representative = MatchAppointmentPolicy.representative(items, now.getAsLong());
+                // 채팅 상단 카드와 같은 기준(서버 종료 지연 포함)으로 방 대표 시간을 정한다. 모두 ENDED 면 가장 늦게 끝난 약속.
+                MatchAppointment representative = ChatAppointmentDisplay.pick(items, now.getAsLong());
                 if (representative == null) representative = items.stream().max(Comparator.comparingLong(MatchAppointment::endAtMillis)).get();
                 boolean hasActive = items.stream().anyMatch(a -> a.status == MatchAppointment.Status.ACTIVE);
                 boolean hasReadyLink = snapshot.getDocuments().stream().anyMatch(doc -> Boolean.TRUE.equals(doc.getBoolean("chatReady")));
