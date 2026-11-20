@@ -33,6 +33,12 @@ public interface ChatRepository {
 
     Registration observeRoom(String matchId, Listener<ChatRoom> listener);
 
+    /**
+     * 화면 복귀 때 부른다. 오류로 끊긴 매칭 스냅샷 구독이 있으면 한 번만 다시 연다(BT-035).
+     * 끊긴 구독이 없으면 아무 일도 하지 않는다. Mock 은 구독이 끊기지 않아 기본 구현을 쓴다.
+     */
+    default void retryFailedSources() {}
+
     /** 오래된 메시지부터 전달한다. */
     Registration observeMessages(String matchId, Listener<List<ChatMessage>> listener);
 

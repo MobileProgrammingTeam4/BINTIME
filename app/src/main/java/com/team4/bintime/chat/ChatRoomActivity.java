@@ -170,6 +170,8 @@ public class ChatRoomActivity extends AppCompatActivity {
         super.onResume();
         if (matchId == null) return;
         repository.markRead(matchId);
+        // 오프라인·권한 오류로 끊긴 매칭 시간 구독이 있으면 복귀할 때 한 번만 다시 연다(BT-035). 없으면 아무 일도 없다.
+        repository.retryFailedSources();
         // 후기 화면에서 돌아오면 배너 문구(남기기 → 보기)를 다시 맞춘다.
         refreshReviewStatus();
         if (room != null) bindRoom();

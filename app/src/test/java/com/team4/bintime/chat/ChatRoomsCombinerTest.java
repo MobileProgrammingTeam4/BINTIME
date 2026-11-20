@@ -63,6 +63,101 @@ public class ChatRoomsCombinerTest {
         return emitted.get(emitted.size() - 1);
     }
 
+    private static MatchInfo info(String matchId, String date) {
+        return new MatchInfo(matchId, Arrays.asList(ME, "u-" + matchId), ChatRoom.Status.ACTIVE, date, 600, 690, true);
+    }
+
+    private static int count(List<String> values, String key) {
+        return Collections.frequency(values, key);
+    }
+
+    // ---- BT-035 복귀 시 끊긴 매칭 구독 다시 열기 ----
+
+    @Test
+    public void retryResubscribesOnlyFailedMatchOnce() {
+        combiner.update(Arrays.asList(entry("m1", "u-m1", 200L, false), entry("m2", "u-m2", 100L, false)));
+        matches.push("m1", info("m1", "2026-11-20"));
+        matches.push("m2", info("m2", "2026-11-21"));
+        matches.fail("m1");
+        assertNull("오류 뒤에는 시간 정보 없이 방을 유지", last().get(0).meetingDate);
+
+        combiner.retryFailedMatches();
+        assertEquals(2, count(matches.subscribed, "m1"));
+        assertEquals("정상 구독은 다시 열지 않는다", 1, count(matches.subscribed, "m2"));
+        assertEquals("상대 프로필은 다시 열지 않는다", 2, partners.subscribed.size());
+
+        matches.push("m1", info("m1", "2026-11-20"));
+        assertEquals("2026-11-20", last().get(0).meetingDate);
+        assertEquals("2026-11-21", last().get(1).meetingDate);
+
+        // 다시 실패하지 않았으면 다음 복귀에서 또 열지 않는다(자동 반복 없음).
+        combiner.retryFailedMatches();
+        assertEquals(2, count(matches.subscribed, "m1"));
+    }
+
+    @Test
+    public void retryWithoutFailureDoesNothing() {
+        combiner.update(Collections.singletonList(entry("m1", "u-m1", 100L, false)));
+        matches.push("m1", info("m1", "2026-11-20"));
+        int before = emitted.size();
+        combiner.retryFailedMatches();
+        assertEquals(1, count(matches.subscribed, "m1"));
+        assertEquals("다시 그리지 않는다", before, emitted.size());
+    }
+
+    @Test
+    public void retryFailingAgainWaitsForNextResume() {
+        combiner.update(Collections.singletonList(entry("m1", "u-m1", 100L, false)));
+        matches.fail("m1");
+        combiner.retryFailedMatches();
+        matches.fail("m1");
+        assertEquals("실패 콜백만으로는 다시 열지 않는다", 2, count(matches.subscribed, "m1"));
+        combiner.retryFailedMatches();
+        assertEquals(3, count(matches.subscribed, "m1"));
+    }
+
+    @Test
+    public void lateCallbackFromFailedSubscriptionIsIgnoredAfterRetry() {
+        combiner.update(Collections.singletonList(entry("m1", "u-m1", 100L, false)));
+        ChatRepository.Listener<MatchInfo> old = matches.active.get("m1");
+        matches.fail("m1");
+        combiner.retryFailedMatches();
+        assertTrue("끊긴 구독은 해제", matches.released.contains("m1"));
+        old.onData(info("m1", "2000-01-01"));
+        assertNull(last().get(0).meetingDate);
+        matches.push("m1", info("m1", "2026-11-20"));
+        assertEquals("2026-11-20", last().get(0).meetingDate);
+    }
+
+    @Test
+    public void retryAfterReleaseDoesNothing() {
+        combiner.update(Collections.singletonList(entry("m1", "u-m1", 100L, false)));
+        matches.fail("m1");
+        combiner.release();
+        int before = emitted.size();
+        combiner.retryFailedMatches();
+        assertEquals(1, count(matches.subscribed, "m1"));
+        assertEquals(before, emitted.size());
+    }
+
+    @Test
+    public void retryWithSynchronousAnswerEmitsOnce() {
+        // UNAVAILABLE 처럼 구독하자마자 응답하는 출처
+        List<String> subscribed = new ArrayList<>();
+        boolean[] failFirst = { true };
+        ChatRoomsCombiner sync = new ChatRoomsCombiner(ME, "상대", (key, listener) -> {
+            subscribed.add(key);
+            if (failFirst[0]) { failFirst[0] = false; listener.onError(); } else listener.onData(info(key, "2026-11-20"));
+            return () -> {};
+        }, partners::observe, emitted::add);
+        sync.update(Collections.singletonList(entry("m1", "u-m1", 100L, false)));
+        int before = emitted.size();
+        sync.retryFailedMatches();
+        assertEquals(2, subscribed.size());
+        assertEquals(before + 1, emitted.size());
+        assertEquals("2026-11-20", last().get(0).meetingDate);
+    }
+
     @Test
     public void nothingEmittedBeforeFirstUpdate() {
         assertTrue(emitted.isEmpty());

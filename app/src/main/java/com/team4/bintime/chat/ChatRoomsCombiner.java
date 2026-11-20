@@ -31,6 +31,8 @@ final class ChatRoomsCombiner {
     private static final class Subscription {
         ChatRepository.Registration registration;
         boolean active = true;
+        /** onError 를 받았는지. Firestore·RTDB 는 오류 뒤 같은 리스너를 다시 부르지 않는다. */
+        boolean failed;
 
         void cancel() {
             active = false;
@@ -89,6 +91,27 @@ final class ChatRoomsCombiner {
         emit();
     }
 
+    /**
+     * 오류로 끊긴 매칭 스냅샷 구독만 한 번씩 다시 연다(BT-035, 화면 복귀 시 호출).
+     * 자동 반복은 하지 않는다. 다시 실패하면 다음 복귀 때까지 시간 정보 없이 둔다.
+     * 상대 프로필은 BT-034 방침(재조회 루프 없음)대로 다시 열지 않는다.
+     */
+    void retryFailedMatches() {
+        if (released) return;
+        boolean retried = false;
+        updating = true; // 다시 연 구독이 바로(동기로) 응답해도 한 번만 내보낸다
+        for (Map.Entry<String, Subscription> entry : new ArrayList<>(matchRegistrations.entrySet())) {
+            if (!entry.getValue().failed) continue;
+            entry.getValue().cancel(); // 끊긴 구독의 늦은 콜백은 active=false 로 버린다
+            Subscription sub = new Subscription();
+            matchRegistrations.put(entry.getKey(), sub);
+            sub.registration = matches.observe(entry.getKey(), listener(matchData, entry.getKey(), sub));
+            retried = true;
+        }
+        updating = false;
+        if (retried) emit(); // 실패한 구독이 없으면 화면을 다시 그리지 않는다
+    }
+
     /** 모든 하위 구독을 해제한다. 이후 늦게 온 콜백은 무시한다. */
     void release() {
         released = true;
@@ -113,6 +136,7 @@ final class ChatRoomsCombiner {
             @Override
             public void onError() {
                 if (released || !sub.active) return;
+                sub.failed = true;
                 store.remove(key);
                 emit();
             }
