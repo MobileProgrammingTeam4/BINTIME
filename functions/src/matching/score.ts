@@ -1,6 +1,7 @@
-import type { Firestore } from "firebase-admin/firestore";
+import { createHash } from "node:crypto";
+import { type Firestore, FieldValue, Timestamp } from "firebase-admin/firestore";
 import { evaluateMatch } from "../ai/internal";
-import type { EvaluateMatchInput, EvaluateMatchOutput } from "../ai/tasks/evaluateMatch";
+import { type EvaluateMatchInput, type EvaluateMatchOutput, SYSTEM_INSTRUCTION } from "../ai/tasks/evaluateMatch";
 import type { AiResponse } from "../ai/types";
 import { type Candidate, PURPOSE_ALL, type Slot } from "./eligibility";
 
@@ -8,8 +9,15 @@ import { type Candidate, PURPOSE_ALL, type Slot } from "./eligibility";
  * A · BT-027. 필수 조건을 통과한 검색 후보 중 겹침이 긴 상위 AI_SCORE_LIMIT 명에게만 AI 점수를 붙인다.
  * AI 입력은 공개 프로필 요약·수업 건물·공통 과목·겹침·목적뿐이다(이름·UID·시간표 원본 금지, BT-024 계약).
  * AI 가 실패하거나 프로필이 모자라면 점수 없이 그대로 둔다(검색은 멈추지 않는다, BT-028 완료 조건).
+ * BT-028: 같은 입력이면 matchScores 캐시를 쓰고(TTL 24시간), 점수 있는 후보를 점수 높은 순으로 앞에 둔다.
  */
 export const AI_SCORE_LIMIT = 5;
+export const SCORE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+/**
+ * 프롬프트(SYSTEM_INSTRUCTION)와 모델(GEMINI_MODEL)은 해시에 들어가 바뀌면 자동으로 다시 평가된다.
+ * 그 밖의 규칙(출력 검사 verify 등)을 바꾸면 이 값을 올린다. 2: 건물명 출력 검사 추가(#102).
+ */
+export const SCORE_CACHE_VERSION = 2;
 /** searchMatches 30초 제한 안에서 검색 결과를 꼭 돌려주기 위한 점수 마감. 늦은 후보는 점수 없이 보낸다. */
 export const SCORE_DEADLINE_MS = 15_000;
 
@@ -32,11 +40,31 @@ export interface CourseInfo {
   slots: Slot[];
 }
 
-/** 점수 입력을 읽는 곳. 테스트는 메모리 구현을 쓴다. */
+export interface CachedScore {
+  inputHash: string;
+  score: number;
+  reasons: string[];
+  suggestedActivity: string;
+  expiresAt: number; // epoch ms
+}
+
+/** 점수 입력·캐시를 읽고 쓰는 곳. 테스트는 메모리 구현을 쓴다. */
 export interface ScoreData {
   profile(uid: string): Promise<PublicSide | null>;
   courses(uid: string): Promise<CourseInfo[]>;
+  cached(uid: string, candidateId: string): Promise<CachedScore | null>;
+  saveCache(uid: string, candidateId: string, entry: CachedScore): Promise<void>;
 }
+
+/** 재평가 기준: 목적·겹침(30분 단위)·양쪽 프로필·수업 건물·공통 과목·프롬프트·모델·버전 중 하나라도 바뀌면 해시가 달라진다. */
+export function inputHash(input: EvaluateMatchInput, model: string = process.env.GEMINI_MODEL?.trim() ?? ""): string {
+  return createHash("sha256")
+    .update(JSON.stringify({ v: SCORE_CACHE_VERSION, prompt: SYSTEM_INSTRUCTION, model, input }))
+    .digest("hex");
+}
+
+const validCache = (c: CachedScore | null, hash: string, now: number): c is CachedScore =>
+  !!c && c.inputHash === hash && c.expiresAt > now && Number.isInteger(c.score) && c.score >= 0 && c.score <= 100;
 
 export type Evaluator = (uid: string, input: EvaluateMatchInput) => Promise<AiResponse<EvaluateMatchOutput>>;
 
@@ -55,11 +83,10 @@ export function toSide(data: Record<string, unknown> | undefined): PublicSide | 
   return { department, grade, tags, ...(bio ? { bio } : {}) };
 }
 
-/** 공강 직전에 끝나는 수업과 직후에 시작하는 수업의 강의실(같은 요일, 각 1개). */
 /**
  * 진행 중인 공강은 남은 시간이 매분 줄어 AI 입력이 계속 바뀐다. 30분 단위로 내려 입력을 고정한다.
  * 후보는 이미 최소 60분을 통과했으므로 결과도 60 이상이다.
- * shortcut: Gemini 자체 응답 흔들림은 남는다, BT-028 점수 캐시에서 해결.
+ * 같은 입력이면 matchScores 캐시(BT-028)를 써서 새로고침마다 점수가 바뀌지 않는다.
  */
 export function aiOverlap(minutes: number): number {
   return Math.max(60, Math.floor(minutes / 30) * 30);
@@ -70,6 +97,7 @@ export function buildingOf(classroom: unknown): string {
   return clip(classroom, 40).replace(/[\s-]*\d.*$/, "").trim();
 }
 
+/** 공강 직전에 끝나는 수업과 직후에 시작하는 수업의 건물(같은 요일, 각 1개). */
 export function nearbyBuildings(courses: CourseInfo[], dayOfWeek: number, start: number, end: number): string[] {
   let before: { at: number; room: string } | null = null;
   let after: { at: number; room: string } | null = null;
@@ -95,6 +123,7 @@ export async function addScores(
   evaluate: Evaluator,
   uid: string,
   candidates: Candidate[],
+  now: number = Date.now(),
   deadlineMs: number = SCORE_DEADLINE_MS,
 ): Promise<ScoredCandidate[]> {
   const top = candidates.slice(0, AI_SCORE_LIMIT);
@@ -116,13 +145,26 @@ export async function addScores(
       const [them, theirCourses] = await Promise.all([data.profile(c.candidateId), data.courses(c.candidateId)]);
       if (!them) return c;
       const day = new Date(`${c.meetingDate}T00:00:00Z`).getUTCDay() || 7;
-      const { data: out } = await evaluate(uid, {
+      const input: EvaluateMatchInput = {
         overlapMinutes: aiOverlap(c.overlapMinutes),
         purposes: c.purpose === PURPOSE_ALL ? [] : [c.purpose],
         commonCourses: commonCourses(myCourses, theirCourses),
         searcher: { ...me, nearbyBuildings: nearbyBuildings(myCourses, day, c.startMinute, c.endMinute) },
         candidate: { ...them, nearbyBuildings: nearbyBuildings(theirCourses, day, c.startMinute, c.endMinute) },
-      });
+      };
+      const hash = inputHash(input);
+      const hit = await data.cached(uid, c.candidateId).catch(() => null);
+      if (validCache(hit, hash, now)) {
+        return { ...c, score: hit.score, reasons: hit.reasons, suggestedActivity: hit.suggestedActivity };
+      }
+      const res = await evaluate(uid, input);
+      const out = res.data;
+      // Mock 점수는 저장하지 않는다(live 로 바꾼 뒤 가짜 점수가 남지 않게). 저장 실패는 점수 표시를 막지 않는다.
+      if (!res.meta.mock) {
+        await data
+          .saveCache(uid, c.candidateId, { inputHash: hash, ...out, expiresAt: now + SCORE_CACHE_TTL_MS })
+          .catch(() => undefined);
+      }
       return { ...c, score: out.score, reasons: out.reasons, suggestedActivity: out.suggestedActivity };
     } catch {
       return c; // AI·읽기 실패는 점수 없이 보여준다
@@ -131,7 +173,12 @@ export async function addScores(
   // 마감 뒤 끝난 호출 결과는 버린다(횟수는 이미 차감됨).
   const scored = await Promise.all(top.map((c) => Promise.race([scoreOne(c), deadline]).then((r) => r ?? c)));
   clearTimeout(timer);
-  return [...scored, ...candidates.slice(AI_SCORE_LIMIT)];
+  return [...rankByScore(scored), ...candidates.slice(AI_SCORE_LIMIT)];
+}
+
+/** AI 추천순: 점수 높은 순, 동점과 점수 없는 후보는 기존 순서(겹침 긴 순)를 유지한다(안정 정렬). */
+export function rankByScore(list: ScoredCandidate[]): ScoredCandidate[] {
+  return [...list].sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
 }
 
 export class FirestoreScoreData implements ScoreData {
@@ -150,6 +197,32 @@ export class FirestoreScoreData implements ScoreData {
         classroom: typeof d.classroom === "string" ? d.classroom : undefined,
         slots: Array.isArray(d.timeSlots) ? (d.timeSlots as Slot[]) : [],
       };
+    });
+  }
+
+  /** matchScores/{검색자UID}_{후보UID}: 서버 전용(Rules 에 규칙이 없어 앱은 읽기·쓰기 모두 거부). */
+  async cached(uid: string, candidateId: string): Promise<CachedScore | null> {
+    const d = (await this.db.doc(`matchScores/${uid}_${candidateId}`).get()).data();
+    if (!d) return null;
+    return {
+      inputHash: String(d.inputHash ?? ""),
+      score: Number(d.score),
+      reasons: Array.isArray(d.reasons) ? d.reasons.map(String) : [],
+      suggestedActivity: String(d.suggestedActivity ?? ""),
+      expiresAt: d.expiresAt instanceof Timestamp ? d.expiresAt.toMillis() : 0,
+    };
+  }
+
+  async saveCache(uid: string, candidateId: string, e: CachedScore) {
+    await this.db.doc(`matchScores/${uid}_${candidateId}`).set({
+      searcherUid: uid,
+      candidateUid: candidateId,
+      inputHash: e.inputHash,
+      score: e.score,
+      reasons: e.reasons,
+      suggestedActivity: e.suggestedActivity,
+      expiresAt: Timestamp.fromMillis(e.expiresAt),
+      updatedAt: FieldValue.serverTimestamp(),
     });
   }
 }

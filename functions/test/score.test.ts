@@ -9,7 +9,11 @@ import {
   aiOverlap,
   buildingOf,
   nearbyBuildings,
+  type CachedScore,
+  inputHash,
   type PublicSide,
+  rankByScore,
+  SCORE_CACHE_TTL_MS,
   SCORE_DEADLINE_MS,
   type ScoreData,
   toSide,
@@ -27,6 +31,13 @@ class MemoryData implements ScoreData {
   constructor(private readonly profiles: Record<string, PublicSide | null>, private readonly courseMap: Record<string, CourseInfo[]> = {}) {}
   async profile(uid: string) { return this.profiles[uid] ?? null; }
   async courses(uid: string) { return this.courseMap[uid] ?? []; }
+  cache = new Map<string, CachedScore>();
+  failSave = false;
+  async cached(uid: string, id: string) { return this.cache.get(`${uid}_${id}`) ?? null; }
+  async saveCache(uid: string, id: string, e: CachedScore) {
+    if (this.failSave) throw new Error("write failed");
+    this.cache.set(`${uid}_${id}`, e);
+  }
 }
 
 const fixed: Evaluator = async () => ({
@@ -102,6 +113,75 @@ describe("addScores", () => {
   });
 });
 
+describe("BT-028 점수 캐시·추천순", () => {
+  const live = (score = 77): Evaluator => async (u, i) => ({ ...(await fixed(u, i)), data: { score, reasons: ["태그가 같아요"], suggestedActivity: "카페" }, meta: { model: "m", requestId: "r", latencyMs: 1, mock: false } });
+  const counting = (inner: Evaluator) => {
+    const fn = (async (u, i) => { fn.calls++; return inner(u, i); }) as Evaluator & { calls: number };
+    fn.calls = 0;
+    return fn;
+  };
+  const now = Date.UTC(2026, 10, 19);
+
+  it("같은 입력으로 다시 검색하면 AI 를 다시 부르지 않는다", async () => {
+    const data = new MemoryData({ me: side, a: side });
+    const ev = counting(live());
+    await addScores(data, ev, "me", [cand("a")], now);
+    const again = await addScores(data, ev, "me", [cand("a")], now + 60_000);
+    expect(ev.calls).toBe(1);
+    expect(again[0]).toMatchObject({ score: 77, reasons: ["태그가 같아요"], suggestedActivity: "카페" });
+  });
+
+  it("입력(겹침 30분 단위·프로필)이 바뀌거나 24시간이 지나면 다시 평가한다", async () => {
+    const data = new MemoryData({ me: side, a: side });
+    const ev = counting(live());
+    await addScores(data, ev, "me", [cand("a", 90)], now);
+    await addScores(data, ev, "me", [cand("a", 119)], now); // 90분 단위 그대로
+    expect(ev.calls).toBe(1);
+    await addScores(data, ev, "me", [cand("a", 120)], now);
+    expect(ev.calls).toBe(2);
+    await addScores(new MemoryData({ me: side, a: { ...side, tags: ["운동"] } }), ev, "me", [cand("a", 120)], now);
+    expect(ev.calls).toBe(3);
+    await addScores(data, ev, "me", [cand("a", 120)], now + SCORE_CACHE_TTL_MS);
+    expect(ev.calls).toBe(4);
+  });
+
+  it("모델이 바뀌면 해시가 달라져 다시 평가한다 (#117 E 리뷰)", () => {
+    const input = { overlapMinutes: 90, purposes: [], commonCourses: [], searcher: side, candidate: side };
+    expect(inputHash(input, "gemini-a")).toBe(inputHash(input, "gemini-a"));
+    expect(inputHash(input, "gemini-a")).not.toBe(inputHash(input, "gemini-b"));
+  });
+
+  it("Mock 점수는 저장하지 않고, 저장 실패해도 점수는 보여준다", async () => {
+    const data = new MemoryData({ me: side, a: side });
+    await addScores(data, fixed, "me", [cand("a")], now);
+    expect(data.cache.size).toBe(0);
+    data.failSave = true;
+    const out = await addScores(data, live(), "me", [cand("a")], now);
+    expect(out[0].score).toBe(77);
+  });
+
+  it("범위 밖 캐시 점수는 무시하고 다시 평가한다", async () => {
+    const data = new MemoryData({ me: side, a: side });
+    const ev = counting(live());
+    await addScores(data, ev, "me", [cand("a")], now);
+    const key = "me_a";
+    data.cache.set(key, { ...data.cache.get(key)!, score: 150 });
+    await addScores(data, ev, "me", [cand("a")], now);
+    expect(ev.calls).toBe(2);
+  });
+
+  it("점수 높은 순, 동점·점수 없음은 기존(겹침) 순서 유지, 6번째 이후는 뒤에 그대로", async () => {
+    const scores: Record<number, number> = { 180: 60, 150: 90, 120: 60 };
+    const byOverlap: Evaluator = async (u, i) => ({ ...(await live()(u, i)), data: { score: scores[i.overlapMinutes], reasons: ["x"], suggestedActivity: "카페" } });
+    const data = new MemoryData({ me: side, a: side, b: side, c: side, d: null, e: side, f: side });
+    const list = [cand("a", 180), cand("b", 150), cand("c", 120), cand("d", 100), cand("e", 90), cand("f", 60)];
+    const flaky: Evaluator = async (u, i) => { if (i.overlapMinutes === 90) throw new Error("x"); return byOverlap(u, i); };
+    const out = await addScores(data, flaky, "me", list, now);
+    expect(out.map((c) => c.candidateId)).toEqual(["b", "a", "c", "d", "e", "f"]);
+    expect(rankByScore([{ ...cand("x"), score: 0 }, cand("y")]).map((c) => c.candidateId)).toEqual(["x", "y"]);
+  });
+});
+
 describe("점수 마감 (#102 E 리뷰 1)", () => {
   it("마감까지 끝나지 않은 후보는 점수 없이, 끝난 후보는 점수와 함께 돌려준다", async () => {
     const slow: Evaluator = async (u, i) => {
@@ -109,7 +189,7 @@ describe("점수 마감 (#102 E 리뷰 1)", () => {
       return fixed(u, i);
     };
     const data = new MemoryData({ me: side, fast: side, slow: side });
-    const out = await addScores(data, slow, "me", [cand("fast"), cand("slow", 60)], 50);
+    const out = await addScores(data, slow, "me", [cand("fast"), cand("slow", 60)], Date.now(), 50);
     expect(out.map((c) => c.score)).toEqual([77, undefined]);
     expect(SCORE_DEADLINE_MS).toBeLessThan(30_000);
   });

@@ -9,10 +9,11 @@ import { text } from "./shared";
  * 앱이 직접 부르면 필수 조건 검사를 우회할 수 있으므로 index.ts 에 export 하지 않는다.
  * 팀 결정으로 Callable 이 필요해지면 index.ts 에서 createAiCallable(evaluateMatchTask) 한 줄로 열 수 있다
  * (그때는 authorize 에 적격성 재검사를 반드시 넣는다).
- * 점수는 추천 정렬용 내부 지표이며 성공 확률이 아니다. 캐시는 BT-028(A).
+ * 점수는 추천 정렬용 내부 지표이며 성공 확률이 아니다. 캐시는 BT-028 matchScores(A).
  */
 
-const SYSTEM_INSTRUCTION = [
+/** 바뀌면 matchScores 캐시가 자동으로 다시 평가된다(score.ts inputHash). */
+export const SYSTEM_INSTRUCTION = [
   "너는 대학생 공강 매칭 앱의 추천 평가기다. 두 학생은 이미 공강 겹침·목적 같은 필수 조건을 통과했다.",
   "입력 JSON 만 근거로 두 학생이 이번 공강을 함께 보내기 좋은 정도를 score(0~100 정수)로 평가한다.",
   "기준: 겹친 시간(길수록 유리), 공통 관심 태그, 함께 듣는 수업, 공강 전후 수업 건물이 같거나 가까운지, 목적과 자기소개의 어울림.",
