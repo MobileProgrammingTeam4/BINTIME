@@ -50,6 +50,11 @@ describe("toSide", () => {
     expect(toSide({ department: "경영학과", grade: "3학년", interestTags: ["#카페", "카페", "운동"], bio: " " }))
       .toEqual({ department: "경영학과", grade: 3, tags: ["카페", "운동"] });
   });
+  it("bio 의 이메일·전화번호·링크를 지우고, 연락처뿐이면 bio 생략", () => {
+    expect(toSide({ department: "경영학과", grade: "3", bio: "카페 좋아해요 010-1234-5678 a.b@kookmin.ac.kr https://x.io/y" })?.bio)
+      .toBe("카페 좋아해요");
+    expect(toSide({ department: "경영학과", grade: "3", bio: "01012345678" })).toEqual({ department: "경영학과", grade: 3, tags: [] });
+  });
   it("학과나 학년이 없으면 null", () => {
     expect(toSide({ department: "경영학과", grade: "" })).toBeNull();
     expect(toSide(undefined)).toBeNull();
