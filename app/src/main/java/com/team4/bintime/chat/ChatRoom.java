@@ -37,6 +37,8 @@ public final class ChatRoom {
     /** 학과·학년·성별 요약. 예: 컴퓨터공학과 3학년 · 여성. 실제 값은 publicProfiles 에서 받는다. */
     public final String otherInfo;
     public final boolean otherHasPhoto;
+    /** publicProfiles 의 Storage 사진 경로(BT-034). 없거나 Mock 이면 null 이고 기본 이미지를 쓴다. */
+    public final String otherPhotoPath;
     public final String lastMessage;
     public final long lastMessageAt;
     public final int unreadCount;
@@ -48,13 +50,14 @@ public final class ChatRoom {
              String otherInfo, boolean otherHasPhoto, String lastMessage, long lastMessageAt,
              int unreadCount, String recommendedPlace) {
         this(matchId, participantUids, status, meetingDate, startMinute, endMinute, chatReady, otherUid, otherName,
-                otherInfo, otherHasPhoto, lastMessage, lastMessageAt, unreadCount, recommendedPlace, Collections.emptyList(), false);
+                otherInfo, otherHasPhoto, lastMessage, lastMessageAt, unreadCount, recommendedPlace, Collections.emptyList(), false, null);
     }
 
     private ChatRoom(String matchId, List<String> participantUids, Status status, String meetingDate,
              int startMinute, int endMinute, boolean chatReady, String otherUid, String otherName,
              String otherInfo, boolean otherHasPhoto, String lastMessage, long lastMessageAt,
-             int unreadCount, String recommendedPlace, List<MatchAppointment> appointments, boolean archived) {
+             int unreadCount, String recommendedPlace, List<MatchAppointment> appointments, boolean archived,
+             String otherPhotoPath) {
         this.matchId = matchId;
         this.participantUids = participantUids;
         this.status = status;
@@ -72,12 +75,13 @@ public final class ChatRoom {
         this.recommendedPlace = recommendedPlace;
         this.appointments = Collections.unmodifiableList(new ArrayList<>(appointments));
         this.archived = archived;
+        this.otherPhotoPath = otherPhotoPath;
     }
 
     ChatRoom withLastMessage(String message, long at, int unread) {
         return new ChatRoom(matchId, participantUids, status, meetingDate, startMinute, endMinute,
                 chatReady, otherUid, otherName, otherInfo, otherHasPhoto, message, at, unread,
-                recommendedPlace, appointments, archived);
+                recommendedPlace, appointments, archived, otherPhotoPath);
     }
 
     ChatRoom withUnread(int unread) {
@@ -88,22 +92,27 @@ public final class ChatRoom {
     ChatRoom withStatus(Status newStatus) {
         return new ChatRoom(matchId, participantUids, newStatus, meetingDate, startMinute, endMinute,
                 chatReady, otherUid, otherName, otherInfo, otherHasPhoto, lastMessage, lastMessageAt,
-                unreadCount, recommendedPlace, appointments, archived);
+                unreadCount, recommendedPlace, appointments, archived, otherPhotoPath);
     }
 
     ChatRoom withAppointments(List<MatchAppointment> items, boolean archived) {
         Status aggregate = items.isEmpty() ? status : items.stream().anyMatch(a -> a.status == MatchAppointment.Status.ACTIVE) ? Status.ACTIVE : Status.ENDED;
         return new ChatRoom(matchId, participantUids, archived ? Status.ENDED : aggregate, meetingDate, startMinute, endMinute,
                 chatReady && !archived, otherUid, otherName, otherInfo, otherHasPhoto, lastMessage, lastMessageAt,
-                unreadCount, recommendedPlace, items, archived);
+                unreadCount, recommendedPlace, items, archived, otherPhotoPath);
     }
     ChatRoom withChatReady(boolean ready) {
         return new ChatRoom(matchId, participantUids, status, meetingDate, startMinute, endMinute,
                 ready && !archived, otherUid, otherName, otherInfo, otherHasPhoto, lastMessage, lastMessageAt,
-                unreadCount, recommendedPlace, appointments, archived);
+                unreadCount, recommendedPlace, appointments, archived, otherPhotoPath);
+    }
+    /** 상대 공개 프로필 사진 경로만 바꾼다(BT-034). */
+    ChatRoom withPartnerPhoto(String path) {
+        return new ChatRoom(matchId, participantUids, status, meetingDate, startMinute, endMinute, chatReady,
+                otherUid, otherName, otherInfo, otherHasPhoto, lastMessage, lastMessageAt, unreadCount, recommendedPlace, appointments, archived, path);
     }
     ChatRoom withDisplayAppointment(MatchAppointment item) {
         return new ChatRoom(matchId, participantUids, status, item.meetingDate, item.startMinute, item.endMinute, chatReady,
-                otherUid, otherName, otherInfo, otherHasPhoto, lastMessage, lastMessageAt, unreadCount, recommendedPlace, appointments, archived);
+                otherUid, otherName, otherInfo, otherHasPhoto, lastMessage, lastMessageAt, unreadCount, recommendedPlace, appointments, archived, otherPhotoPath);
     }
 }

@@ -85,7 +85,10 @@ export class ChatLinkService {
       for (const uid of participants) {
         const otherUid = participants.find(u => u !== uid)!;
         const entryResult = await this.rtdb.ref(`userChatRooms/${uid}/${roomId}`).transaction(current => {
-          if (current === null) return { otherUid, status: "ACTIVE", hidden: false, unreadCount: 0, lastMessage: "", lastMessageAt: 0, chatReady: false, archived: false };
+          // linkedAt(BT-034): 항목을 처음 만들 때 한 번만 함수 서버 시각으로 기록한다. 메시지 없는 새 방의 목록 정렬 기준이다.
+          // 재시도·기존 방 재사용은 아래 기존 항목 분기라 바꾸지 않는다.
+          if (current === null) return { otherUid, status: "ACTIVE", hidden: false, unreadCount: 0, lastMessage: "", lastMessageAt: 0,
+            linkedAt: this.now().getTime(), chatReady: false, archived: false };
           if (current.otherUid !== otherUid || current.hidden === true || current.archived === true) return undefined;
           return current; // 안읽음·최근 메시지·중복 처리 이력은 절대 초기화하지 않는다.
         });

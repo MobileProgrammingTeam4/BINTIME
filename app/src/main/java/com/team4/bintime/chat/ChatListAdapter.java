@@ -1,5 +1,6 @@
 package com.team4.bintime.chat;
 
+import android.graphics.Bitmap;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -10,6 +11,8 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.team4.bintime.R;
+import com.team4.bintime.profile.ProfileRepositories;
+import com.team4.bintime.profile.ProfileRepository;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,12 +34,32 @@ final class ChatListAdapter extends RecyclerView.Adapter<ChatListAdapter.Holder>
         notifyDataSetChanged();
     }
 
-    /** 사진이 있으면 사진, 없으면 이름을 표시한다. 목록과 말풍선이 함께 쓴다. */
+    /**
+     * 사진이 있으면 사진, 없으면 이름을 표시한다. 목록과 말풍선이 함께 쓴다.
+     * BT-034: 공개 프로필 사진 경로가 있으면 B 의 loadProfilePhoto(캐시·중복 요청 합치기)로 불러온다.
+     * 경로를 태그로 기억해 같은 경로는 다시 받지 않고, 재활용된 행에 다른 사람의 늦은 결과를 넣지 않는다.
+     * 실패하면 기본 이미지를 유지한다(재시도 루프 없음).
+     */
     static void bindAvatar(ImageView photo, TextView initials, ChatRoom room) {
         boolean hasPhoto = room == null || room.otherHasPhoto;
         photo.setVisibility(hasPhoto ? View.VISIBLE : View.GONE);
         initials.setVisibility(hasPhoto ? View.GONE : View.VISIBLE);
         if (!hasPhoto) initials.setText(room.otherName);
+        String path = hasPhoto && room != null ? room.otherPhotoPath : null;
+        if (path == null) {
+            if (photo.getTag() != null) photo.setImageResource(R.drawable.img_default_profile);
+            photo.setTag(null);
+            return;
+        }
+        if (path.equals(photo.getTag())) return;
+        photo.setTag(path);
+        photo.setImageResource(R.drawable.img_default_profile);
+        ProfileRepositories.get(photo.getContext()).loadProfilePhoto(path, new ProfileRepository.Callback<Bitmap>() {
+            @Override public void onSuccess(Bitmap bitmap) {
+                if (bitmap != null && path.equals(photo.getTag())) photo.setImageBitmap(bitmap);
+            }
+            @Override public void onError(String message) { /* 기본 이미지 유지 */ }
+        });
     }
 
     @NonNull

@@ -40,6 +40,32 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_DA
     await assertFails(getDoc(doc(client, "chatLinkJobs", first)));
     await assertFails(setDoc(doc(client, "chatRoomLinks", first), { chatReady: false }));
   });
+  it("linkedAt은 새 목록 항목을 만들 때 한 번만 기록하고 재시도·재사용·메시지 반영에도 바꾸지 않는다", async () => {
+    const createdAt = clock;
+    await linker().link(first);
+    for (const uid of ["u0", "u1"]) expect((await rtdb.ref(`userChatRooms/${uid}/${first}/linkedAt`).get()).val()).toBe(createdAt);
+    // 재시도(READY 이후 재호출)·작업 중단 뒤 재실행 모두 같은 값
+    clock += 60_000;
+    await linker().link(first, "u0");
+    await db.doc(`chatLinkJobs/${first}`).update({ status: "FAILED", nextAttemptAt: null });
+    await linker().link(first, "u1");
+    expect((await rtdb.ref(`userChatRooms/u0/${first}/linkedAt`).get()).val()).toBe(createdAt);
+    // 기존 방 재사용: 안읽음·최근 메시지 유지, linkedAt 그대로
+    await rtdb.ref(`userChatRooms/u1/${first}`).update({ unreadCount: 3, lastMessage: "기존 대화", lastMessageAt: createdAt + 1 });
+    clock += 60_000; await seed(second);
+    expect((await linker().link(second)).chatRoomId).toBe(first);
+    expect((await rtdb.ref(`userChatRooms/u1/${first}`).get()).val()).toMatchObject({ linkedAt: createdAt, unreadCount: 3, lastMessage: "기존 대화", lastMessageAt: createdAt + 1 });
+    // linkedAt은 서버 전용: 앱이 쓸 수 없다
+    await assertFails(env.authenticatedContext("u0").database().ref(`userChatRooms/u0/${first}/linkedAt`).set(0));
+  });
+  it("linkedAt 없는 기존 항목은 재연결해도 새로 만들지 않는다(필드 없는 방 호환)", async () => {
+    await linker().link(first);
+    await rtdb.ref(`userChatRooms/u0/${first}/linkedAt`).remove();
+    clock += 60_000; await seed(second);
+    await linker().link(second);
+    expect((await rtdb.ref(`userChatRooms/u0/${first}/linkedAt`).get()).exists()).toBe(false);
+    expect((await rtdb.ref(`userChatRooms/u0/${first}/otherUid`).get()).val()).toBe("u1");
+  });
   it("양측 잔류 방은 재사용하고 안읽음·메시지·과거 약속을 초기화하지 않는다", async () => {
     await linker().link(first); await db.doc(`matches/${first}`).update({ status: "ENDED" });
     await rtdb.ref(`chatRooms/${first}/messages/old`).set({ senderId: "u0", content: "기존 대화", createdAt: 1 });

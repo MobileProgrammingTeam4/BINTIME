@@ -3,7 +3,7 @@ import { evaluateMatch } from "../src/ai/internal";
 import { runAiTask } from "../src/ai/gateway";
 import { aiPingTask } from "../src/ai/tasks/aiPing";
 import { analyzeTimetableTask } from "../src/ai/tasks/analyzeTimetable";
-import { evaluateMatchTask } from "../src/ai/tasks/evaluateMatch";
+import { evaluateMatchTask, stripBuildings } from "../src/ai/tasks/evaluateMatch";
 import { DAILY_LIMIT, MIN_INTERVAL_MS, generateProfileTask, stripContacts } from "../src/ai/tasks/generateProfile";
 import { recommendPlaceTask } from "../src/ai/tasks/recommendPlace";
 import { suggestChatRepliesTask } from "../src/ai/tasks/suggestChatReplies";
@@ -121,6 +121,28 @@ describe("evaluateMatch (서버 내부)", () => {
 
   it("필수 최소 겹침 60분 미만은 INVALID_INPUT", async () => {
     await expectReason(evaluateMatch(me, { ...input, overlapMinutes: 59 }, makeDeps()), "INVALID_INPUT");
+  });
+
+  it("live 프롬프트는 입력 JSON 만 보내고 결정적(temperature 0)이다", async () => {
+    const ok = '{"score":82,"reasons":["공강이 길게 겹쳐요"],"suggestedActivity":"카페"}';
+    const deps = makeDeps({ mode: "live", steps: [{ text: ok }] });
+    const res = await evaluateMatch(me, input, deps);
+    expect(res.data.score).toBe(82);
+    const call = deps.client.calls[0];
+    expect(call.temperature).toBe(0);
+    expect(JSON.parse(call.contents as string)).toMatchObject({ overlapMinutes: input.overlapMinutes });
+    expect(call.contents as string).not.toContain(me);
+    expect(call.systemInstruction).toContain("건물 이름을 쓰지 않는다");
+    expect(call.systemInstruction).toContain("commonCourses 에 있는 것만");
+  });
+
+  it("건물 이름이 들어간 이유는 빼고, 활동은 일반 문구로 바꾸고, 다 빠지면 형식 오류 (#102 리뷰)", () => {
+    const out = { score: 80, reasons: ["둘 다 미래관에서 수업이 끝나요", "관심사가 비슷해요"], suggestedActivity: "미래관 카페" };
+    expect(stripBuildings(out, ["미래관"])).toEqual({ score: 80, reasons: ["관심사가 비슷해요"], suggestedActivity: "가까운 곳에서 함께 공강 보내기" });
+    expect(stripBuildings(out, [])).toEqual(out);
+    expect(() => stripBuildings({ ...out, reasons: ["미래관 근처예요"] }, ["미래관"])).toThrow();
+    const verified = evaluateMatchTask.verify!(out, { ...input, searcher: { ...input.searcher, nearbyBuildings: [] }, candidate: { ...input.candidate, nearbyBuildings: ["미래관"] } } as never, makeDeps());
+    expect(verified.reasons).toEqual(["관심사가 비슷해요"]);
   });
 
   it("범위 밖 점수는 형식 오류", async () => {

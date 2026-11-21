@@ -141,6 +141,7 @@ notifications/{uid}/items/{notificationId}
 reviews/{reviewId}
 reports/{reportId}
 aiUsage/{uid}_{YYYY-MM-DD}
+matchScores/{searcherUid}_{candidateUid}
 
 Realtime Database
 chatRooms/{chatRoomId}/members/{uid}
@@ -157,15 +158,18 @@ userChatRooms/{uid}/{chatRoomId}
 | `availability` | 선택 원본을 병합한 60분 이상 슬롯과 `sourceRevision`. 검색(`searchMatches`)은 revision 일치·30분 경계·병합 후 60분 이상만 확인하고, 요청 생성(`createMatchRequest`)이 원본·수업 비겹침·revision을 다시 검증 |
 | `matchSettings` | `isMatching`, `minOverlapMinutes`(60·90·120·150·180), `purposes`(빈 목록 = 전체, 최대 5), `preferredTags`(`#` 없이, 최대 20), `updatedAt`(서버 시간). 본인만 읽기·쓰기, 다른 사용자는 검색 서버만 읽음. 계약은 `docs/BT-017.md` |
 | 매칭 검색 계약 | `searchMatches()`(입력 없음): 토큰 UID·학교 이메일 확인 → 지금/가장 가까운 내 공강 하나 기준으로 양측 ON·검색자 최소 겹침·목적 AND·양방향 차단을 판정. 결과 `MATCHING_OFF`/`NO_FREE_SLOT`/`OK{reference, candidates}`, 후보는 `candidateId`(= 상대 UID)와 겹침·목적만 반환. availability는 revision 일치·30분 경계·병합 후 60분 이상만 사용. 계약은 `docs/BT-017.md` |
+| AI 매칭률 계약 | BT-027: `searchMatches`가 필수 조건 통과 후보 중 겹침 상위 5명에게만 서버 내부 `evaluateMatch`를 호출해 `score`(0~100)·`reasons`·`suggestedActivity`를 선택 필드로 붙임. 입력은 공개 프로필 요약·수업 건물(호실 제외)·공통 과목·겹침·목적(이름·UID·시간표 원본 금지), 이유 문장에 건물 이름 금지(서버 `verify`가 건물명 문장 제거)·수업 이름은 공통 과목만. 점수 붙이기는 15초 마감, 늦은 후보는 점수 없음. 앱은 점수 없음을 `NO_SCORE`(-1)로 두고 0점과 구분. AI 실패 후보는 필드 없음, 검색은 계속. 정렬·캐시는 BT-028. 계약은 `docs/BT-027.md` |
+| AI 추천순·점수 캐시 | BT-028: 점수가 붙은 상위 5명은 점수 높은 순, 동점·점수 없음은 겹침 순 유지, 6번째부터는 겹침 순. 같은 AI 입력(목적·30분 단위 겹침·양쪽 프로필·수업 건물·공통 과목)·프롬프트·모델·캐시 버전의 해시가 같으면 24시간 동안 `matchScores` 캐시를 쓰고, 입력이 바뀌거나 만료되면 다시 평가. Mock 점수는 저장 안 함. 계약은 `docs/BT-028.md` |
 | `matchRequests` | `fromUid`, `toUid`, `status`, `meetingDate`, `startMinute`, `endMinute`, `overlapMinutes` 등 **시간 스냅샷** |
 | 요청 생성 계약 | `createMatchRequest({candidateId, clientRequestId})`: 상대 UID와 재시도 UUID만 입력. 검색자가 선택한 최소 겹침, 프로필·차단·시간표·확정 매칭 충돌을 같은 서버 트랜잭션에서 검증. 같은 방향 PENDING 중복은 서버 전용 `matchRequestGuards`로 막음. 계약은 `docs/BT-019.md` |
 | 요청 목록·취소 계약 | UID별 발신/수신 Firestore 리스너, `cancelMatchRequest(requestId)`, 두 복합 인덱스와 검증 범위는 `docs/BT-020.md`를 따릅니다. |
 | 요청 수락·제한 계약 | `respondToMatchRequest({requestId, action})`, action은 `ACCEPTED` 또는 `REJECTED`. 토큰 수신자만 처리. 보낸 유효 PENDING 3개·받은 5개, 직접 취소 후 신규 신청 60초 제한·역방향 차단. 기존 초과 요청 보존, UUID 재시도와 자동 취소는 제한을 새로 만들지 않음. 서버 전용 `requestUserGuards/{uid}`는 사용자 단위 경합과 cooldownUntil을 보호. 상세는 `docs/BT-031.md` |
 | `matches` | `participantUids`, `requestId`, `status`, `meetingDate`, `startMinute`, `endMinute`, `chatReady` 등 **확정 스냅샷** |
 | `chatRooms` | 실제 방 키는 `chatRoomId`, 개별 약속 `matchId`와 구분. Rules는 `database.rules.json`: 멤버만 메시지 읽기·새 쓰기(`senderId === auth.uid`, 서버 시각, 본문 1~1000자), `members` 쓰기와 `control {chatReady,writable,archived}` 읽기·쓰기는 서버 전용. Rules는 control을 내부 참조하며 앱은 직접 읽지 않음. `writable=false` 또는 `archived=true`면 전송 거부. 계약은 `docs/BT-021.md`·`docs/BT-034.md` |
-| `userChatRooms` | `userChatRooms/{uid}/{chatRoomId}`의 본인 목록/안읽음·방 단위 `chatReady/archived/hidden/status`. 앱은 본인 읽기 및 `unreadCount=0`만 쓰기 가능. 나머지는 서버 전용이며 표시 상태는 이 값과 참여자용 `chatRoomLinks`를 사용 |
+| `userChatRooms` | `userChatRooms/{uid}/{chatRoomId}`의 본인 목록/안읽음·방 단위 `chatReady/archived/hidden/status`·`linkedAt`(항목을 처음 만든 서버 시각, 메시지 없는 방의 정렬 기준). 앱은 본인 읽기 및 `unreadCount=0`만 쓰기 가능. 나머지는 서버 전용이며 표시 상태는 이 값과 참여자용 `chatRoomLinks`를 사용 |
 | `reviews` / `reports` | 참여·공개/작성 권한, 개인정보 최소 수집 |
 | `aiUsage` | BT-024 Gemini 게이트웨이의 사용자별 하루 호출 수(`uid`, `date`, `counts.{task}`, `lastCalledAtMs.{task}`, `total`, `updatedAt`). 날짜는 `Asia/Seoul`. **서버 전용**: Admin SDK만 쓰고 Rules는 앱 읽기·쓰기 모두 거부. 계약은 `docs/BT-024.md` |
+| `matchScores` | BT-028 AI 점수 캐시(`searcherUid`, `candidateUid`, `inputHash`, `score`, `reasons`, `suggestedActivity`, `expiresAt`, `updatedAt`). **서버 전용**: Rules에 규칙이 없어 앱 읽기·쓰기 모두 거부. 계약은 `docs/BT-028.md` |
 
 시간 규칙:
 

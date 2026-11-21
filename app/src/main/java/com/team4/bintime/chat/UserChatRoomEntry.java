@@ -17,6 +17,8 @@ final class UserChatRoomEntry {
     final boolean archived;
     /** null은 BT-033 이전의 필드 없는 방이다. 명시적 false는 매칭 문서보다 우선한다. */
     final Boolean chatReady;
+    /** BT-034: 항목을 처음 만든 서버 시각(ms). 필드가 없는 이전 방은 0 */
+    final long linkedAt;
 
     UserChatRoomEntry(String matchId, String otherUid, String lastMessage, long lastMessageAt,
                       int unreadCount, ChatRoom.Status status, boolean hidden) {
@@ -28,6 +30,11 @@ final class UserChatRoomEntry {
     }
     UserChatRoomEntry(String matchId, String otherUid, String lastMessage, long lastMessageAt,
                       int unreadCount, ChatRoom.Status status, boolean hidden, boolean archived, Boolean chatReady) {
+        this(matchId, otherUid, lastMessage, lastMessageAt, unreadCount, status, hidden, archived, chatReady, 0L);
+    }
+    UserChatRoomEntry(String matchId, String otherUid, String lastMessage, long lastMessageAt,
+                      int unreadCount, ChatRoom.Status status, boolean hidden, boolean archived, Boolean chatReady,
+                      long linkedAt) {
         this.matchId = matchId;
         this.otherUid = otherUid;
         this.lastMessage = lastMessage;
@@ -37,5 +44,6 @@ final class UserChatRoomEntry {
         this.hidden = hidden;
         this.archived = archived;
         this.chatReady = chatReady;
+        this.linkedAt = linkedAt;
     }
 }

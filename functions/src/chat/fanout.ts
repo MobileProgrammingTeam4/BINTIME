@@ -1,7 +1,7 @@
 /**
  * E · BT-022 새 메시지 → userChatRooms 갱신(서버 전용). 경로·필드는 docs/BT-021.md.
  *   chatRooms/{matchId}/messages/{messageId}: { senderId, content, createdAt }
- *   userChatRooms/{uid}/{matchId}: { otherUid, lastMessage, lastMessageAt, lastMessageId, recentMessageIds, unreadCount, status, hidden }
+ *   userChatRooms/{uid}/{chatRoomId}: { otherUid, lastMessage, lastMessageAt, lastMessageId, recentMessageIds, unreadCount, status, hidden, linkedAt, chatReady, archived }
  *
  * 앱은 Rules 때문에 userChatRooms 를 쓸 수 없으므로(본인 unreadCount = 0 제외) 이 트리거가
  * 두 멤버의 마지막 메시지와 상대의 안읽음 수를 갱신한다. Admin SDK 는 Rules 를 우회하므로 여기서 멤버를 직접 확인한다.
@@ -114,7 +114,7 @@ export interface RootRef {
 
 export type FanoutResult = "applied" | "invalid-message" | "not-member";
 
-/** 트리거 본문. 멤버마다 별도 트랜잭션이라 한쪽 실패가 다른 쪽을 되돌리지 않는다(재전송 시 lastMessageId 로 멱등). */
+/** 트리거 본문. 멤버마다 별도 트랜잭션이라 한쪽 실패가 다른 쪽을 되돌리지 않는다(재전송 시 멤버별 recentMessageIds 로 멱등). */
 export async function fanOutMessage(root: RootRef, matchId: string, messageId: string,
   value: unknown): Promise<FanoutResult> {
   const message = parseMessage(value);

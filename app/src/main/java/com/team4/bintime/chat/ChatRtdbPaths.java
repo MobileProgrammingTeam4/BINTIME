@@ -29,6 +29,8 @@ final class ChatRtdbPaths {
     static final String UNREAD_COUNT = "unreadCount";
     static final String STATUS = "status";
     static final String HIDDEN = "hidden";
+    /** BT-034: 목록 항목을 처음 만든 서버 시각(ms). 메시지 없는 방의 정렬 기준. 없는 이전 방은 0 */
+    static final String LINKED_AT = "linkedAt";
 
     /** 메시지 본문 최대 길이. database.rules.json 의 검증 값과 같아야 한다. */
     static final int MAX_CONTENT_LENGTH = 1000;

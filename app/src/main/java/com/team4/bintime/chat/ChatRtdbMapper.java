@@ -48,6 +48,7 @@ final class ChatRtdbMapper {
         String lastMessage = string(map.get(ChatRtdbPaths.LAST_MESSAGE));
         Long lastMessageAt = positiveLong(map.get(ChatRtdbPaths.LAST_MESSAGE_AT));
         Long unread = nonNegativeLong(map.get(ChatRtdbPaths.UNREAD_COUNT));
+        Long linkedAt = positiveLong(map.get(ChatRtdbPaths.LINKED_AT));
         Object hidden = map.get(ChatRtdbPaths.HIDDEN);
         return new UserChatRoomEntry(matchId, otherUid,
                 lastMessage == null ? "" : lastMessage,
@@ -55,19 +56,26 @@ final class ChatRtdbMapper {
                 unread == null ? 0 : (int) Math.min(unread, Integer.MAX_VALUE),
                 status,
                 Boolean.TRUE.equals(hidden), Boolean.TRUE.equals(map.get("archived")),
-                map.containsKey("chatReady") ? Boolean.TRUE.equals(map.get("chatReady")) : null);
+                map.containsKey("chatReady") ? Boolean.TRUE.equals(map.get("chatReady")) : null,
+                linkedAt == null ? 0L : linkedAt);
     }
 
     /**
-     * 목록에 보일 항목만 최근 메시지 순으로. 나간 방(hidden)은 뺀다.
-     * 메시지가 없는 방은 뒤로 보내고, 시각이 같으면 matchId 로 순서를 고정한다.
+     * 목록에 보일 항목만 최근 순으로. 나간 방(hidden)은 뺀다.
+     * 정렬 시각은 {@link #sortTime}: 메시지가 있으면 lastMessageAt, 없으면 방을 만든 linkedAt(BT-034).
+     * 둘 다 없는 이전 방은 맨 뒤로 가고, 시각이 같으면 방 키로 순서를 고정한다.
      */
     static List<UserChatRoomEntry> visibleRooms(List<UserChatRoomEntry> entries) {
         List<UserChatRoomEntry> visible = new ArrayList<>();
         for (UserChatRoomEntry entry : entries) if (!entry.hidden) visible.add(entry);
-        visible.sort(Comparator.<UserChatRoomEntry>comparingLong(e -> e.lastMessageAt).reversed()
+        visible.sort(Comparator.<UserChatRoomEntry>comparingLong(e -> sortTime(e.lastMessageAt, e.linkedAt)).reversed()
                 .thenComparing(e -> e.matchId));
         return visible;
+    }
+
+    /** 목록 정렬 시각. 메시지가 있으면(lastMessageAt > 0) 그 시각, 없으면 linkedAt(없으면 0). Mock 도 같은 규칙을 쓴다. */
+    static long sortTime(long lastMessageAt, long linkedAt) {
+        return lastMessageAt > 0 ? lastMessageAt : Math.max(0L, linkedAt);
     }
 
     /**
@@ -92,7 +100,8 @@ final class ChatRtdbMapper {
                 samePartner ? partner.info : null,
                 samePartner && partner.hasPhoto,
                 entry.lastMessage, entry.lastMessageAt, entry.unreadCount,
-                null /* recommendedPlace: BT-042 */).withAppointments(match == null ? Collections.emptyList() : match.appointments, entry.archived);
+                null /* recommendedPlace: BT-042 */).withAppointments(match == null ? Collections.emptyList() : match.appointments, entry.archived)
+                .withPartnerPhoto(samePartner ? partner.photoPath : null);
     }
 
     @Nullable

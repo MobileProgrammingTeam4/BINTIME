@@ -47,6 +47,8 @@ public final class RequestTabsController {
     private RequestRepository.Registration registration;
     private final Consumer<Intent> openAccepted;
     private final RequestProfileLoader profiles;
+    /** 완료 카드의 채팅방 준비 응답이 늦게 오면, 그 사이 탭을 바꿨을 때 이동하지 않게 한다(#114 리뷰). */
+    private final TabVisit visit = new TabVisit();
 
     public RequestTabsController(Fragment fragment, View root, RequestRepository repository,
                                  Consumer<Intent> openAccepted) {
@@ -75,6 +77,7 @@ public final class RequestTabsController {
 
     public void show(MockRequestRepository.Tab selected) {
         tab = selected;
+        visit.changed();
         root.setVisibility(View.VISIBLE);
         render();
     }
@@ -153,7 +156,8 @@ public final class RequestTabsController {
             secondary.setText(ended ? R.string.request_review : R.string.request_chat);
             secondary.setOnClickListener(v -> {
                 if (ended) Toast.makeText(v.getContext(), R.string.request_review_pending, Toast.LENGTH_SHORT).show();
-                else MatchChatNavigator.open((MainActivity) fragment.requireActivity(), item.id, v);
+                else MatchChatNavigator.open((MainActivity) fragment.requireActivity(), item.id, v,
+                        visit.current(() -> root.isShown() && canShowFeedback()));
             });
         } else if (item.sent) {
             secondary.setText(R.string.request_cancel);

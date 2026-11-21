@@ -94,6 +94,20 @@ public class MockChatRepositoryTest {
     }
 
     @Test
+    public void newlyConnectedRoomWithoutMessages_isListedFirstByLinkedAt() {
+        com.team4.bintime.request.RequestRepository.Item item = new com.team4.bintime.request.RequestRepository.Item(
+                "new-match", "mock-me", "uid-new", "mock-me", "스터디", "2026-10-07", 840, 930,
+                com.team4.bintime.request.RequestRepository.Status.ACCEPTED,
+                com.team4.bintime.request.RequestRepository.MatchStatus.ACTIVE, 0);
+        repository.connectMatchForDemo(item);
+        repository.connectMatchForDemo(item); // 다시 연결해도 방·연결 시각이 늘거나 바뀌지 않는다
+        List<ChatRoom> rooms = freshRooms();
+        assertEquals("new-match", rooms.get(0).matchId);
+        assertEquals(0L, rooms.get(0).lastMessageAt);
+        assertEquals(5, rooms.size());
+    }
+
+    @Test
     public void rooms_areSortedByLatestMessage_andFilterByStatus() {
         List<ChatRoom> rooms = liveRooms.last;
         assertEquals(4, rooms.size());
