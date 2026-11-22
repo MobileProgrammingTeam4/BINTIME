@@ -26,7 +26,8 @@ import java.io.InputStream;
  *   <li>원본 형식·크기·헤더 해상도를 디코딩 전에 {@link #inspect}로 검사한다. 디코딩 실패도 검사한다.</li>
  *   <li>긴 변을 {@link #MAX_SIDE}px로 줄이고 다시 인코딩한다. EXIF 방향은 픽셀에 반영하고, 위치 등 EXIF
  *       메타데이터는 남기지 않는다(프로필 사진 압축기와 같은 방식, 글자 판독을 위해 해상도만 크게).</li>
- *   <li>결과가 {@link TimetableImagePaths#MAX_UPLOAD_BYTES} 미만이 될 때까지 품질을 {@link #QUALITIES} 순서로
+ *   <li>결과가 한 장 상한(장수별 {@link TimetableImageValidator#uploadLimit}, 최대
+ *       {@link TimetableImagePaths#MAX_UPLOAD_BYTES}) 미만이 될 때까지 품질을 {@link #QUALITIES} 순서로
  *       낮춘다. 그래도 넘으면 {@link Code#COMPRESSED_TOO_LARGE}.</li>
  * </ul>
  * 디코딩이 무거우므로 UI 스레드가 아닌 곳에서 부른다. URI·파일명·이미지 내용을 로그에 남기지 않는다.
@@ -105,7 +106,7 @@ final class TimetableImageCompressor {
      * 업로드용 JPEG를 만든다. 선택 시 검사({@link #inspect})를 다시 통과해야만 디코딩한다(그 사이 파일이 바뀌었거나
      * 검사를 거치지 않은 호출 방어).
      */
-    static Result prepare(ContentResolver resolver, Uri uri) {
+    static Result prepare(ContentResolver resolver, Uri uri, long limitExclusive) {
         Code inspected = inspect(resolver, uri);
         if (inspected != null) return Result.fail(inspected);
         Bitmap bitmap = null;
@@ -125,7 +126,7 @@ final class TimetableImageCompressor {
                 ByteArrayOutputStream out = new ByteArrayOutputStream();
                 if (!source.compress(Bitmap.CompressFormat.JPEG, quality, out)) return null;
                 return out.toByteArray();
-            }, TimetableImagePaths.MAX_UPLOAD_BYTES);
+            }, Math.min(limitExclusive, TimetableImagePaths.MAX_UPLOAD_BYTES));
             if (jpeg == null) return Result.fail(Code.COMPRESSED_TOO_LARGE);
             return Result.ok(jpeg);
         } catch (FileNotFoundException | SecurityException e) {

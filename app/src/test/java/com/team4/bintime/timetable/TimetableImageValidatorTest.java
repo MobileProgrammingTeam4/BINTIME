@@ -3,6 +3,7 @@ package com.team4.bintime.timetable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import com.team4.bintime.R;
 import com.team4.bintime.data.repository.TimetableImageFailure.Code;
@@ -64,6 +65,32 @@ public class TimetableImageValidatorTest {
         assertEquals(Code.COMPRESSED_TOO_LARGE, TimetableImageValidator.checkUploadSize(new byte[limit]));
         assertEquals(Code.CORRUPT, TimetableImageValidator.checkUploadSize(new byte[0]));
         assertEquals(Code.CORRUPT, TimetableImageValidator.checkUploadSize(null));
+    }
+
+    @Test
+    public void uploadLimit_perCount_keepsTotalWithinServerLimit() {
+        long mib = 1024L * 1024;
+        assertEquals(5 * mib, TimetableImageValidator.uploadLimit(1));
+        assertEquals(5 * mib, TimetableImageValidator.uploadLimit(2));
+        assertEquals(14 * mib / 3, TimetableImageValidator.uploadLimit(3));
+        assertEquals(14 * mib / 4, TimetableImageValidator.uploadLimit(4));
+        assertEquals(14 * mib / 5, TimetableImageValidator.uploadLimit(5));
+        // 범위 밖이면 가장 엄격한 5장 기준
+        assertEquals(14 * mib / 5, TimetableImageValidator.uploadLimit(0));
+        assertEquals(14 * mib / 5, TimetableImageValidator.uploadLimit(6));
+        for (int n = 1; n <= 5; n++) {
+            assertTrue(n * (TimetableImageValidator.uploadLimit(n) - 1) <= TimetableImageValidator.MAX_TOTAL_UPLOAD_BYTES);
+        }
+    }
+
+    @Test
+    public void qualityLoop_usesGivenLimit_andFailsBelowQuality40() throws IOException {
+        long limit = TimetableImageValidator.uploadLimit(5);
+        // 품질 60에서 처음으로 상한 미만
+        byte[] fits = TimetableImageCompressor.encodeUnderLimit(q -> new byte[q > 60 ? (int) limit : (int) limit - 1], limit);
+        assertEquals(limit - 1, fits.length);
+        // 품질 40에서도 상한 이상 → null(→ COMPRESSED_TOO_LARGE)
+        assertNull(TimetableImageCompressor.encodeUnderLimit(q -> new byte[(int) limit], limit));
     }
 
     @Test

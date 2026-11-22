@@ -33,7 +33,7 @@ public final class MockTimetableRecognitionRepository implements TimetableRecogn
     @Override
     public Registration analyze(List<String> imagePaths, Callback callback) {
         calls++;
-        RecognitionFailure failure = check(imagePaths);
+        RecognitionFailure failure = check(currentUid == null ? null : currentUid.get(), imagePaths);
         if (failure == null && nextFailure != null) {
             failure = nextFailure;
             nextFailure = null;
@@ -51,8 +51,8 @@ public final class MockTimetableRecognitionRepository implements TimetableRecogn
         return () -> { };
     }
 
-    private RecognitionFailure check(List<String> paths) {
-        String uid = currentUid == null ? null : currentUid.get();
+    /** 서버 입력 검사·authorize 와 같은 규칙. 통과하면 null. Firebase 구현도 호출 전에 쓴다. */
+    static RecognitionFailure check(String uid, List<String> paths) {
         if (uid == null) return RecognitionFailure.of(RecognitionFailure.Reason.UNAUTHENTICATED);
         if (paths == null || paths.isEmpty() || paths.size() > TimetableImagePaths.MAX_IMAGES) {
             return RecognitionFailure.of(RecognitionFailure.Reason.INVALID_INPUT);

@@ -36,9 +36,12 @@ final class TimetableUploadController<K> {
         TimetableImageFailure.Code inspect(K image);
     }
 
-    /** 업로드용 JPEG 준비(검사 + 압축). background 스레드에서 불린다. */
+    /**
+     * 업로드용 JPEG 준비(검사 + 압축). background 스레드에서 불린다. limitExclusive 는 장수로 정한 한 장 상한
+     * ({@link TimetableImageValidator#uploadLimit}).
+     */
     interface Preparer<K> {
-        TimetableImageCompressor.Result prepare(K image);
+        TimetableImageCompressor.Result prepare(K image, long limitExclusive);
     }
 
     interface Listener {
@@ -185,7 +188,9 @@ final class TimetableUploadController<K> {
         }
         List<K> frozen = Collections.unmodifiableList(selection());
         inFlight = frozen;
-        uploader.start(frozen.size(), index -> preparer.prepare(frozen.get(index)));
+        // 장수는 여기서 확정된다(업로드 중에는 선택을 바꿀 수 없다). 합계가 서버 상한을 넘지 않게 한 장 상한을 정한다.
+        long limit = TimetableImageValidator.uploadLimit(frozen.size());
+        uploader.start(frozen.size(), index -> preparer.prepare(frozen.get(index), limit));
         return AnalyzeResult.STARTED;
     }
 
@@ -194,6 +199,16 @@ final class TimetableUploadController<K> {
         if (!recognitionPending || recognition == null) return null;
         recognitionPending = false;
         return recognition;
+    }
+
+    /**
+     * [BT-026] 검수가 끝났다(저장했거나 검수 화면을 떠났다). 인식에 성공한 묶음이면 이미지를 지운다
+     * ({@code deleteBatch}). 다시 검수를 열어도 저장해 둔 인식 결과를 쓰므로 이미지는 더 필요 없다.
+     * 인식 실패(다시 시도 대기)·인식 전에는 지우지 않는다. 이미 지웠으면 아무것도 하지 않는다.
+     */
+    void onReviewFinished() {
+        if (recognition == null || recognizing) return;
+        uploader.deleteUploadedBatch();
     }
 
     /** analyzeTimetable 에 넘긴(넘길) 경로. UPLOADED가 아니면 빈 목록. */
