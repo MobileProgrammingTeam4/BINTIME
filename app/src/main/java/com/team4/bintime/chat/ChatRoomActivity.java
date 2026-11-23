@@ -170,6 +170,8 @@ public class ChatRoomActivity extends AppCompatActivity {
         super.onResume();
         if (matchId == null) return;
         repository.markRead(matchId);
+        // 오프라인·권한 오류로 끊긴 매칭 시간 구독이 있으면 복귀할 때 한 번만 다시 연다(BT-035). 없으면 아무 일도 없다.
+        repository.retryFailedSources();
         // 후기 화면에서 돌아오면 배너 문구(남기기 → 보기)를 다시 맞춘다.
         refreshReviewStatus();
         if (room != null) bindRoom();
@@ -320,7 +322,8 @@ public class ChatRoomActivity extends AppCompatActivity {
         setAiButtonEnabled(replyRequest == null);
         findViewById(R.id.chatAiRow).setVisibility(room.archived ? View.GONE : View.VISIBLE);
         // 매칭 스냅샷(matches/{matchId})을 아직 못 받으면 확정 시간이 없다(BT-034 연결 전·문서 생성 전). 시간 카드를 숨긴다.
-        boolean hasMatchTime = room.meetingDate != null && (room.appointments.isEmpty() || MatchAppointmentPolicy.representative(room.appointments, repository.nowMillis()) != null);
+        // 종료 시각이 지났는데 서버가 아직 ACTIVE 로 둔 구간도 카드를 유지한다(ChatAppointmentDisplay, BT-035).
+        boolean hasMatchTime = room.meetingDate != null && (room.appointments.isEmpty() || ChatAppointmentDisplay.pick(room.appointments, repository.nowMillis()) != null);
         findViewById(R.id.chatMatchInfo).setVisibility(active && hasMatchTime ? View.VISIBLE : View.GONE);
         findViewById(R.id.chatEndedBanner).setVisibility(active ? View.GONE : View.VISIBLE);
         renderBody();
@@ -330,7 +333,8 @@ public class ChatRoomActivity extends AppCompatActivity {
 
     private void bindMatchInfo() {
         long now = repository.nowMillis();
-        MatchAppointment appointment = MatchAppointmentPolicy.representative(room.appointments, now);
+        // 서버 종료 지연 구간이면 마지막으로 끝난 약속이 오고, remaining 은 음수를 막아 0:00:00 이 된다.
+        MatchAppointment appointment = ChatAppointmentDisplay.pick(room.appointments, now);
         ChatRoom display = appointment == null ? room : room.withDisplayAppointment(appointment);
         String time = ChatTimeFormatter.timeRange(display, now, getString(R.string.chat_today), getString(R.string.chat_yesterday));
         int additional = MatchAppointmentPolicy.additionalCount(room.appointments, now);

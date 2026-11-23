@@ -53,15 +53,14 @@ final class FirebaseChatRepository implements ChatRepository {
     private final Set<String> sending = new HashSet<>();
     /** 구독으로 알게 된 내 방별 unreadCount. markRead 의 불필요한 쓰기를 줄인다. */
     private final Map<String, Integer> knownUnread = new HashMap<>();
+    /** 구독 중인 목록·방의 결합기. 복귀 시 끊긴 매칭 구독을 다시 열 때 쓴다(메인 스레드 전용). */
+    private final Set<ChatRoomsCombiner> liveCombiners = new HashSet<>();
     @Nullable private final DatabaseReference connectedRef;
     @Nullable private final DatabaseReference serverTimeRef;
-    private long serverTimeOffset;
+    private final ServerClock serverClock = new ServerClock();
     private final ValueEventListener serverTimeListener = new ValueEventListener() {
-        @Override public void onDataChange(@NonNull DataSnapshot snapshot) {
-            Object value = snapshot.getValue();
-            if (value instanceof Number) serverTimeOffset = ((Number) value).longValue();
-        }
-        @Override public void onCancelled(@NonNull DatabaseError error) { serverTimeOffset = 0; }
+        @Override public void onDataChange(@NonNull DataSnapshot snapshot) { serverClock.onOffset(snapshot.getValue()); }
+        @Override public void onCancelled(@NonNull DatabaseError error) { serverClock.onCancelled(); }
     };
     private final ValueEventListener connectedListener = new ValueEventListener() {
         @Override
@@ -95,13 +94,20 @@ final class FirebaseChatRepository implements ChatRepository {
     public String currentUid() {
         return uid;
     }
-    @Override public long nowMillis() { return System.currentTimeMillis() + serverTimeOffset; }
+    @Override public long nowMillis() { return serverClock.nowMillis(); }
+
+    @Override
+    public void retryFailedSources() {
+        // 다시 연 구독의 콜백에서 화면이 구독을 해제하면(liveCombiners 에서 빠짐) 집합이 바뀌므로 복사본을 돈다.
+        for (ChatRoomsCombiner combiner : new ArrayList<>(liveCombiners)) combiner.retryFailedMatches();
+    }
 
     @Override
     public Registration observeRooms(Listener<List<ChatRoom>> listener) {
         if (!ready()) return failNow(listener);
         ChatRoomsCombiner combiner = new ChatRoomsCombiner(uid, fallbackName, matches, partners,
                 listener::onData);
+        liveCombiners.add(combiner);
         DatabaseReference ref = database.getReference(ChatRtdbPaths.userChatRooms(uid));
         return listen(ref, new SnapshotHandler() {
             @Override
@@ -126,6 +132,7 @@ final class FirebaseChatRepository implements ChatRepository {
 
             @Override
             public void onRelease() {
+                liveCombiners.remove(combiner);
                 combiner.release();
             }
         });
@@ -139,6 +146,7 @@ final class FirebaseChatRepository implements ChatRepository {
             if (rooms.isEmpty()) listener.onError();
             else listener.onData(rooms.get(0));
         });
+        liveCombiners.add(combiner);
         DatabaseReference ref = database.getReference(ChatRtdbPaths.userChatRooms(uid)).child(matchId);
         return listen(ref, new SnapshotHandler() {
             @Override
@@ -157,6 +165,7 @@ final class FirebaseChatRepository implements ChatRepository {
 
             @Override
             public void onRelease() {
+                liveCombiners.remove(combiner);
                 combiner.release();
             }
         });

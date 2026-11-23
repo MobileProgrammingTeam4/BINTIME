@@ -136,6 +136,31 @@ public class AppointmentSelectionDeviceTest {
             screenshot("07-reviews-complete");
         }
     }
+    /** BT-035 결정 A: 종료 시각이 지났는데 서버가 아직 ACTIVE 로 두면 마지막 약속 카드와 0:00:00 을 보여 준다. */
+    @Test public void overdueActiveKeepsLastCardWithZeroRemaining() throws Exception {
+        String yesterday = LocalDate.now(ZoneId.of("Asia/Seoul")).minusDays(1).toString();
+        List<MatchAppointment> overdue = Arrays.asList(
+                new MatchAppointment("overdue-early-qa", "match-jimin", yesterday, 540, 600, "스터디", MatchAppointment.Status.ACTIVE, null, false),
+                new MatchAppointment("overdue-late-qa", "match-jimin", yesterday, 600, 690, "스터디", MatchAppointment.Status.ACTIVE, null, false),
+                new MatchAppointment("ended-later-qa", "match-jimin", yesterday, 900, 960, "스터디", MatchAppointment.Status.ENDED, true, false));
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> MockChatRepository.shared().setAppointmentsForDemo("match-jimin", overdue, false));
+        try (ActivityScenario<ChatRoomActivity> scenario = ActivityScenario.launch(ChatRoomActivity.intent(context, "match-jimin"))) {
+            showWindow(scenario);
+            scenario.onActivity(activity -> assertOverdueCard(activity));
+            screenshot("08-overdue-zero-remaining");
+            Thread.sleep(1500); // 1초 갱신을 지나도 카드가 사라지거나 음수로 바뀌지 않는다
+            scenario.onActivity(activity -> assertOverdueCard(activity));
+            scenario.recreate(); idle(); // 회전·재생성 뒤에도 같은 표시
+            scenario.onActivity(activity -> assertOverdueCard(activity));
+        }
+    }
+    private static void assertOverdueCard(ChatRoomActivity activity) {
+        assertTrue(activity.findViewById(R.id.chatMatchInfo).isShown());
+        assertFalse("서버가 ENDED 로 바꾸기 전에는 종료 배너를 띄우지 않는다", activity.findViewById(R.id.chatEndedBanner).isShown());
+        assertEquals(activity.getString(R.string.chat_yesterday) + " 10:00 ~ 11:30", ((TextView) activity.findViewById(R.id.chatMatchTime)).getText().toString());
+        assertEquals(activity.getString(R.string.chat_remaining, "0:00:00"), ((TextView) activity.findViewById(R.id.chatMatchRemaining)).getText().toString());
+        assertTrue("지연 구간에도 입력은 그대로", activity.findViewById(R.id.chatInput).isEnabled());
+    }
     private static void writeReview(String id) {
         com.team4.bintime.review.MockReviewRepository.shared().submitReview(id, "u1", com.team4.bintime.review.Satisfaction.GREAT,
                 java.util.Collections.emptySet(), null, new com.team4.bintime.review.ReviewRepository.SubmitCallback() {
