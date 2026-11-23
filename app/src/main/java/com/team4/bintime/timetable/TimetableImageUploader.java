@@ -40,6 +40,8 @@ final class TimetableImageUploader {
 
     private TimetableImageRepository.Registration upload;
     private List<String> uploadedPaths = Collections.emptyList();
+    /** uploadedPaths 의 묶음. 경로가 없으면 null. */
+    private String uploadedBatchId;
     private TimetableUploadState state = TimetableUploadState.idle();
 
     TimetableImageUploader(TimetableImageRepository repository, Executor background, Executor main,
@@ -105,6 +107,19 @@ final class TimetableImageUploader {
         });
     }
 
+    /**
+     * [BT-026] 올린 묶음을 {@code deleteBatch}로 지우고 경로를 잊는다(상태는 그대로). 인식이 성공해 이미지가 더 필요
+     * 없을 때 부른다. 실패는 저장소가 코드만 로그로 남기고(콜백 없음) 사용자에게 알리지 않는다. 남은 파일은 버킷
+     * Lifecycle(1일)이 정리한다. 경로를 잊으므로 뒤의 {@link #discard}가 같은 이미지를 다시 지우지 않는다.
+     */
+    void deleteUploadedBatch() {
+        if (uploadedPaths.isEmpty() || uploadedBatchId == null) return;
+        String batchId = uploadedBatchId;
+        uploadedPaths = Collections.emptyList();
+        uploadedBatchId = null;
+        repository.deleteBatch(batchId, null);
+    }
+
     /** 진행 중인 작업을 취소하고 올린 이미지를 지운 뒤 IDLE로 돌아간다. 선택 변경·화면 종료 시 부른다. */
     void discard() {
         generation.incrementAndGet();
@@ -143,6 +158,7 @@ final class TimetableImageUploader {
                         upload = null;
                         uploadedPaths = paths == null ? Collections.emptyList()
                                 : Collections.unmodifiableList(new ArrayList<>(paths));
+                        uploadedBatchId = uploadedPaths.isEmpty() ? null : batchId;
                         emit(TimetableUploadState.uploaded(uploadedPaths));
                     }
 
@@ -167,6 +183,7 @@ final class TimetableImageUploader {
         if (!uploadedPaths.isEmpty()) {
             repository.deleteImages(uploadedPaths, null);
             uploadedPaths = Collections.emptyList();
+            uploadedBatchId = null;
         }
     }
 

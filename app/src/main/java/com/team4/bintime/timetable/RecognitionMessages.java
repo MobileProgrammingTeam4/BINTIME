@@ -37,6 +37,7 @@ final class RecognitionMessages {
             case NETWORK:
                 return R.string.timetable_recognition_error_network;
             case INVALID_INPUT:
+                return R.string.timetable_recognition_error_invalid_input;
             case INTERNAL:
             default:
                 return R.string.timetable_recognition_error_internal;

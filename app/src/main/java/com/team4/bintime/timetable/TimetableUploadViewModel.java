@@ -45,7 +45,7 @@ public class TimetableUploadViewModel extends ViewModel {
         if (controller != null) return;
         controller = new TimetableUploadController<>(repository, recognizer, background, mainHandler::post,
                 uri -> TimetableImageCompressor.inspect(resolver, uri),
-                uri -> TimetableImageCompressor.prepare(resolver, uri),
+                (uri, limit) -> TimetableImageCompressor.prepare(resolver, uri, limit),
                 screen::setValue);
     }
 
@@ -75,6 +75,11 @@ public class TimetableUploadViewModel extends ViewModel {
     /** 검수로 넘어갈 차례면 인식 결과를 한 번만 돌려준다. 아니면 null. */
     RecognitionResult takeRecognition() {
         return controller == null ? null : controller.takeRecognition();
+    }
+
+    /** 검수 화면이 끝나면(저장·뒤로) 인식에 쓴 이미지를 지운다. */
+    void onReviewFinished() {
+        if (controller != null) controller.onReviewFinished();
     }
 
     /** analyzeTimetable 에 넘긴 경로. UPLOADED가 아니면 빈 목록. */
