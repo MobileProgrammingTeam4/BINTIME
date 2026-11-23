@@ -96,6 +96,23 @@ public class ChatRoomsCombinerTest {
     }
 
     @Test
+    public void recoveredOnSameSubscriptionIsNotRetried() {
+        // 출처의 검증 실패(100건 초과·해석 실패)는 리스너가 살아 있어 같은 구독으로 정상 값이 다시 온다.
+        combiner.update(Collections.singletonList(entry("m1", "u-m1", 100L, false)));
+        matches.push("m1", info("m1", "2026-11-20"));
+        matches.fail("m1");
+        assertNull(last().get(0).meetingDate);
+        matches.push("m1", info("m1", "2026-11-21"));
+        assertEquals("같은 구독에서 복구", "2026-11-21", last().get(0).meetingDate);
+
+        int before = emitted.size();
+        combiner.retryFailedMatches();
+        assertEquals("복구된 구독은 다시 열지 않는다", 1, count(matches.subscribed, "m1"));
+        assertTrue("복구된 구독은 해제하지 않는다", matches.released.isEmpty());
+        assertEquals("다시 그리지 않는다", before, emitted.size());
+    }
+
+    @Test
     public void retryWithoutFailureDoesNothing() {
         combiner.update(Collections.singletonList(entry("m1", "u-m1", 100L, false)));
         matches.push("m1", info("m1", "2026-11-20"));

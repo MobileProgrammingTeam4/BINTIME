@@ -31,7 +31,10 @@ final class ChatRoomsCombiner {
     private static final class Subscription {
         ChatRepository.Registration registration;
         boolean active = true;
-        /** onError 를 받았는지. Firestore·RTDB 는 오류 뒤 같은 리스너를 다시 부르지 않는다. */
+        /**
+         * 마지막 콜백이 onError 인지. SDK 오류는 리스너가 끊겨 다시 오지 않지만, 출처의 검증 실패
+         * (예: matches 100건 초과·해석 실패)는 리스너가 살아 있어 이후 정상 데이터가 오면 해제한다.
+         */
         boolean failed;
 
         void cancel() {
@@ -128,6 +131,7 @@ final class ChatRoomsCombiner {
             @Override
             public void onData(T data) {
                 if (released || !sub.active) return;
+                sub.failed = false; // 같은 구독이 정상으로 돌아왔으면 복귀 시 다시 열지 않는다
                 if (data == null) store.remove(key);
                 else store.put(key, data);
                 emit();
