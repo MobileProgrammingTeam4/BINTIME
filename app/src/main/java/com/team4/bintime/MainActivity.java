@@ -100,6 +100,7 @@ public class MainActivity extends AppCompatActivity {
         });
         getOnBackPressedDispatcher().addCallback(this, backToMatching);
         if (savedInstanceState == null) showTab(R.id.nav_matching);
+        com.team4.bintime.notification.NotificationNavigator.fromIntent(this, getIntent());
     }
 
     /** BT-030(B): 다시 보일 때 로그인이 끊겼으면 온보딩으로, 보이는 동안 끊기면 바로 온보딩으로. */
@@ -110,6 +111,7 @@ public class MainActivity extends AppCompatActivity {
         super.onStart();
         if (SessionGuard.redirectIfSignedOut(this)) return;
         sessionWatch = SessionGuard.watch(this);
+        com.team4.bintime.notification.NotificationDevices.register(getApplicationContext());
     }
 
     @Override
@@ -131,6 +133,17 @@ public class MainActivity extends AppCompatActivity {
     /** 다른 화면에서 탭 이동이 필요할 때 사용 (예: 매칭 → 시간표). */
     public void selectTab(@IdRes int tabId) {
         bottomNav.setSelectedItemId(tabId);
+    }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent); setIntent(intent);
+        com.team4.bintime.notification.NotificationNavigator.fromIntent(this, intent);
+    }
+    public void openRequestTab(RequestRepository.Tab tab) {
+        selectTab(R.id.nav_matching);
+        getSupportFragmentManager().executePendingTransactions();
+        Fragment fragment = getSupportFragmentManager().findFragmentByTag("tab_" + R.id.nav_matching);
+        if (fragment instanceof MatchingFragment) ((MatchingFragment) fragment).openRequestTab(tab);
     }
 
     private void showTab(@IdRes int tabId) {

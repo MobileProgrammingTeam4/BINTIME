@@ -14,6 +14,10 @@ import { createSearchCallable } from "./matching/callable";
 import { createMessageTrigger } from "./chat/trigger";
 import { createRequestMaintenanceSchedule } from "./requests/scheduled";
 import { createChatLinkCallable, createChatLinkTrigger } from "./chat/linkCallable";
+export { notificationOnRequestCreated, notificationOnMatchChanged, notificationOnReviewCreated,
+  notificationOnMessageCreated, notificationOnPushQueued, notificationOnAvailabilityChanged,
+  notificationOnTimetableChanged, notificationOnSettingsChanged, notificationOnUserChanged, maintainNotifications,
+  registerNotificationDevice } from "./notification/functions";
 
 /** D · BT-019 요청 생성. */
 export const createMatchRequest = createRequestCallable();

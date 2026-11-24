@@ -301,6 +301,20 @@
         }
       ],
       "queryScope": "COLLECTION"
+    },
+    {
+      "collectionGroup": "notificationPushJobs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nextAttemptAt",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

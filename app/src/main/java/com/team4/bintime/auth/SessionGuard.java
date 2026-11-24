@@ -59,6 +59,7 @@ public final class SessionGuard {
      */
     public static void signOutByUser(Activity activity) {
         userSignOutInProgress = true;
+        com.team4.bintime.notification.NotificationDevices.clearVisible(activity);
         ProfileRepositories.get(activity).clearSessionCaches();
         AuthRepositories.get(activity).signOut();
         Intent intent = new Intent(activity, OnboardingActivity.class)

@@ -59,6 +59,7 @@
 ### 요청·채팅·종료
 
 - 요청 상태: `PENDING`, `ACCEPTED`, `REJECTED`, `CANCELED`.
+- BT-039 알림·기기 토큰·공강 시작 이벤트는 `docs/BT-039.md`를 따른다. 토큰/전송 작업은 서버 전용이고 앱 알림의 생성·수신자 변경은 허용하지 않는다.
 - BT-032 상충/만료 정리는 `docs/BT-032.md`를 따른다. `matchCleanupJobs`는 서버 전용이며 자동 정리는 직접 취소 cooldown을 변경하지 않는다. 5분 주기 예약 코드와 실제 운영 활성화를 구분한다.
 - 매칭 상태: `ACTIVE`, `ENDED`.
 - BT-033부터 개별 matchId와 실제 chatRoomId를 구분합니다. 서버 전용 chatPairs/chatLinkJobs, 현재 참여자 읽기 전용 chatRoomLinks 및 방의 archived/writable 계약은 `docs/BT-034.md`를 따릅니다. 여러 약속의 대표·종료/후기 선택과 비활성 MessageComposer는 `docs/BT-035.md`의 제공 컴포넌트를 재사용합니다.

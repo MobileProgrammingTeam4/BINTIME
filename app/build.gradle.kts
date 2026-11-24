@@ -50,6 +50,7 @@ dependencies {
     implementation(libs.firebase.storage)
     implementation(libs.firebase.database)
     implementation(libs.firebase.functions)
+    implementation(libs.firebase.messaging)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.junit)
