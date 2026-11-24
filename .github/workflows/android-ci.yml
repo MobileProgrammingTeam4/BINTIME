@@ -60,10 +60,3 @@ jobs:
         run: |
           cd "$PROJECT_DIR"
           bash ./gradlew --no-daemon assembleDebug testDebugUnitTest lintDebug
-      - name: Upload debug APK (if built)
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: bintime-debug-apk
-          path: '**/build/outputs/apk/debug/*.apk'
-          if-no-files-found: warn
