@@ -19,6 +19,12 @@ export { notificationOnRequestCreated, notificationOnMatchChanged, notificationO
   notificationOnTimetableChanged, notificationOnSettingsChanged, notificationOnUserChanged, maintainNotifications,
   registerNotificationDevice } from "./notification/functions";
 
+import { createEndMatchCallable, createMatchEndSchedule } from "./requests/endCallable";
+
+/** D · BT-038. Only participants end a match; server time drives automatic ending. */
+export const endMatch = createEndMatchCallable();
+export const maintainMatches = createMatchEndSchedule();
+
 /** D · BT-019 요청 생성. */
 export const createMatchRequest = createRequestCallable();
 /** D · BT-020. 발신자 본인의 PENDING 요청만 취소한다. */
