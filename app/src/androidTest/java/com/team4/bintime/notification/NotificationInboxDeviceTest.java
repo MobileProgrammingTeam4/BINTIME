@@ -33,14 +33,16 @@ import static org.junit.Assert.*;
 @RunWith(AndroidJUnit4.class)
 public class NotificationInboxDeviceTest {
     private static final String PROJECT = "demo-bintime";
-    private Context context;
-    private String uid;
-    private FirebaseFirestore db;
+    Context context;
+    String uid;
+    FirebaseFirestore db;
     @Before public void localOnly() throws Exception {
         context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         for (FirebaseApp app : new ArrayList<>(FirebaseApp.getApps(context))) app.delete();
+        // Syntactically valid placeholder required by the SDK, not a Google-issued credential.
+        String emulatorPlaceholder = "AIza" + new String(new char[35]).replace('\0', '0');
         FirebaseApp.initializeApp(context, new FirebaseOptions.Builder().setProjectId(PROJECT)
-                .setApiKey("AIzaSyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA").setApplicationId("1:123456789:android:abcdef1234567890").build());
+                .setApiKey(emulatorPlaceholder).setApplicationId("1:123456789:android:abcdef1234567890").build());
         FirebaseAuth auth = FirebaseAuth.getInstance(); auth.useEmulator("10.0.2.2", 9099);
         uid = Tasks.await(auth.signInAnonymously(), 25, TimeUnit.SECONDS).getUser().getUid();
         db = FirebaseFirestore.getInstance();
@@ -48,8 +50,8 @@ public class NotificationInboxDeviceTest {
         FirebaseFunctions.getInstance("asia-northeast3").useEmulator("10.0.2.2", 5001);
         seed("users/" + uid, new JSONObject().put("nickname", text("로컬 검증")));
     }
-    private static JSONObject text(String s) throws Exception { return new JSONObject().put("stringValue", s); }
-    private void seed(String path, JSONObject fields) throws Exception {
+    static JSONObject text(String s) throws Exception { return new JSONObject().put("stringValue", s); }
+    void seed(String path, JSONObject fields) throws Exception {
         // Owner token is accepted only by the explicitly addressed local emulator.
         HttpURLConnection conn = (HttpURLConnection) new URL("http://10.0.2.2:8080/v1/projects/" + PROJECT + "/databases/(default)/documents/" + path).openConnection();
         conn.setRequestMethod("PATCH"); conn.setRequestProperty("Authorization", "Bearer owner");

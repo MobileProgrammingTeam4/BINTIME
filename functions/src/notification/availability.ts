@@ -37,8 +37,8 @@ export class AvailabilityReminders {
     const jobs = await this.db.collection("availabilityNotificationJobs").where("dueAt", "<=", Timestamp.fromDate(now)).limit(20).get();
     for (const job of jobs.docs) {
       const due = (job.get("dueAt") as Timestamp).toMillis();
-      // Stale events after a prolonged outage are not advertised as a newly starting slot.
-      if (now.getTime() - due <= 120_000) {
+      // Inbox keeps the original start time even after an outage; push expires after two minutes.
+      {
         const emitted = await this.db.runTransaction(async tx => {
           const [current, availability, timetable] = await Promise.all([tx.get(job.ref),
             tx.get(this.db.doc(`availability/${job.id}`)), tx.get(this.db.doc(`timetables/${job.id}`))]);
@@ -47,7 +47,7 @@ export class AvailabilityReminders {
           return parseSlots(availability.data(), timetable.data()).some(s => s.dayOfWeek === day.dayOfWeek && s.startMinute === day.minute);
         });
         if (emitted) await this.notices.emit(job.id, `availability:${job.get("meetingDate")}:${job.get("startMinute")}`,
-          { type: "availability", targetId: job.get("meetingDate") });
+          { type: "availability", targetId: job.get("meetingDate") }, { occurredAt: due, pushUntil: due + 120_000 });
       }
       await this.refresh(job.id, Math.max(now.getTime(), due + 1));
     }

@@ -16,14 +16,15 @@ export class NotificationService {
   constructor(private readonly db: Firestore, private readonly messaging: Pick<Messaging, "sendEachForMulticast">,
     private readonly now: () => Date = () => new Date()) {}
 
-  async emit(uid: string, source: string, notice: Notice) {
+  async emit(uid: string, source: string, notice: Notice, delivery?: { occurredAt: number; pushUntil: number }) {
     const id = eventKey(`${uid}:${source}`), ref = this.db.doc(`notifications/${uid}/items/${id}`);
     await this.db.runTransaction(async tx => {
       const [old, user] = await Promise.all([tx.get(ref), tx.get(this.db.doc(`users/${uid}`))]);
       if (old.exists || !user.exists) return;
-      tx.create(ref, { ...notice, title: noticeTitle[notice.type], createdAt: Timestamp.fromDate(this.now()), readAt: null });
+      tx.create(ref, { ...notice, title: noticeTitle[notice.type], createdAt: delivery ? Timestamp.fromMillis(delivery.occurredAt) : Timestamp.fromDate(this.now()), readAt: null });
       tx.create(this.db.doc(`notificationPushJobs/${id}`), { uid, notificationId: id, status: "PENDING", attempts: 0,
-        nextAttemptAt: Timestamp.fromDate(this.now()), createdAt: Timestamp.fromDate(this.now()) });
+        nextAttemptAt: Timestamp.fromDate(this.now()), createdAt: Timestamp.fromDate(this.now()),
+        ...(delivery ? { expiresAt: Timestamp.fromMillis(delivery.pushUntil) } : {}) });
     });
     return id;
   }
@@ -34,24 +35,29 @@ export class NotificationService {
       const job = await tx.get(ref);
       if (!job.exists || !["PENDING", "SENDING"].includes(job.get("status"))) return null;
       const now = this.now(), next = job.get("nextAttemptAt");
+      const expiresAt = job.get("expiresAt");
+      if (expiresAt instanceof Timestamp && now.getTime() > expiresAt.toMillis()) { tx.update(ref, { status: "SKIPPED", nextAttemptAt: null }); return null; }
       if (next instanceof Timestamp && next.toMillis() > now.getTime()) return null;
       const attempts = Number(job.get("attempts") || 0);
       if (attempts >= 3) { tx.update(ref, { status: "FAILED", nextAttemptAt: null }); return null; }
       tx.update(ref, { status: "SENDING", attempts: attempts + 1, nextAttemptAt: Timestamp.fromMillis(now.getTime() + 120_000) });
-      return { uid: job.get("uid") as string, id: job.get("notificationId") as string };
+      return { uid: job.get("uid") as string, id: job.get("notificationId") as string,
+        expiresAt: expiresAt instanceof Timestamp ? expiresAt.toMillis() : null };
     });
     if (!claim) return;
     try {
       const [notice, preferences, devices] = await Promise.all([this.db.doc(`notifications/${claim.uid}/items/${claim.id}`).get(),
         this.db.doc(`notificationSettings/${claim.uid}`).get(), this.db.collection("notificationDevices").where("uid", "==", claim.uid).limit(10).get()]);
       const type = notice.get("type") as NotificationKind;
+      if (!notice.exists || !KINDS.includes(type)) { await ref.update({ status: "SKIPPED", nextAttemptAt: null }); return; }
       const enabled = preferences.get(type) ?? DEFAULT_SETTINGS[type];
-      if (!notice.exists || !KINDS.includes(type) || !enabled || notice.get("readAt") != null || devices.empty) {
+      if (!notice.exists || !KINDS.includes(type) || !enabled || notice.get("readAt") != null || devices.empty
+          || (claim.expiresAt !== null && this.now().getTime() > claim.expiresAt)) {
         await ref.update({ status: "SKIPPED", nextAttemptAt: null }); return;
       }
       const message: MulticastMessage = { tokens: devices.docs.map(d => d.get("token")), data: { recipientUid: claim.uid,
         notificationId: claim.id, type, targetId: notice.get("targetId") || "", title: noticeTitle[type] },
-        android: { priority: "high", ttl: 300_000, collapseKey: claim.id } };
+        android: { priority: "high", ttl: claim.expiresAt === null ? 300_000 : Math.max(0, Math.min(300_000, claim.expiresAt - this.now().getTime())), collapseKey: claim.id } };
       // Generic data-only payload: the client checks current UID before displaying anything.
       const response = await this.messaging.sendEachForMulticast(message);
       let transient = false;

@@ -95,9 +95,18 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)("BT-039 inbox, routing, FC
     await reminders().refresh("a"); clock += 60_000; await reminders().runBatch(); await service().retryBatch();
     expect((await db.collection("notifications/a/items").get()).size).toBe(1); expect(send).not.toHaveBeenCalled();
   });
-  it("an outage does not deliver an old slot as newly starting", async () => {
+  it("an outage preserves the original inbox time but skips the expired push", async () => {
     await seedAvailability(); await reminders().refresh("a"); clock += 10 * 60_000; await reminders().runBatch();
-    expect((await db.collection("notifications/a/items").get()).empty).toBe(true);
+    const notices = await db.collection("notifications/a/items").get(); expect(notices.size).toBe(1);
+    expect(notices.docs[0].get("createdAt").toMillis()).toBe(Date.parse("2026-11-24T10:00:00+09:00"));
+    await service().retryBatch(); expect(send).not.toHaveBeenCalled();
     expect((await db.doc("availabilityNotificationJobs/a").get()).get("dueAt")).toBeInstanceOf(Timestamp);
+  });
+  it("a failed free-slot push expires during retries at the same original deadline", async () => {
+    await seedAvailability(); await db.doc("notificationDevices/first").set({ uid: "a", token: "token_a" });
+    await reminders().refresh("a"); clock += 60_000; await reminders().runBatch();
+    send.mockRejectedValueOnce(new Error("temporary")); await service().retryBatch();
+    clock += 120_001; await service().retryBatch(); expect(send).toHaveBeenCalledTimes(1);
+    expect((await db.collection("notifications/a/items").get()).size).toBe(1);
   });
 });
