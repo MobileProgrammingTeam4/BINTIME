@@ -27,6 +27,7 @@ public final class BinTimeMessagingService extends FirebaseMessagingService {
         NotificationManager manager = getSystemService(NotificationManager.class);
         manager.createNotificationChannel(new NotificationChannel("bintime_events", "매칭 및 대화 알림", NotificationManager.IMPORTANCE_DEFAULT));
         Intent intent = new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .setData(new android.net.Uri.Builder().scheme("bintime-notification").authority("inbox").appendPath(uid).appendPath(id).build())
                 .putExtra("notificationId", id).putExtra("notificationUid", uid);
         PendingIntent pending = PendingIntent.getActivity(this, id.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         manager.notify(id, 0, new NotificationCompat.Builder(this, "bintime_events").setSmallIcon(R.drawable.ic_nav_chat)
