@@ -28,6 +28,7 @@ final class FirebaseRequestPopupController {
     private RequestRepository.Registration registration;
     private com.google.firebase.firestore.ListenerRegistration preferences;
     private boolean sending, binding, active, todaySaving, lastSuppressed;
+    private int generation;
     private String serverDate = "", suppressedDate = "";
     FirebaseRequestPopupController(DialogFragment fragment, View root, String id) {
         this.fragment = fragment; this.root = root; this.id = id;
@@ -47,18 +48,21 @@ final class FirebaseRequestPopupController {
             if (binding) return;
             todaySaving = true; today.setEnabled(false);
             settings.set("suppressToday", checked, saved -> {
+                // Complete in-flight state even while the dialog is stopped, so resuming can recover.
+                todaySaving = false;
                 if (!visible()) return;
-                todaySaving = false; today.setEnabled(true);
-                if (!saved) { binding = true; today.setChecked(lastSuppressed); binding = false; Toast.makeText(root.getContext(), "설정을 저장하지 못했어요", Toast.LENGTH_SHORT).show(); }
+                if (saved) refreshServerDate();
+                else { bindToday(); Toast.makeText(root.getContext(), "설정을 저장하지 못했어요", Toast.LENGTH_SHORT).show(); }
             });
         });
         render();
     }
     private void loadProfile() {
+        int visit = generation;
         RequestRepository.Item item = requests.find(id);
         if (item != null) ProfileRepositories.get(root.getContext()).getPublicProfile(item.profileUid, new ProfileRepository.Callback<UserProfile>() {
             @Override public void onSuccess(UserProfile profile) {
-                if (!visible() || profile == null) return;
+                if (visit != generation || !visible() || profile == null) return;
                 int grade = profile.getGrade() != null && profile.getGrade().matches("[1-4]학년") ? profile.getGrade().charAt(0) - '0' : 0;
                 MatchCandidate candidate = new MatchCandidate(item.profileUid, profile.getNickname(), profile.getDepartment(), grade,
                         profile.getGender(), MatchCandidate.NO_SCORE, "", minute(item.startMinute), minute(item.endMinute), item.purpose,
@@ -69,7 +73,7 @@ final class FirebaseRequestPopupController {
                 if (profile.getPhotoPath() != null && !profile.getPhotoPath().isEmpty())
                     ProfileRepositories.get(root.getContext()).loadProfilePhoto(profile.getPhotoPath(), new ProfileRepository.Callback<android.graphics.Bitmap>() {
                         @Override public void onSuccess(android.graphics.Bitmap bitmap) {
-                            if (visible() && bitmap != null) ((android.widget.ImageView) root.findViewById(R.id.popupProfilePhoto)).setImageBitmap(bitmap);
+                            if (visit == generation && visible() && bitmap != null) ((android.widget.ImageView) root.findViewById(R.id.popupProfilePhoto)).setImageBitmap(bitmap);
                         }
                         @Override public void onError(String message) { /* existing default profile remains */ }
                     });
@@ -82,17 +86,21 @@ final class FirebaseRequestPopupController {
         });
     }
     void start() {
+        int visit = ++generation;
         active = true; loadProfile();
-        serverDate = "";
-        settings.serverToday(date -> { if (visible()) { serverDate = date; bindToday(); } });
+        refreshServerDate();
         registration = requests.observe(() -> { if (visible()) render(); });
         preferences = settings.observe(new NotificationSettingsRepository.Listener() {
             @Override public void onData(NotificationSettingsRepository.Snapshot snapshot) {
-                if (!visible()) return;
+                if (visit != generation || !visible()) return;
                 suppressedDate = snapshot.suppressedDate(); bindToday();
             }
-            @Override public void onError() { if (visible()) root.findViewById(R.id.popupToday).setEnabled(false); }
+            @Override public void onError() { if (visit == generation && visible()) root.findViewById(R.id.popupToday).setEnabled(false); }
         });
+    }
+    private void refreshServerDate() {
+        int visit = generation; serverDate = ""; bindToday();
+        settings.serverToday(date -> { if (visit == generation && visible()) { serverDate = date; bindToday(); } });
     }
     private boolean visible() { return active && fragment.isAdded() && fragment.getDialog() != null && fragment.getDialog().isShowing() && settings.current(); }
     private void bindToday() {
@@ -120,15 +128,17 @@ final class FirebaseRequestPopupController {
         sending = true; render();
         requests.respond(id, status, new RequestRepository.Callback() {
             @Override public void onSuccess(RequestRepository.Item item) {
+                sending = false;
                 if (!visible()) return;
                 if (status == RequestRepository.Status.ACCEPTED) fragment.startActivity(MatchAcceptedActivity.intent(root.getContext(), item));
                 fragment.dismissAllowingStateLoss();
             }
             @Override public void onError(String message) {
+                sending = false;
                 if (!visible()) return;
-                sending = false; render(); Toast.makeText(root.getContext(), message, Toast.LENGTH_SHORT).show();
+                render(); Toast.makeText(root.getContext(), message, Toast.LENGTH_SHORT).show();
             }
         });
     }
-    void close() { active = false; if (registration != null) registration.remove(); if (preferences != null) preferences.remove(); registration = null; preferences = null; }
+    void close() { active = false; generation++; if (registration != null) registration.remove(); if (preferences != null) preferences.remove(); registration = null; preferences = null; }
 }

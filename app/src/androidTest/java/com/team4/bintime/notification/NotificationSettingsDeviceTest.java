@@ -70,6 +70,31 @@ public class NotificationSettingsDeviceTest {
                 RequestPopupNavigator.open(a,id);
                 RequestPopupNavigator.open(a,id); // repeated taps must still create one popup
             });Thread.sleep(1500);capture(local,"02-popup-local");
+            // Force onStop before the async save callback can return to the main thread.
+            // The same dialog must recover after completion while it is stopped.
+            for(int i=0;i<60;i++){final boolean[] ready={false};scenario.onActivity(a->{
+                androidx.fragment.app.Fragment matching=a.getSupportFragmentManager().findFragmentByTag("tab_"+R.id.nav_matching);
+                androidx.fragment.app.DialogFragment popup=(androidx.fragment.app.DialogFragment)matching.getChildFragmentManager().findFragmentByTag(MatchRequestDialog.RESULT);
+                ready[0]=popup.requireDialog().findViewById(R.id.popupToday).isEnabled();});if(ready[0])break;Thread.sleep(250);}
+            scenario.onActivity(a->{
+                androidx.fragment.app.Fragment matching=a.getSupportFragmentManager().findFragmentByTag("tab_"+R.id.nav_matching);
+                androidx.fragment.app.DialogFragment popup=(androidx.fragment.app.DialogFragment)matching.getChildFragmentManager().findFragmentByTag(MatchRequestDialog.RESULT);
+                android.widget.CheckBox today=popup.requireDialog().findViewById(R.id.popupToday);
+                assertTrue(today.isEnabled());assertTrue(today.isChecked());today.performClick();popup.onStop();
+            });
+            for(int i=0;i<60;i++){if("".equals(Tasks.await(local.db.document("notificationSettings/"+local.uid).get(),5,TimeUnit.SECONDS).getString("suppressedDate")))break;Thread.sleep(250);}
+            Thread.sleep(1500);InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+            scenario.onActivity(a->{
+                androidx.fragment.app.Fragment matching=a.getSupportFragmentManager().findFragmentByTag("tab_"+R.id.nav_matching);
+                ((androidx.fragment.app.DialogFragment)matching.getChildFragmentManager().findFragmentByTag(MatchRequestDialog.RESULT)).onStart();
+            });
+            boolean recovered=false;
+            for(int i=0;i<60;i++){final boolean[] ready={false};scenario.onActivity(a->{
+                androidx.fragment.app.Fragment matching=a.getSupportFragmentManager().findFragmentByTag("tab_"+R.id.nav_matching);
+                androidx.fragment.app.DialogFragment popup=(androidx.fragment.app.DialogFragment)matching.getChildFragmentManager().findFragmentByTag(MatchRequestDialog.RESULT);
+                android.widget.CheckBox today=popup.requireDialog().findViewById(R.id.popupToday);
+                ready[0]=today.isEnabled()&&!today.isChecked();});if(ready[0]){recovered=true;break;}Thread.sleep(250);}
+            assertTrue("stopped save callback must release the checkbox when the popup resumes",recovered);
             scenario.onActivity(a->{androidx.fragment.app.Fragment matching=a.getSupportFragmentManager().findFragmentByTag("tab_"+R.id.nav_matching);
                 androidx.fragment.app.DialogFragment popup=(androidx.fragment.app.DialogFragment)matching.getChildFragmentManager().findFragmentByTag(MatchRequestDialog.RESULT);
                 assertNotNull(popup);assertTrue(popup.requireDialog().findViewById(R.id.popupReject).isEnabled());
