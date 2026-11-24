@@ -1,10 +1,12 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import type { Database } from "firebase-admin/database";
 import { Timestamp, type Firestore } from "firebase-admin/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
+import { chatPairKey } from "./pair";
+import { RoomStateService } from "./roomState";
+export { chatPairKey } from "./pair";
 
 /** BT-043도 같은 pair 문서에서 pendingMatchId와 미종료 약속을 확인해야 한다. */
-export const chatPairKey = (uids: readonly string[]) => createHash("sha256").update(JSON.stringify([...uids].sort())).digest("hex");
 const failure = (reason: string, details: Record<string, unknown> = {}) => new HttpsError("failed-precondition", "채팅방을 준비하지 못했어요. 잠시 후 다시 시도해주세요.", { reason, ...details });
 
 interface Plan { roomId: string; previousRoomId: string | null; archive: boolean }
@@ -34,6 +36,10 @@ export class ChatLinkService {
       }
       const owner = pair.get("pendingMatchId");
       if (owner && owner !== matchId) throw failure("CHAT_PAIR_BUSY", { blockingMatchId: owner });
+      const stateLease = pair.get("roomStateLeaseUntil");
+      if (stateLease instanceof Timestamp && stateLease.toMillis() > this.now().getTime()) {
+        throw failure("CHAT_RETRY_LATER", { retryAfterMillis: stateLease.toMillis() - this.now().getTime() });
+      }
       const lease = job.get("leaseUntil");
       if (lease instanceof Timestamp && lease.toMillis() > this.now().getTime()) throw failure("CHAT_LINK_BUSY", { retryAfterMillis: lease.toMillis() - this.now().getTime() });
       const nextAttempt = job.get("nextAttemptAt");
@@ -98,7 +104,6 @@ export class ChatLinkService {
         [`chatRooms/${roomId}/control/writable`]: true };
       for (const uid of participants) {
         patch[`userChatRooms/${uid}/${roomId}/chatReady`] = true;
-        patch[`userChatRooms/${uid}/${roomId}/status`] = "ACTIVE";
       }
       await this.rtdb.ref().update(patch);
       await this.db.runTransaction(async tx => {
@@ -111,7 +116,11 @@ export class ChatLinkService {
         tx.update(matchRef, { chatRoomId: roomId, chatReady: true, updatedAt });
         tx.set(jobRef, { status: "READY", roomId, workerId: null, leaseUntil: null, nextAttemptAt: null, updatedAt }, { merge: true });
         tx.set(pairRef, { roomId, pendingMatchId: null }, { merge: true });
+        tx.set(this.db.doc(`roomStateJobs/${roomId}`), { roomId, participantUids: participants,
+          status: "PENDING", nextAttemptAt: updatedAt }, { merge: true });
       });
+      // A match may have ended while its chat was being prepared. Aggregate current matches, not a hardcoded ACTIVE.
+      try { await new RoomStateService(this.db, this.rtdb, this.now).sync(roomId, participants); } catch { /* scheduler repairs */ }
       return { matchId, chatRoomId: roomId, chatReady: true };
     } catch (error) {
       await this.db.runTransaction(async tx => {
