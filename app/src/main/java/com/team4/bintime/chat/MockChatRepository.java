@@ -3,6 +3,8 @@ package com.team4.bintime.chat;
 import android.os.Handler;
 import android.os.Looper;
 
+import com.team4.bintime.request.MatchAppointment;
+
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -178,10 +180,18 @@ public final class MockChatRepository implements ChatRepository {
     }
 
     @Override
-    public void leaveRoom(String matchId, ActionCallback callback) {
+    public void leaveRoom(String matchId, LeaveCallback callback) {
         ChatRoom room = rooms.get(matchId);
-        if (room == null || room.status != ChatRoom.Status.ENDED || demoState == DemoState.ERROR) {
-            callback.onError();
+        if (room == null || demoState == DemoState.ERROR) {
+            callback.onError(ChatLeaveFailure.RETRY_LATER);
+            return;
+        }
+        // 서버(BT-043)와 같이 방 상태가 아니라 연결된 약속 전체를 본다. 약속 목록이 없는 Mock 방은 방 상태로 판단한다.
+        boolean active = room.appointments.isEmpty()
+                ? room.status != ChatRoom.Status.ENDED
+                : room.appointments.stream().anyMatch(a -> a.status == MatchAppointment.Status.ACTIVE);
+        if (active) {
+            callback.onError(ChatLeaveFailure.ACTIVE_MATCH);
             return;
         }
         // 상대 기록은 남기고 내 목록에서만 숨긴다.

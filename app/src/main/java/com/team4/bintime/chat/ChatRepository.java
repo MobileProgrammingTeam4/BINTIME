@@ -59,9 +59,19 @@ public interface ChatRepository {
      */
     void endMatch(String matchId, ActionCallback callback);
 
+    /** 채팅방 나가기 결과. 콜백은 메인 스레드에서 호출한다. */
+    interface LeaveCallback {
+        void onSuccess();
+
+        void onError(ChatLeaveFailure failure);
+    }
+
     /**
-     * 채팅방 나가기. ENDED 에서만 허용하고 ACTIVE 면 onError 로 거절한다.
-     * 내 목록에서만 숨기고 상대의 기록은 지우지 않는다. 실제 구현과 상대 안내는 BT-043 범위다.
+     * 채팅방 나가기(BT-043). 매칭 종료와 별개 이벤트다. 방에 연결된 약속이 하나라도 ACTIVE 면 서버가
+     * {@link ChatLeaveFailure#ACTIVE_MATCH} 로 거절한다. 내 목록에서만 숨기고 메시지는 지우지 않으며,
+     * 상대에게는 방이 보관(archived)되어 '상대가 나갔어요' 안내와 비활성 입력창이 보인다.
+     *
+     * @param matchId 실제 방 키(chatRoomId). 이름은 호환상 유지한다(BT-034).
      */
-    void leaveRoom(String matchId, ActionCallback callback);
+    void leaveRoom(String matchId, LeaveCallback callback);
 }

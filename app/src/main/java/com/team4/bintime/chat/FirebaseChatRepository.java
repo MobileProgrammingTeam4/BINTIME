@@ -14,6 +14,9 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.Query;
 import com.google.firebase.database.ServerValue;
 import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.functions.FirebaseFunctions;
+import com.google.firebase.functions.FirebaseFunctionsException;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -37,6 +40,8 @@ import java.util.function.Consumer;
 final class FirebaseChatRepository implements ChatRepository {
 
     private static final String TAG = "FirebaseChatRepository";
+    /** 모든 Callable 은 서울 리전이다(BT-024). */
+    private static final String FUNCTIONS_REGION = "asia-northeast3";
 
     @Nullable private final String uid;
     /** google-services.json 에 RTDB 주소(firebase_url)가 없으면 null. 모든 구독이 onError 를 받는다. */
@@ -285,10 +290,39 @@ final class FirebaseChatRepository implements ChatRepository {
         callback.onError();
     }
 
-    /** BT-043 Callable(ENDED 검사 후 hidden 설정)로 구현한다. 그 전에는 실패로 알린다. */
+    /**
+     * leaveChatRoom Callable(asia-northeast3, BT-043). 입력은 방 키 하나이고, 참여자·ACTIVE 약속·잠금은 서버가 검사한다.
+     * 호출 중 로그인 계정이 바뀌면 결과를 쓰지 않고 로그인 필요로 끝낸다.
+     */
     @Override
-    public void leaveRoom(String matchId, ActionCallback callback) {
-        callback.onError();
+    public void leaveRoom(String matchId, LeaveCallback callback) {
+        if (uid == null || !uid.equals(FirebaseAuth.getInstance().getUid())) {
+            callback.onError(ChatLeaveFailure.SIGNED_OUT);
+            return;
+        }
+        if (matchId == null || !matchId.matches("[a-f0-9]{64}")) {
+            callback.onError(ChatLeaveFailure.GENERIC);
+            return;
+        }
+        FirebaseFunctions.getInstance(FUNCTIONS_REGION).getHttpsCallable("leaveChatRoom")
+                .call(Collections.singletonMap("chatRoomId", matchId))
+                .addOnCompleteListener(task -> {
+                    if (!uid.equals(FirebaseAuth.getInstance().getUid())) {
+                        callback.onError(ChatLeaveFailure.SIGNED_OUT);
+                        return;
+                    }
+                    if (task.isSuccessful()) {
+                        callback.onSuccess();
+                        return;
+                    }
+                    Exception error = task.getException();
+                    if (error instanceof FirebaseFunctionsException) {
+                        FirebaseFunctionsException e = (FirebaseFunctionsException) error;
+                        callback.onError(ChatLeaveFailure.from(e.getCode().name(), e.getDetails()));
+                    } else {
+                        callback.onError(ChatLeaveFailure.from(null, null));
+                    }
+                });
     }
 
     // ---- 구독 공통 ----
