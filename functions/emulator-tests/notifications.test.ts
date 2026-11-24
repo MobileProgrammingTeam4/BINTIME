@@ -90,6 +90,28 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)("BT-039 inbox, routing, FC
     expect((await db.collection("notifications/a/items").get()).empty).toBe(true);
     expect((await db.doc("availabilityNotificationJobs/a").get()).exists).toBe(false);
   });
+  it("settings/profile refresh after the slot start preserves the unprocessed reminder", async () => {
+    await seedAvailability(); await reminders().refresh("a");
+    clock += 90_000;
+    await db.doc("notificationSettings/a").update({ message: false });
+    await reminders().refresh("a");
+    expect((await db.doc("availabilityNotificationJobs/a").get()).get("dueAt").toMillis()).toBe(Date.parse("2026-11-24T10:00:00+09:00"));
+    await reminders().runBatch();
+    expect((await db.collection("notifications/a/items").get()).size).toBe(1);
+    expect((await db.doc("availabilityNotificationJobs/a").get()).get("dueAt").toMillis()).toBeGreaterThan(clock);
+  });
+  it("a changed slot replaces the pending reminder and a stale worker cannot advance it", async () => {
+    await seedAvailability(); await reminders().refresh("a");
+    const oldDue = (await db.doc("availabilityNotificationJobs/a").get()).get("dueAt").toMillis();
+    clock += 90_000;
+    await db.doc("availability/a").update({ slots: [{ dayOfWeek: 2, startMinute: 630, endMinute: 720 }] });
+    await reminders().refresh("a");
+    const replacement = (await db.doc("availabilityNotificationJobs/a").get()).get("dueAt").toMillis();
+    expect(replacement).toBe(Date.parse("2026-11-24T10:30:00+09:00"));
+    await reminders().refresh("a", replacement + 1, oldDue);
+    expect((await db.doc("availabilityNotificationJobs/a").get()).get("dueAt").toMillis()).toBe(replacement);
+    await reminders().runBatch(); expect((await db.collection("notifications/a/items").get()).empty).toBe(true);
+  });
   it("free-slot push OFF still creates inbox history", async () => {
     await seedAvailability(); await db.doc("notificationSettings/a").update({ availability: false });
     await reminders().refresh("a"); clock += 60_000; await reminders().runBatch(); await service().retryBatch();

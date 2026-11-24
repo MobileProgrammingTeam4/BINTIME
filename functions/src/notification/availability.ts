@@ -7,15 +7,23 @@ export class AvailabilityReminders {
   constructor(private readonly db: Firestore, private readonly notices: NotificationService,
     private readonly now: () => Date = () => new Date()) {}
 
-  async refresh(uid: string, afterMillis = this.now().getTime()) {
+  async refresh(uid: string, afterMillis = this.now().getTime(), consumedDue?: number) {
     const ref = this.db.doc(`availabilityNotificationJobs/${uid}`);
     await this.db.runTransaction(async tx => {
-      const [availability, timetable, user] = await Promise.all([
+      const [availability, timetable, user, pending] = await Promise.all([
         tx.get(this.db.doc(`availability/${uid}`)), tx.get(this.db.doc(`timetables/${uid}`)),
-        tx.get(this.db.doc(`users/${uid}`))]);
+        tx.get(this.db.doc(`users/${uid}`)), tx.get(ref)]);
       // OFF suppresses push delivery, not creation of inbox history.
       if (!user.exists) { tx.delete(ref); return; }
       const slots = parseSlots(availability.data(), timetable.data());
+      const due = pending.get("dueAt");
+      // A stale worker must not advance a replacement job created by another refresh.
+      if (consumedDue !== undefined && (!(due instanceof Timestamp) || due.toMillis() !== consumedDue)) return;
+      // Settings/profile changes must not skip a due event before the scheduler emits its history.
+      if (consumedDue === undefined && due instanceof Timestamp && due.toMillis() <= afterMillis) {
+        const day = seoulTime(due.toDate());
+        if (slots.some(s => s.dayOfWeek === day.dayOfWeek && s.startMinute === day.minute)) return;
+      }
       const events: { at: number; date: string; start: number }[] = [];
       for (let day = 0; day <= 7; day++) {
         const date = seoulTime(new Date(afterMillis), day);
@@ -49,7 +57,7 @@ export class AvailabilityReminders {
         if (emitted) await this.notices.emit(job.id, `availability:${job.get("meetingDate")}:${job.get("startMinute")}`,
           { type: "availability", targetId: job.get("meetingDate") }, { occurredAt: due, pushUntil: due + 120_000 });
       }
-      await this.refresh(job.id, Math.max(now.getTime(), due + 1));
+      await this.refresh(job.id, Math.max(now.getTime(), due + 1), due);
     }
   }
 }
