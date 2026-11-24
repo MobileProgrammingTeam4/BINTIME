@@ -63,6 +63,7 @@ main을 전혀 수정하지 않는 정책을 유지한다면 현재 pull_request
 
 - develop 및 main 대상 PR, develop/main push, 수동 실행에서 자동화 테스트를 실행합니다. PR 재오픈·추가 커밋·리뷰 준비·본문/대상 편집도 검사합니다.
 - Gradle Wrapper가 루트 또는 android/에 있으면 Java 17 환경에서 `assembleDebug testDebugUnitTest lintDebug`를 실행합니다. 현재 저장소에는 루트 Android 프로젝트가 있습니다.
+- APK는 빌드 검증만 하고 Actions 보관 파일로 업로드하지 않습니다.
 - Wrapper가 없으면 Android 작업은 SKIPPED이며 빌드 통과 증거로 취급하지 않습니다.
 - 병합 전 다른 팀원 **최소 1명 승인**, `Automation logic tests`와 `android-build` 성공 및 최신 develop 통합 결과를 확인합니다. 리뷰 요청만으로 승인을 대신하지 않습니다.
 - 조사 시 main/develop의 protected 값은 false였습니다. 보호 규칙 조회는 연결 권한으로 거부되고 규칙셋 API는 비공개 저장소의 플랜 제한을 반환했습니다. 따라서 CI·리뷰의 **강제 병합 차단을 설정했다고 주장하지 않습니다**. 지원되는 플랜/권한이 마련되면 develop 보호 규칙에 필수 승인 1명과 위 두 체크, 최신 브랜치 요구를 설정하세요. 그 전에는 팀이 수동으로 병합 기준을 지켜야 합니다.
