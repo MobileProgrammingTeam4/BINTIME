@@ -14,6 +14,7 @@ import { createSearchCallable } from "./matching/callable";
 import { createMessageTrigger } from "./chat/trigger";
 import { createRequestMaintenanceSchedule } from "./requests/scheduled";
 import { createChatLinkCallable, createChatLinkTrigger } from "./chat/linkCallable";
+import { createChatLeaveCallable } from "./chat/leaveCallable";
 
 /** D · BT-019 요청 생성. */
 export const createMatchRequest = createRequestCallable();
@@ -26,6 +27,8 @@ export const maintainMatchRequests = createRequestMaintenanceSchedule();
 /** D · BT-033. Firestore 매칭 → RTDB 방 연결과 참여자의 멱등 재시도. */
 export const chatOnMatchCreated = createChatLinkTrigger();
 export const ensureMatchChat = createChatLinkCallable();
+/** E · BT-043. 연결된 약속이 모두 종료된 방만 나간다. 매칭 종료와 별개 이벤트. */
+export const leaveChatRoom = createChatLeaveCallable();
 
 /** BT-024 연결 확인 */
 export const aiPing = createAiCallable(aiPingTask);
