@@ -206,6 +206,10 @@ service cloud.firestore {
     match /matchCleanupJobs/{matchId} {
       allow read, write: if false;
     }
+    // BT-038: server-only retry of room status aggregation. No client access.
+    match /roomStateJobs/{roomId} {
+      allow read, write: if false;
+    }
     match /chatLinkJobs/{matchId} {
       allow read, write: if false;
     }

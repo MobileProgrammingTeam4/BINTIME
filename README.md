@@ -108,6 +108,8 @@ overlapMinutes = max(0, min(endA, endB) - max(startA, startB))
 알림·기기 토큰·공강 시작 이벤트의 데이터·권한 계약은 [`docs/BT-039.md`](./docs/BT-039.md)를 따릅니다.
 계정별 알림 선호와 서버 날짜 기반 요청 팝업 계약은 [`docs/BT-040.md`](./docs/BT-040.md)를 따릅니다.
 
+매칭 종료·후기 자격·채팅방 상태 및 담당자 간 연결 계약은 [`docs/BT-038.md`](./docs/BT-038.md)를 따릅니다.
+
 | 구성 | 용도 | 핵심 원칙 |
 |---|---|---|
 | **Android Java/XML** | 화면·상호작용·상태 표시 | Activity/Fragment에서 서버 상태 변경 로직 분리 |
