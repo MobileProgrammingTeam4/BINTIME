@@ -2,6 +2,7 @@ import type { z } from "zod";
 import type { ModelClient, ModelRequest } from "./gemini";
 import type { UsageStore } from "./usage";
 import type { MatchAccess } from "./access";
+import type { ChatContextAccess } from "./chatContext";
 
 export type AiMode = "mock" | "live";
 
@@ -27,6 +28,8 @@ export interface AiDeps {
   modelClient: () => ModelClient;
   usage: UsageStore;
   matches: MatchAccess;
+  /** BT-041 답장 추천이 읽는 채팅 맥락(matches 스냅샷 + RTDB 방). RTDB 는 처음 쓸 때 연결한다. */
+  chatContext: ChatContextAccess;
   now: () => Date;
   sleep: (ms: number) => Promise<void>;
   /** 학교 이메일 허용 접미사(ALLOWED_EMAIL_SUFFIXES). 비어 있으면 Callable 호출을 모두 거부한다. */
