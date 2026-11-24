@@ -12,6 +12,7 @@ import { chatTriggerRegion } from "../chat/trigger";
 import { NotificationService, eventKey } from "./service";
 import { NotificationEvents } from "./events";
 import { AvailabilityReminders } from "./availability";
+import { NotificationSettingsService, settingsInput } from "./settings";
 
 const options = { region: "asia-northeast3", timeoutSeconds: 60, maxInstances: 2, retry: true };
 const fresh = (time: string) => Number.isFinite(Date.parse(time)) && Date.now() - Date.parse(time) <= 3_600_000;
@@ -63,4 +64,18 @@ export const registerNotificationDevice = onCall({ region: "asia-northeast3", ma
     else tx.set(ref, { uid, token: parsed.data.token, updatedAt: Timestamp.now() });
   });
   return { registered: !parsed.data.remove };
+});
+
+export const updateNotificationSettings = onCall({ region: "asia-northeast3", maxInstances: 2 }, async request => {
+  if (!request.auth?.uid) throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+  if (checkSchoolEmail(request.auth.token, parseAllowedEmailSuffixes(process.env[ALLOWED_EMAIL_SUFFIXES_ENV]))) throw new HttpsError("permission-denied", "학교 이메일 인증이 필요합니다.");
+  const parsed = settingsInput.safeParse(request.data);
+  if (!parsed.success) throw new HttpsError("invalid-argument", "알림 설정을 확인해주세요.");
+  return new NotificationSettingsService(notificationServices().db).update(request.auth.uid, parsed.data);
+});
+export const requestPopupPolicy = onCall({ region: "asia-northeast3", maxInstances: 2 }, async request => {
+  if (!request.auth?.uid) throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+  if (checkSchoolEmail(request.auth.token, parseAllowedEmailSuffixes(process.env[ALLOWED_EMAIL_SUFFIXES_ENV]))) throw new HttpsError("permission-denied", "학교 이메일 인증이 필요합니다.");
+  if (!z.object({}).strict().safeParse(request.data ?? {}).success) throw new HttpsError("invalid-argument", "요청 정보를 확인해주세요.");
+  return new NotificationSettingsService(notificationServices().db).popupPolicy(request.auth.uid);
 });

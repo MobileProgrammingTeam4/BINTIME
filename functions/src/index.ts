@@ -17,7 +17,7 @@ import { createChatLinkCallable, createChatLinkTrigger } from "./chat/linkCallab
 export { notificationOnRequestCreated, notificationOnMatchChanged, notificationOnReviewCreated,
   notificationOnMessageCreated, notificationOnPushQueued, notificationOnAvailabilityChanged,
   notificationOnTimetableChanged, notificationOnSettingsChanged, notificationOnUserChanged, maintainNotifications,
-  registerNotificationDevice } from "./notification/functions";
+  registerNotificationDevice, updateNotificationSettings, requestPopupPolicy } from "./notification/functions";
 
 /** D · BT-019 요청 생성. */
 export const createMatchRequest = createRequestCallable();

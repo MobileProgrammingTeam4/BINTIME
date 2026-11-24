@@ -20,7 +20,7 @@ public final class NotificationNavigator {
                     if (!doc.exists()) { Toast.makeText(activity, "알림을 찾을 수 없어요", Toast.LENGTH_SHORT).show(); return; }
                     if (doc.get("readAt") == null) doc.getReference().update("readAt", FieldValue.serverTimestamp());
                     String type = doc.getString("type"), target = doc.getString("targetId");
-                    if ("request".equals(type)) { activity.openRequestTab(RequestRepository.Tab.RECEIVED); return; }
+                    if ("request".equals(type)) { RequestPopupNavigator.open(activity, target); return; }
                     if ("availability".equals(type)) { activity.openRequestTab(null); return; }
                     if ("message".equals(type) && target != null) { activity.startActivity(ChatRoomActivity.intent(activity, target)); return; }
                     // Resolve actual room ID from a match. A shared room may differ from the selected match ID.

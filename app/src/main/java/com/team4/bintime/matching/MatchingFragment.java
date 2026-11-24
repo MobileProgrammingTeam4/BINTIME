@@ -57,6 +57,7 @@ public class MatchingFragment extends Fragment {
     private RequestTabsController requestTabs;
     private View requestContent;
     private int selectedTab;
+    private com.team4.bintime.notification.RequestPopupCoordinator popupCoordinator;
     private StateView stateView;
     private TextView[] tabs;
     private MaterialSwitch switchMatching;
@@ -117,6 +118,10 @@ public class MatchingFragment extends Fragment {
         if (getView() != null) {
             reload(); // 시간표에서 공강을 바꾸고 돌아와도 서버 기준으로 다시 검색
             if (requestTabs != null) requestTabs.render();
+            if (!requestRepository.isMock()) {
+                if (popupCoordinator == null) popupCoordinator = new com.team4.bintime.notification.RequestPopupCoordinator(this, requestRepository);
+                popupCoordinator.start();
+            }
             getView().post(() -> {
                 if (!isResumed() || isHidden() || getView() == null || getChildFragmentManager().isStateSaved()) return;
                 NotificationPreferences prefs = new NotificationPreferences(requireContext());
@@ -199,11 +204,13 @@ public class MatchingFragment extends Fragment {
 
     @Override public void onHiddenChanged(boolean hidden) {
         super.onHiddenChanged(hidden);
+        if (popupCoordinator != null) { if (hidden) popupCoordinator.close(); else popupCoordinator.start(); }
         if (!hidden && getView() != null) {
             reload();
             if (requestTabs != null) requestTabs.render();
         }
     }
+    @Override public void onPause() { if (popupCoordinator != null) popupCoordinator.close(); super.onPause(); }
 
     @Override
     public void onDestroyView() {
