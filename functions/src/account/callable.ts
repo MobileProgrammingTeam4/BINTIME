@@ -8,7 +8,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
 import { z } from "zod";
 import { ALLOWED_EMAIL_SUFFIXES_ENV, checkSchoolEmail, parseAllowedEmailSuffixes } from "../ai/emailPolicy";
-import { AccountDeletionService } from "./deleteAccount";
+import { AccountDeletionBusy, AccountDeletionService } from "./deleteAccount";
 
 /** 입력 없음. 탈퇴할 계정은 토큰 UID 로만 정한다. */
 const input = z.union([z.null(), z.undefined(), z.object({}).strict()]);
@@ -45,6 +45,10 @@ export function createDeleteAccountCallable(service = defaultService, suffixes: 
     try {
       return await service().delete(request.auth.uid);
     } catch (error) {
+      if (error instanceof AccountDeletionBusy) {
+        throw new HttpsError("unavailable", "채팅방을 정리하는 중이에요. 잠시 후 다시 시도해주세요.",
+          { reason: "CHAT_LINK_BUSY", retryable: true, retryAfterMillis: error.retryAfterMillis, requestId });
+      }
       // UID·개인정보는 남기지 않는다. 운영자는 accountDeletions 문서와 requestId 로 추적한다.
       // 오류 메시지에는 문서 경로(UID)가 들어갈 수 있어 코드만 남긴다.
       logger.error("account_delete_failed", { requestId, code: String((error as { code?: unknown })?.code ?? "unknown") });

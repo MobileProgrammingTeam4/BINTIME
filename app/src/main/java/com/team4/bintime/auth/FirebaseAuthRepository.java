@@ -11,6 +11,7 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.functions.FirebaseFunctions;
+import com.google.firebase.functions.FirebaseFunctionsException;
 
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
@@ -132,7 +133,11 @@ public final class FirebaseAuthRepository implements AuthRepository {
                     Exception e = task.getException();
                     boolean network = e instanceof FirebaseNetworkException
                             || (e != null && e.getCause() instanceof FirebaseNetworkException);
-                    callback.onError(network ? MSG_DELETE_NETWORK : MSG_DELETE_FAILED);
+                    Object details = e instanceof FirebaseFunctionsException
+                            ? ((FirebaseFunctionsException) e).getDetails() : null;
+                    boolean linkBusy = details instanceof java.util.Map
+                            && "CHAT_LINK_BUSY".equals(((java.util.Map<?, ?>) details).get("reason"));
+                    callback.onError(network ? MSG_DELETE_NETWORK : linkBusy ? MSG_DELETE_BUSY : MSG_DELETE_FAILED);
                 });
     }
 

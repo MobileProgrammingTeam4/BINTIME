@@ -7,7 +7,7 @@ import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestE
 import { doc, getDoc } from "firebase/firestore";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ChatLinkService } from "../src/chat/link";
-import { AccountDeletionService } from "../src/account/deleteAccount";
+import { AccountDeletionBusy, AccountDeletionService } from "../src/account/deleteAccount";
 
 /**
  * BT-045 회원 탈퇴. 로컬 Firestore·RTDB 에뮬레이터에서만 실행한다. Storage·Auth 는 가짜 구현으로 호출만 확인한다.
@@ -22,10 +22,16 @@ const ROOM = "a".repeat(64), PAST = "b".repeat(64);
 let env: RulesTestEnvironment;
 let deletedFiles: string[], deletedUsers: string[], failAuth: boolean;
 
-const service = () => new AccountDeletionService(db, rtdb,
+const service = (at = NOW) => new AccountDeletionService(db, rtdb,
   { async deleteUserFiles(uid) { deletedFiles.push(uid); } },
   { async deleteUser(uid) { if (failAuth) throw new Error("auth down"); deletedUsers.push(uid); } },
-  () => new Date(NOW));
+  () => new Date(at));
+const LATE = "c".repeat(64);
+async function seedLateMatch() {
+  await db.doc(`matches/${LATE}`).set({ requestId: LATE, participantUids: [ME, THIRD], purpose: "스터디",
+    meetingDate: "2026-11-25", startMinute: 960, endMinute: 1080, status: "ACTIVE", chatReady: false,
+    createdAt: Timestamp.fromMillis(NOW) });
+}
 const message = (uid: string) => ({ senderId: uid, content: "안녕하세요", createdAt: { ".sv": "timestamp" } });
 const exists = async (path: string) => (await db.doc(path).get()).exists;
 
@@ -144,5 +150,77 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_DA
     await service().delete(ME);
     await assertFails(getDoc(doc(env.authenticatedContext(ME).firestore(), `accountDeletions/${ME}`)));
     await assertFails(getDoc(doc(env.authenticatedContext(OTHER).firestore(), `accountDeletions/${ME}`)));
+  });
+
+  describe("#130 리뷰: 탈퇴와 늦게 도는 채팅 연결", () => {
+    it("탈퇴 뒤 늦게 실행된 연결은 거부되어 방·멤버·목록을 다시 만들지 않는다", async () => {
+      await seedLateMatch(); // 수락은 됐지만 채팅 연결은 아직 실행되지 않은 매칭
+      await service().delete(ME);
+      for (const caller of [undefined, THIRD]) {
+        await expect(new ChatLinkService(db, rtdb, () => new Date(NOW)).link(LATE, caller))
+          .rejects.toMatchObject({ details: { reason: "PARTICIPANT_DELETED" } });
+      }
+      expect((await rtdb.ref(`chatRooms/${LATE}`).get()).exists()).toBe(false);
+      expect((await rtdb.ref(`userChatRooms/${ME}`).get()).exists()).toBe(false);
+      expect((await rtdb.ref(`userChatRooms/${THIRD}/${LATE}`).get()).exists()).toBe(false);
+      expect((await db.doc(`matches/${LATE}`).get()).data()).toMatchObject({ status: "ENDED", chatReady: false });
+    });
+
+    it("lease 가 남은 연결이 있으면 탈퇴를 미루고, 끝난 뒤 다시 부르면 그 방까지 정리한다", async () => {
+      await seedLateMatch();
+      // 탈퇴 전에 시작해 RTDB 까지 쓴 연결(아직 READY 전)
+      await db.doc(`chatLinkJobs/${LATE}`).set({ matchId: LATE, status: "PREPARING", workerId: "w1",
+        leaseUntil: Timestamp.fromMillis(NOW + 60_000) });
+      await rtdb.ref().update({
+        [`chatRooms/${LATE}/control`]: { chatReady: true, writable: true, archived: false },
+        [`chatRooms/${LATE}/members`]: { [ME]: { joinedAt: NOW }, [THIRD]: { joinedAt: NOW } },
+        [`userChatRooms/${ME}/${LATE}`]: { otherUid: THIRD, status: "ACTIVE", hidden: false, unreadCount: 0 },
+        [`userChatRooms/${THIRD}/${LATE}`]: { otherUid: ME, status: "ACTIVE", hidden: false, unreadCount: 0 },
+      });
+      const busy = await service().delete(ME).catch(e => e);
+      expect(busy).toBeInstanceOf(AccountDeletionBusy);
+      expect(busy.retryAfterMillis).toBe(60_000);
+      expect((await db.doc(`accountDeletions/${ME}`).get()).get("status")).toBe("FAILED");
+      expect(deletedUsers).toEqual([]); // 계정은 아직 지우지 않는다
+
+      await expect(service(NOW + 61_000).delete(ME)).resolves.toMatchObject({ deleted: true });
+      expect((await rtdb.ref(`chatRooms/${LATE}/members`).get()).val()).toEqual({ [THIRD]: expect.anything() });
+      expect((await rtdb.ref(`chatRooms/${LATE}/control/archived`).get()).val()).toBe(true);
+      expect((await rtdb.ref(`userChatRooms/${ME}`).get()).exists()).toBe(false);
+      expect((await rtdb.ref(`userChatRooms/${THIRD}/${LATE}`).get()).val()).toMatchObject({ archived: true, status: "ENDED" });
+      await assertFails(env.authenticatedContext(ME).database().ref(`chatRooms/${LATE}/messages`).get());
+    });
+
+    it("연결 도중 탈퇴가 시작되면 연결은 완료되지 않고, 이어지는 탈퇴가 쓰인 항목을 정리한다", async () => {
+      await seedLateMatch();
+      // 연결이 RTDB 를 쓴 직후(완료 표시 전) 탈퇴가 시작되는 순서를 만든다.
+      const racing = new Proxy(rtdb, { get(target, key) {
+        if (key !== "ref") return Reflect.get(target, key);
+        return (path?: string) => {
+          const ref = target.ref(path);
+          if (path !== undefined) return ref;
+          return new Proxy(ref, { get(r, k) {
+            if (k === "update") return async (patch: object) => {
+              await r.update(patch);
+              await db.doc(`accountDeletions/${ME}`).set({ uid: ME, status: "RUNNING" });
+            };
+            const value = Reflect.get(r, k);
+            return typeof value === "function" ? value.bind(r) : value;
+          } });
+        };
+      } }) as typeof rtdb;
+      await expect(new ChatLinkService(db, racing, () => new Date(NOW)).link(LATE))
+        .rejects.toMatchObject({ details: { reason: "PARTICIPANT_DELETED" } });
+      expect((await db.doc(`chatLinkJobs/${LATE}`).get()).get("status")).toBe("FAILED");
+      expect((await db.doc(`chatRoomLinks/${LATE}`).get()).exists).toBe(false);
+      expect((await db.doc(`matches/${LATE}`).get()).get("chatReady")).toBe(false);
+      expect((await rtdb.ref(`userChatRooms/${ME}/${LATE}`).get()).exists()).toBe(true); // 이미 쓴 항목
+
+      await service().delete(ME);
+      expect((await rtdb.ref(`userChatRooms/${ME}`).get()).exists()).toBe(false);
+      expect(Object.keys((await rtdb.ref(`chatRooms/${LATE}/members`).get()).val() ?? {})).toEqual([THIRD]);
+      await expect(new ChatLinkService(db, rtdb, () => new Date(NOW + 20_000)).link(LATE, THIRD))
+        .rejects.toMatchObject({ details: { reason: "PARTICIPANT_DELETED" } });
+    });
   });
 });

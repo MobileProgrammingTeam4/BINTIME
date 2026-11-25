@@ -38,6 +38,13 @@ export interface DeletionResult {
 
 const PAGE = 100;
 
+/** 진행 중인 채팅 연결이 끝나야 탈퇴를 마칠 수 있다. 잠시 뒤 다시 호출하면 이어서 진행한다. */
+export class AccountDeletionBusy extends Error {
+  constructor(readonly retryAfterMillis: number) {
+    super("chat link in progress");
+  }
+}
+
 export class AccountDeletionService {
   constructor(private readonly db: Firestore, private readonly rtdb: Database,
     private readonly files: AccountFiles, private readonly auth: AccountAuth,
@@ -54,6 +61,7 @@ export class AccountDeletionService {
       await this.hideFromMatching(uid);
       const closedRequests = await this.closeRequests(uid);
       const endedMatches = await this.endMatches(uid);
+      await this.waitForChatLinks(uid);
       const leftRooms = await this.leaveRooms(uid);
       await this.deletePersonalData(uid);
       await this.files.deleteUserFiles(uid);
@@ -123,6 +131,23 @@ export class AccountDeletionService {
       if (changed) ended++;
     }
     return ended;
+  }
+
+  /**
+   * #130 리뷰(D): 탈퇴 시작(accountDeletions) 뒤에는 ChatLinkService 가 새 연결을 거부한다. 그 전에 시작해 아직 lease 가
+   * 남은 연결은 RTDB 에 멤버·목록을 쓸 수 있으므로, 끝날 때까지 탈퇴를 미룬다(재시도 가능한 오류). 연결이 끝나거나
+   * lease 가 지나면 다시 호출했을 때 그 방까지 아래 leaveRooms 가 정리한다.
+   */
+  private async waitForChatLinks(uid: string) {
+    const matches = await this.db.collection("matches").where("participantUids", "array-contains", uid).get();
+    const now = this.now().getTime();
+    for (const match of matches.docs) {
+      const job = await this.db.doc(`chatLinkJobs/${match.id}`).get();
+      const lease = job.get("leaseUntil");
+      if (job.get("status") === "PREPARING" && lease instanceof Timestamp && lease.toMillis() > now) {
+        throw new AccountDeletionBusy(lease.toMillis() - now);
+      }
+    }
   }
 
   /** 내 목록과 참여 기록에 있는 모든 방에서 나간다. 남은 사람은 보관된 방을 읽기만 한다. */

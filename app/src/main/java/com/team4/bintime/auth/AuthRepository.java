@@ -69,6 +69,8 @@ public interface AuthRepository {
     /** BT-045 탈퇴 실패 문구. */
     String MSG_DELETE_FAILED = "탈퇴를 마치지 못했어요. 잠시 후 다시 시도해 주세요.";
     String MSG_DELETE_NETWORK = "네트워크 연결을 확인해 주세요.";
+    /** 방금 수락한 매칭의 채팅방을 준비하는 중이라 잠시 뒤 다시 시도해야 하는 경우(서버 CHAT_LINK_BUSY). */
+    String MSG_DELETE_BUSY = "채팅방을 정리하는 중이에요. 1~2분 뒤 다시 시도해 주세요.";
 
     /**
      * BT-045 회원 탈퇴. 서버(deleteAccount)가 개인 데이터 삭제·대기 요청/진행 매칭 정리·채팅방 나가기 후 계정을 지운다.

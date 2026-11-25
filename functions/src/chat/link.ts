@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Database } from "firebase-admin/database";
-import { Timestamp, type Firestore } from "firebase-admin/firestore";
+import { Timestamp, type Firestore, type Transaction } from "firebase-admin/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
 
 /** BT-043도 같은 pair 문서에서 pendingMatchId와 미종료 약속을 확인해야 한다. */
@@ -32,6 +32,9 @@ export class ChatLinkService {
         const room = await tx.get(this.db.doc(`chatRoomLinks/${roomId}`));
         return { participants, pairId, ready: { matchId, chatRoomId: roomId, chatReady: room.get("chatReady") === true }, plan: null };
       }
+      // BT-045(#130 리뷰 D): 탈퇴를 시작한 참여자가 있으면 새로 연결하지 않는다. 탈퇴 정리가 끝난 뒤 늦게 도는 연결이
+      // 그 UID 의 멤버·목록을 다시 만들지 않게 한다. accountDeletions 는 탈퇴 첫 단계에서 쓰고 지우지 않는다.
+      await this.assertNoDeletion(tx, participants);
       const owner = pair.get("pendingMatchId");
       if (owner && owner !== matchId) throw failure("CHAT_PAIR_BUSY", { blockingMatchId: owner });
       const lease = job.get("leaseUntil");
@@ -105,6 +108,9 @@ export class ChatLinkService {
         const pairRef = this.db.doc(`chatPairs/${pairId}`);
         const [pair, job] = await Promise.all([tx.get(pairRef), tx.get(jobRef)]);
         if (job.get("status") === "READY") return;
+        // 연결 도중 탈퇴가 시작됐으면 완료로 표시하지 않는다. 이미 쓴 RTDB 항목은 탈퇴가 다시 실행될 때 정리한다
+        // (탈퇴는 lease 가 남은 연결이 있으면 끝날 때까지 기다리게 한다, account/deleteAccount.ts).
+        await this.assertNoDeletion(tx, participants);
         if (pair.get("pendingMatchId") !== matchId || job.get("plan.roomId") !== roomId || job.get("workerId") !== workerId) throw failure("STALE_LINK");
         const updatedAt = Timestamp.fromDate(this.now());
         tx.set(this.db.doc(`chatRoomLinks/${roomId}`), { participantUids: participants, pairId, chatReady: true, archived: false, updatedAt });
@@ -122,6 +128,11 @@ export class ChatLinkService {
       });
       throw error;
     }
+  }
+
+  private async assertNoDeletion(tx: Transaction, participants: string[]) {
+    const deletions = await Promise.all(participants.map(u => tx.get(this.db.doc(`accountDeletions/${u}`))));
+    if (deletions.some(doc => doc.exists)) throw failure("PARTICIPANT_DELETED");
   }
 
   private async archive(roomId: string, participants: string[]) {
