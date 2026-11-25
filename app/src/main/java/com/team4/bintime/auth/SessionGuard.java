@@ -8,6 +8,7 @@ import android.widget.Toast;
 import com.google.firebase.auth.FirebaseAuth;
 import com.team4.bintime.R;
 import com.team4.bintime.profile.ProfileRepositories;
+import com.team4.bintime.timetable.TimetableOriginals;
 
 /**
  * BT-030 로그인 세션 감시. 메인 화면이 보이는 동안·다시 보일 때 로그인이 끊겼으면(계정 삭제·비활성화·토큰 만료로
@@ -60,6 +61,8 @@ public final class SessionGuard {
     public static void signOutByUser(Activity activity) {
         userSignOutInProgress = true;
         ProfileRepositories.get(activity).clearSessionCaches();
+        // BT-048 검수 원본 사본도 이전 계정 데이터라 함께 비운다(#140 리뷰 후속).
+        TimetableOriginals.clearInBackground(activity);
         AuthRepositories.get(activity).signOut();
         Intent intent = new Intent(activity, OnboardingActivity.class)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
