@@ -7,7 +7,7 @@ import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestE
 import { collection, doc, getDoc, getDocs, setDoc, deleteDoc } from "firebase/firestore";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ChatLinkService } from "../src/chat/link";
-import { FirestoreMatchStore } from "../src/matching/search";
+import { FirestoreMatchStore, searchMatches } from "../src/matching/search";
 import { SearchCandidateResolver } from "../src/requests/candidates";
 import { RequestService } from "../src/requests/service";
 import { BlockService, MAX_BLOCKED_USERS } from "../src/safety/block";
@@ -68,13 +68,12 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_DA
 
     expect((await db.doc(`users/${ME}/blockedUsers/${OTHER}`).get()).data())
       .toEqual({ blockedUid: OTHER, createdAt: Timestamp.fromMillis(NOW) });
-    expect((await db.doc("matchRequests/sent").get()).data()).toMatchObject({ status: "CANCELED", updatedAt: Timestamp.fromMillis(NOW) });
-    expect((await db.doc("matchRequests/received").get()).data()).toMatchObject({ status: "REJECTED" });
-    // 두 사람이 모두 읽는 요청 문서에는 차단 사유를 남기지 않는다(상대에게 차단 사실 비공개, #129 리뷰)
-    for (const id of ["sent", "received"]) expect((await db.doc(`matchRequests/${id}`).get()).get("terminalReason")).toBeUndefined();
+    // 두 사람이 모두 읽는 요청 문서에는 일반 취소·거절과 똑같은 상태·사유만 남긴다(#129 리뷰 D·A: 차단 사실 비공개)
+    expect((await db.doc("matchRequests/sent").get()).data()).toMatchObject({ status: "CANCELED", terminalReason: "MANUAL_CANCEL", updatedAt: Timestamp.fromMillis(NOW) });
+    expect((await db.doc("matchRequests/received").get()).data()).toMatchObject({ status: "REJECTED", terminalReason: "RECIPIENT_REJECTED" });
     const other = env.authenticatedContext(OTHER).firestore();
     const seen = (await assertSucceeds(getDoc(doc(other, "matchRequests/sent")))).data();
-    expect(seen).not.toHaveProperty("terminalReason");
+    expect(JSON.stringify(seen)).not.toContain("BLOCK");
     expect((await db.doc("matchRequests/other").get()).get("status")).toBe("PENDING");
     expect((await db.doc("matchRequests/done").get()).get("status")).toBe("ACCEPTED");
     // 직접 취소가 아니므로 60초 재신청 제한을 만들지 않는다.
@@ -84,6 +83,15 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_DA
     // 다시 보내도 같은 결과(멱등). 이미 끝난 요청은 다시 바꾸지 않는다.
     expect(await service().block(ME, OTHER)).toMatchObject({ blocked: true, closedRequests: 0 });
     expect((await db.collection(`users/${ME}/blockedUsers`).get()).size).toBe(1);
+  });
+
+  it("이미 끝난 시각의 대기 요청은 일반 만료와 같게 CANCELED/EXPIRED 로 끝낸다", async () => {
+    await db.doc("matchRequests/old").set({ fromUid: OTHER, toUid: ME, status: "PENDING", purpose: "스터디",
+      meetingDate: "2026-11-24", startMinute: 600, endMinute: 700, createdAt: Timestamp.fromMillis(NOW - 86_400_000) });
+    await db.doc("matchRequests/broken").set({ fromUid: ME, toUid: OTHER, status: "PENDING", meetingDate: "언제", endMinute: 0 });
+    await service().block(ME, OTHER);
+    expect((await db.doc("matchRequests/old").get()).data()).toMatchObject({ status: "CANCELED", terminalReason: "EXPIRED" });
+    expect((await db.doc("matchRequests/broken").get()).data()).toMatchObject({ status: "CANCELED", terminalReason: "EXPIRED" });
   });
 
   it("자기 자신·없는 사용자는 차단하지 않는다", async () => {
@@ -187,6 +195,23 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_DA
         batch.set(db.doc(`availability/${uid}`), { sourceRevision: 1, slots: [slot] });
       }
       await batch.commit();
+    });
+
+    it("실제 검색 결과에서 차단 쌍이 양방향으로 빠지고, 해제하면 다음 검색에 다시 나온다(#129 리뷰 A)", async () => {
+      const store = new FirestoreMatchStore(db);
+      const ids = async (uid: string) => {
+        const result = await searchMatches(store, uid, clock());
+        expect(result.status).toBe("OK");
+        return result.candidates.map(c => c.candidateId);
+      };
+      expect(await ids("sender")).toEqual(["receiver"]);
+      await blocker().block("receiver", "sender"); // 상대가 나를 차단해도
+      expect(await ids("sender")).toEqual([]);
+      expect(await ids("receiver")).toEqual([]);
+      await blocker().unblock("receiver", "sender");
+      expect(await ids("sender")).toEqual(["receiver"]);
+      await blocker().block("sender", "receiver"); // 내가 차단해도
+      expect(await ids("receiver")).toEqual([]);
     });
 
     it("차단이 먼저 커밋되면 이후 생성·수락은 거부된다", async () => {
