@@ -12,8 +12,9 @@ const CONTACT_SOURCE = [
   // 링크
   String.raw`https?:\/\/\S*`,
   String.raw`www\.\S*`,
-  // http·www 없이 쓰는 메신저·SNS 링크(오픈채팅 등)
-  String.raw`(?:open\.kakao\.com|qr\.kakao\.com|pf\.kakao\.com|instagram\.com|instagr\.am|t\.me|discord\.gg|discord\.com\/invite)(?:\/\S*)?`,
+  // http·www 없이 쓰는 메신저·SNS 링크(오픈채팅 등). 앞뒤 경계로 chat.me·at.meeting 처럼 단어 중간이 걸리지 않게 한다.
+  // 앞은 점이 아닌 [\w-]로만 막아 m.instagram.com 같은 서브도메인 링크는 계속 지운다(PR #127 리뷰).
+  String.raw`(?<![\w-])(?:open\.kakao\.com|qr\.kakao\.com|pf\.kakao\.com|instagram\.com|instagr\.am|t\.me|discord\.gg|discord\.com\/invite)(?![\w-])(?:\/\S*)?`,
 ].join("|");
 
 /** 연락처처럼 보이는 부분을 지우고 공백을 정리한다. 남는 글자가 없으면 빈 문자열. */

@@ -36,12 +36,35 @@ describe("contactPolicy", () => {
     "www.example.com",
     "open.kakao.com/o/abc123",
     "instagram.com/someone",
+    "t.me/abc",
+    "링크 t.me/abc 로 와요",
+    "discord.gg/abc",
+    "discord.com/invite/abc",
+    "m.instagram.com/abc",
   ])("연락처로 본다: %s", (text) => {
     expect(containsContact(text)).toBe(true);
     expect(containsContact(stripContacts(text))).toBe(false);
   });
 
-  it.each(["오늘 14:00~15:30 괜찮아요", "학번 20231234 이에요", "3.5층 카페", "2시 반에 봬요"])("연락처가 아니다: %s", (text) => {
+  it.each([
+    ["t.me/abc 보내줘", "보내줘"],
+    ["open.kakao.com/o/xyz 여기요", "여기요"],
+    ["m.instagram.com/abc 팔로우", "m. 팔로우"],
+  ])("메신저 링크는 지운다: %s", (text, expected) => {
+    expect(stripContacts(text)).toBe(expected);
+  });
+
+  it.each([
+    "오늘 14:00~15:30 괜찮아요",
+    "학번 20231234 이에요",
+    "3.5층 카페",
+    "2시 반에 봬요",
+    // PR #127 리뷰: 도메인 패턴이 단어 중간을 자르지 않는다
+    "chat.me 보내줘",
+    "at.meeting room",
+    "t.meeting 어때요",
+    "great.me 같은 말",
+  ])("연락처가 아니다: %s", (text) => {
     expect(containsContact(text)).toBe(false);
     expect(stripContacts(text)).toBe(text);
   });
@@ -152,6 +175,13 @@ describe("suggestChatReplies live", () => {
 
     const failing = makeDeps({ mode: "live", matches, chatRooms: reused(), steps: [withContact, withContact] });
     await expectReason(runAiTask(suggestChatRepliesTask, { matchId: "match-2" }, ctx(me), failing), "AI_INVALID_OUTPUT");
+  });
+
+  it("chat.me·at.meeting 이 들어간 정상 답장은 verify 를 통과한다", () => {
+    const deps = makeDeps();
+    const replies = ["chat.me 보내줘", "at.meeting room 에서 봐요", "좋아요"];
+    expect(suggestChatRepliesTask.verify!({ replies }, { matchId: "m" }, deps).replies).toEqual(replies);
+    expect(() => suggestChatRepliesTask.verify!({ replies: ["t.me/abc 로 와요", "b", "c"] }, { matchId: "m" }, deps)).toThrow();
   });
 
   it("공백만 다른 중복도 거절하고, 통과한 답장의 공백은 정리한다", () => {
