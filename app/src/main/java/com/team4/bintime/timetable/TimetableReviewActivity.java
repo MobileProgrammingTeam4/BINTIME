@@ -210,6 +210,7 @@ public class TimetableReviewActivity extends AppCompatActivity {
             ((TextView) card.findViewById(R.id.tvCourseTitle)).setText(course.getName());
             ((TextView) card.findViewById(R.id.tvCourseInfo)).setText(course.getFormattedInfo());
             if (flags != null) bindFlags(card.findViewById(R.id.tvCourseFlags), course, flags.get(i));
+            if (flags != null) bindTimeShift(card, course, index);
             View edit = card.findViewById(R.id.btnEditLecture);
             edit.setContentDescription(course.getName() + " 수정");
             edit.setOnClickListener(v -> editCourse.launch(CourseModifyActivity.open(this, draft, index)));
@@ -234,6 +235,30 @@ public class TimetableReviewActivity extends AppCompatActivity {
         View confirm = findViewById(R.id.btnConfirm);
         confirm.setEnabled(enabled);
         confirm.setAlpha(enabled ? 1f : 0.5f);
+    }
+
+    /**
+     * [BT-048] 인식 검수 행의 시작·종료 30분 빠른 조정. 0~1440분, 시작 &lt; 종료를 벗어나는 버튼은 막는다.
+     * 누르면 목록을 다시 그려 겹침·수정 필요·확인 버튼 상태를 다시 계산한다. 기존 [수정] 화면은 그대로 둔다.
+     */
+    private void bindTimeShift(View card, Course course, int index) {
+        card.findViewById(R.id.layoutTimeShift).setVisibility(View.VISIBLE);
+        bindShift(card.findViewById(R.id.btnStartEarlier), course, index, true, -RecognitionDrafts.SHIFT_MINUTES);
+        bindShift(card.findViewById(R.id.btnStartLater), course, index, true, RecognitionDrafts.SHIFT_MINUTES);
+        bindShift(card.findViewById(R.id.btnEndEarlier), course, index, false, -RecognitionDrafts.SHIFT_MINUTES);
+        bindShift(card.findViewById(R.id.btnEndLater), course, index, false, RecognitionDrafts.SHIFT_MINUTES);
+    }
+
+    private void bindShift(View button, Course course, int index, boolean start, int delta) {
+        boolean enabled = loaded && RecognitionDrafts.canShift(draft, index, start, delta);
+        button.setEnabled(enabled);
+        button.setAlpha(enabled ? 1f : 0.4f);
+        button.setContentDescription(getString(R.string.timetable_shift_description, course.getName(),
+                getString(start ? R.string.timetable_shift_start : R.string.timetable_shift_end),
+                getString(delta < 0 ? R.string.timetable_shift_earlier_word : R.string.timetable_shift_later_word)));
+        button.setOnClickListener(v -> {
+            if (RecognitionDrafts.shift(draft, index, start, delta)) showCourses();
+        });
     }
 
     /** 행 표시: 막는 판정(빨강)을 먼저, 안내(회색)를 뒤에. */

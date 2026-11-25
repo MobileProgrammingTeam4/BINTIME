@@ -81,4 +81,12 @@
     <string name="timetable_original_next">다음</string>
     <string name="timetable_original_hint">두 손가락으로 확대, 두 번 탭하면 원래 크기</string>
     <string name="timetable_original_missing">원본 이미지를 찾을 수 없어요. 앱을 다시 시작하면 원본은 지워져요</string>
+    <!-- [BT-048] 검수 화면 시각 빠른 조정 -->
+    <string name="timetable_shift_start">시작</string>
+    <string name="timetable_shift_end">종료</string>
+    <string name="timetable_shift_earlier">30분 앞</string>
+    <string name="timetable_shift_later">30분 뒤</string>
+    <string name="timetable_shift_description">%1$s %2$s 시각 30분 %3$s</string>
+    <string name="timetable_shift_earlier_word">앞으로</string>
+    <string name="timetable_shift_later_word">뒤로</string>
 </resources>
