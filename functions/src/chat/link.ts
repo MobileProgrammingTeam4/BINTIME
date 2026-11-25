@@ -100,10 +100,18 @@ export class ChatLinkService {
         });
         if (!entryResult.committed) throw failure("ROOM_ENTRY_CHANGED");
       }
+      // Mirror the current aggregate before marking the room ready. Reused ENDED rooms
+      // must become ACTIVE even if the final sync is unavailable. Include this match,
+      // which has not yet received its chatRoomId, and never revive an already-ended one.
+      const [linkingMatch, active] = await Promise.all([
+        matchRef.get(), this.db.collection("matches").where("chatRoomId", "==", roomId).where("status", "==", "ACTIVE").limit(1).get(),
+      ]);
+      const status = linkingMatch.get("status") === "ACTIVE" || !active.empty ? "ACTIVE" : "ENDED";
       const patch: Record<string, unknown> = { [`chatRooms/${roomId}/control/chatReady`]: true,
         [`chatRooms/${roomId}/control/writable`]: true };
       for (const uid of participants) {
         patch[`userChatRooms/${uid}/${roomId}/chatReady`] = true;
+        patch[`userChatRooms/${uid}/${roomId}/status`] = status;
       }
       await this.rtdb.ref().update(patch);
       await this.db.runTransaction(async tx => {

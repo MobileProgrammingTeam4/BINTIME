@@ -8,6 +8,7 @@ import android.widget.Toast;
 import com.google.firebase.auth.FirebaseAuth;
 import com.team4.bintime.R;
 import com.team4.bintime.profile.ProfileRepositories;
+import com.team4.bintime.notification.NotificationDevices;
 
 /**
  * BT-030 로그인 세션 감시. 메인 화면이 보이는 동안·다시 보일 때 로그인이 끊겼으면(계정 삭제·비활성화·토큰 만료로
@@ -58,13 +59,21 @@ public final class SessionGuard {
      * 다음 계정이 이전 계정의 화면·캐시를 보지 않게 한다.
      */
     public static void signOutByUser(Activity activity) {
+        if (userSignOutInProgress) return;
         userSignOutInProgress = true;
-        com.team4.bintime.notification.NotificationDevices.clearVisible(activity);
-        ProfileRepositories.get(activity).clearSessionCaches();
-        AuthRepositories.get(activity).signOut();
-        Intent intent = new Intent(activity, OnboardingActivity.class)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        activity.startActivity(intent);
+        Context app = activity.getApplicationContext();
+        String uid = AuthRepositories.get(app).getCurrentUid();
+        NotificationDevices.clearVisible(app);
+        NotificationDevices.unregister(app, () -> {
+            // A delayed old account callback must never sign a newer account out.
+            if (!java.util.Objects.equals(uid, AuthRepositories.get(app).getCurrentUid())) {
+                userSignOutInProgress = false; return;
+            }
+            ProfileRepositories.get(app).clearSessionCaches();
+            AuthRepositories.get(app).signOut();
+            app.startActivity(new Intent(app, OnboardingActivity.class)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
+        });
     }
 
     /** 다시 로그인한 뒤에는 만료 감시를 정상으로 되돌린다(온보딩·인증 화면에서 부름). */

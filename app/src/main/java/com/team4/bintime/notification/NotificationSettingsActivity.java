@@ -61,15 +61,7 @@ public class NotificationSettingsActivity extends AppCompatActivity {
             });
             rows.addView(toggle, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         }
-        // Ask in the notification settings context. Permission refusal leaves the in-app inbox available.
-        if (com.team4.bintime.auth.AuthRepositories.isFirebaseEnabled(this) && android.os.Build.VERSION.SDK_INT >= 33
-                && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            android.content.SharedPreferences permission = getSharedPreferences("notificationPermission", MODE_PRIVATE);
-            if (!permission.getBoolean("asked", false)) {
-                permission.edit().putBoolean("asked", true).apply();
-                requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 390);
-            }
-        }
+        NotificationPermission.requestOnce(this);
     }
     @Override protected void onStart() { super.onStart(); if (repository != null) observeRemote(); }
     @Override protected void onStop() { observation++; if (registration != null) registration.remove(); registration = null; super.onStop(); }
