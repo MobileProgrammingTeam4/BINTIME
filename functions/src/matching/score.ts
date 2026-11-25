@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { type Firestore, FieldValue, Timestamp } from "firebase-admin/firestore";
 import { evaluateMatch } from "../ai/internal";
 import { type EvaluateMatchInput, type EvaluateMatchOutput, SYSTEM_INSTRUCTION } from "../ai/tasks/evaluateMatch";
+import { stripContacts } from "../ai/tasks/generateProfile";
 import type { AiResponse } from "../ai/types";
 import { type Candidate, PURPOSE_ALL, type Slot } from "./eligibility";
 
@@ -79,7 +80,8 @@ export function toSide(data: Record<string, unknown> | undefined): PublicSide | 
   const tags = Array.isArray(data.interestTags)
     ? [...new Set(data.interestTags.map((t) => clip(t, 21).replace(/^#/, "").slice(0, 20)).filter(Boolean))].slice(0, 10)
     : [];
-  const bio = clip(data.bio, 150);
+  // 자기소개 속 이메일·전화번호·링크는 Gemini 에 보내지 않는다(BT-024 입력 최소화). 지운 뒤 비면 생략.
+  const bio = stripContacts(clip(data.bio, 150));
   return { department, grade, tags, ...(bio ? { bio } : {}) };
 }
 
