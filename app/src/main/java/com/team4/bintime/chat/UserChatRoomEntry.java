@@ -19,6 +19,8 @@ final class UserChatRoomEntry {
     final Boolean chatReady;
     /** BT-034: 항목을 처음 만든 서버 시각(ms). 필드가 없는 이전 방은 0 */
     final long linkedAt;
+    /** BT-046 blockedByMe(내가 차단)·blockedByPartner(상대가 차단). 둘 다면 내가 차단한 쪽을 보여 준다(내가 풀 수 있음). */
+    final ChatRoom.BlockState blockState;
 
     UserChatRoomEntry(String matchId, String otherUid, String lastMessage, long lastMessageAt,
                       int unreadCount, ChatRoom.Status status, boolean hidden) {
@@ -35,6 +37,13 @@ final class UserChatRoomEntry {
     UserChatRoomEntry(String matchId, String otherUid, String lastMessage, long lastMessageAt,
                       int unreadCount, ChatRoom.Status status, boolean hidden, boolean archived, Boolean chatReady,
                       long linkedAt) {
+        this(matchId, otherUid, lastMessage, lastMessageAt, unreadCount, status, hidden, archived, chatReady, linkedAt,
+                ChatRoom.BlockState.NONE);
+    }
+    UserChatRoomEntry(String matchId, String otherUid, String lastMessage, long lastMessageAt,
+                      int unreadCount, ChatRoom.Status status, boolean hidden, boolean archived, Boolean chatReady,
+                      long linkedAt, ChatRoom.BlockState blockState) {
+        this.blockState = blockState == null ? ChatRoom.BlockState.NONE : blockState;
         this.matchId = matchId;
         this.otherUid = otherUid;
         this.lastMessage = lastMessage;

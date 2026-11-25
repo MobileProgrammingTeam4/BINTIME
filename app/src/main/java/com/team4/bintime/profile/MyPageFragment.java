@@ -158,9 +158,9 @@ public class MyPageFragment extends Fragment {
             editProfileLauncher.launch(intent);
         });
 
-        // 2. 차단한 사용자 관리
+        // 2. 차단한 사용자 관리 (BT-046)
         root.findViewById(R.id.menuBlockedUsers).setOnClickListener(v ->
-                Toast.makeText(requireContext(), "차단한 사용자 관리 (후속 이슈 연동 예정)", Toast.LENGTH_SHORT).show());
+                startActivity(new Intent(requireContext(), BlockedUsersActivity.class)));
 
         // 3. 시간표 관리
         root.findViewById(R.id.menuTimetable).setOnClickListener(v ->
