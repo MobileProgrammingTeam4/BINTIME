@@ -160,7 +160,7 @@ userChatRooms/{uid}/{chatRoomId}: {..., chatReady, archived, hidden, linkedAt, b
 - `aiUsage/{uid}_{YYYY-MM-DD}`(BT-024)는 Gemini 게이트웨이의 사용자별 하루 호출 수입니다. 날짜는 `Asia/Seoul` 기준이며 **서버(Cloud Functions)만 쓰고 앱은 읽기·쓰기 모두 금지**합니다. 자세한 계약은 [`docs/BT-024.md`](./docs/BT-024.md)를 참고합니다.
 - RTDB 채팅(`chatRooms`, `userChatRooms`)의 접근 규칙은 `database.rules.json`(BT-021)입니다. 메시지는 방 멤버만 읽고 새로 쓸 수 있으며(`senderId === auth.uid`, 서버 시각, 본문 1~1000자, 수정·삭제 금지), 멤버·목록·나가기 상태는 서버만 씁니다. 자세한 계약과 에뮬레이터 사용법은 [`docs/BT-021.md`](./docs/BT-021.md)를 참고합니다.
 - `control`은 서버 전용 읽기·쓰기이며 Rules가 `writable/archived`로 전송을 판정합니다. 앱은 본인의 `userChatRooms.chatReady/archived`와 현재 참여자용 `chatRoomLinks`를 표시 상태로 사용합니다. 매칭이 ENDED여도 보관되지 않은 준비된 방은 계속 전송할 수 있습니다.
-- 차단(BT-046)은 `blockUser`/`unblockUser({targetUid})` Callable만 씁니다. 차단 기록 `users/{uid}/blockedUsers/{blockedUid}`는 본인만 읽고, 검색·요청 생성·수락은 양방향 차단 쌍을 제외합니다. 차단 시 두 사람 사이 대기 요청을 `terminalReason=BLOCKED`로 정리하고, 기존 채팅은 기록을 유지한 채 서버 전용 `chatRooms/{roomId}/blocks`로 새 메시지만 막습니다. 상세는 [`docs/BT-046.md`](./docs/BT-046.md)를 따릅니다.
+- 차단(BT-046)은 `blockUser`/`unblockUser({targetUid})` Callable만 씁니다. 차단 기록 `users/{uid}/blockedUsers/{blockedUid}`는 본인만 읽고, 검색·요청 생성·수락은 양방향 차단 쌍을 제외합니다. 차단 시 두 사람 사이 대기 요청을 사유 없이 거절·취소로 정리하고(상대에게 차단 사실 비공개), 기존 채팅은 기록을 유지한 채 서버 전용 `chatRooms/{roomId}/blocks`로 새 메시지만 막습니다. 상세는 [`docs/BT-046.md`](./docs/BT-046.md)를 따릅니다.
 
 더 구체적인 역할별 데이터·상태 변경 경계 및 AI 에이전트 작업 규칙은 [`AGENTS.md`](./AGENTS.md)를 참고하세요.
 

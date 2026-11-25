@@ -8,6 +8,8 @@ import { collection, doc, getDoc, getDocs, setDoc, deleteDoc } from "firebase/fi
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ChatLinkService } from "../src/chat/link";
 import { FirestoreMatchStore } from "../src/matching/search";
+import { SearchCandidateResolver } from "../src/requests/candidates";
+import { RequestService } from "../src/requests/service";
 import { BlockService, MAX_BLOCKED_USERS } from "../src/safety/block";
 
 /**
@@ -66,8 +68,13 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_DA
 
     expect((await db.doc(`users/${ME}/blockedUsers/${OTHER}`).get()).data())
       .toEqual({ blockedUid: OTHER, createdAt: Timestamp.fromMillis(NOW) });
-    expect((await db.doc("matchRequests/sent").get()).data()).toMatchObject({ status: "CANCELED", terminalReason: "BLOCKED" });
-    expect((await db.doc("matchRequests/received").get()).data()).toMatchObject({ status: "REJECTED", terminalReason: "BLOCKED" });
+    expect((await db.doc("matchRequests/sent").get()).data()).toMatchObject({ status: "CANCELED", updatedAt: Timestamp.fromMillis(NOW) });
+    expect((await db.doc("matchRequests/received").get()).data()).toMatchObject({ status: "REJECTED" });
+    // 두 사람이 모두 읽는 요청 문서에는 차단 사유를 남기지 않는다(상대에게 차단 사실 비공개, #129 리뷰)
+    for (const id of ["sent", "received"]) expect((await db.doc(`matchRequests/${id}`).get()).get("terminalReason")).toBeUndefined();
+    const other = env.authenticatedContext(OTHER).firestore();
+    const seen = (await assertSucceeds(getDoc(doc(other, "matchRequests/sent")))).data();
+    expect(seen).not.toHaveProperty("terminalReason");
     expect((await db.doc("matchRequests/other").get()).get("status")).toBe("PENDING");
     expect((await db.doc("matchRequests/done").get()).get("status")).toBe("ACCEPTED");
     // 직접 취소가 아니므로 60초 재신청 제한을 만들지 않는다.
@@ -154,5 +161,86 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_DA
 
   it("차단 해제는 차단한 적 없어도 실패하지 않는다", async () => {
     await expect(service().unblock(ME, OTHER)).resolves.toMatchObject({ blocked: false });
+  });
+
+
+  /**
+   * #129 리뷰(D): 차단과 동시에 들어온 요청 생성·수락이 새 PENDING 이나 확정 매칭을 남기지 않는다.
+   * 실제 RequestService·SearchCandidateResolver(BT-019·031)를 그대로 쓴다. 준비 데이터는 request-candidates.test.ts 와 같다.
+   */
+  describe("BT-046 차단과 요청 생성·수락 경합", () => {
+    const clock = () => new Date("2026-11-11T00:00:00Z");
+    const requests = new RequestService(db, new SearchCandidateResolver(db), clock);
+    const blocker = () => new BlockService(db, rtdb, clock);
+    const cells = [0, 0, 0, 2 ** 20 + 2 ** 21 + 2 ** 22, 0, 0, 0];
+    const slot = { dayOfWeek: 4, startMinute: 600, endMinute: 690 };
+    const pending = async () => (await db.collection("matchRequests").where("status", "==", "PENDING").get()).size;
+
+    beforeEach(async () => {
+      await env.clearFirestore(); await env.clearDatabase();
+      const batch = db.batch();
+      for (const uid of ["sender", "receiver"]) {
+        batch.set(db.doc(`users/${uid}`), { profileCompleted: true });
+        batch.set(db.doc(`publicProfiles/${uid}`), { uid, nickname: uid });
+        batch.set(db.doc(`matchSettings/${uid}`), { isMatching: true, minOverlapMinutes: 60, purposes: [] });
+        batch.set(db.doc(`timetables/${uid}`), { uid, revision: 1, freeCells: cells });
+        batch.set(db.doc(`availability/${uid}`), { sourceRevision: 1, slots: [slot] });
+      }
+      await batch.commit();
+    });
+
+    it("차단이 먼저 커밋되면 이후 생성·수락은 거부된다", async () => {
+      const created = await requests.create("sender", { candidateId: "receiver", clientRequestId: randomUUID() });
+      await blocker().block("receiver", "sender");
+      expect((await db.doc(`matchRequests/${created.id}`).get()).get("status")).toBe("REJECTED");
+      await expect(requests.respond("receiver", { requestId: created.id, action: "ACCEPTED" }))
+        .rejects.toMatchObject({ details: { reason: "REQUEST_NOT_PENDING" } });
+      await expect(requests.create("sender", { candidateId: "receiver", clientRequestId: randomUUID() }))
+        .rejects.toMatchObject({ details: { reason: "INVALID_CANDIDATE" } });
+      expect(await pending()).toBe(0);
+      expect((await db.collection("matches").get()).empty).toBe(true);
+    });
+
+    it("생성과 차단이 동시에 와도 차단 뒤에 대기 요청이 남지 않는다", async () => {
+      for (let round = 0; round < 3; round++) {
+        await db.doc("users/receiver/blockedUsers/sender").delete();
+        for (const doc of (await db.collection("matchRequests").get()).docs) await doc.ref.delete();
+        for (const doc of (await db.collection("matchRequestGuards").get()).docs) await doc.ref.delete();
+        await db.doc("requestUserGuards/sender").delete();
+        const [create, block] = await Promise.allSettled([
+          requests.create("sender", { candidateId: "receiver", clientRequestId: randomUUID() }),
+          blocker().block("receiver", "sender"),
+        ]);
+        expect(block.status).toBe("fulfilled");
+        // 생성이 먼저면 차단이 그 요청을 거절로 끝내고, 차단이 먼저면 생성이 거부된다. 어느 쪽이든 PENDING 은 0.
+        if (create.status === "rejected") expect(create.reason).toMatchObject({ details: { reason: "INVALID_CANDIDATE" } });
+        expect(await pending()).toBe(0);
+      }
+    });
+
+    it("수락과 차단이 동시에 와도 대기 요청이 남지 않고, 확정은 수락이 먼저 끝난 경우에만 생긴다", async () => {
+      for (let round = 0; round < 3; round++) {
+        await env.clearFirestore();
+        const batch = db.batch();
+        for (const uid of ["sender", "receiver"]) {
+          batch.set(db.doc(`users/${uid}`), { profileCompleted: true });
+          batch.set(db.doc(`publicProfiles/${uid}`), { uid, nickname: uid });
+          batch.set(db.doc(`matchSettings/${uid}`), { isMatching: true, minOverlapMinutes: 60, purposes: [] });
+          batch.set(db.doc(`timetables/${uid}`), { uid, revision: 1, freeCells: cells });
+          batch.set(db.doc(`availability/${uid}`), { sourceRevision: 1, slots: [slot] });
+        }
+        await batch.commit();
+        const created = await requests.create("sender", { candidateId: "receiver", clientRequestId: randomUUID() });
+        const [accept] = await Promise.allSettled([
+          requests.respond("receiver", { requestId: created.id, action: "ACCEPTED" }),
+          blocker().block("receiver", "sender"),
+        ]);
+        const status = (await db.doc(`matchRequests/${created.id}`).get()).get("status");
+        const match = (await db.doc(`matches/${created.id}`).get()).exists;
+        expect(await pending()).toBe(0);
+        if (accept.status === "fulfilled") { expect(status).toBe("ACCEPTED"); expect(match).toBe(true); }
+        else { expect(status).toBe("REJECTED"); expect(match).toBe(false); }
+      }
+    });
   });
 });

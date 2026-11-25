@@ -9,8 +9,11 @@ import { chatPairKey } from "../chat/link";
  *
  * - 차단 기록: users/{uid}/blockedUsers/{blockedUid} = { blockedUid, createdAt }. 본인만 읽고, 쓰기는 이 서버만 한다.
  *   매칭 검색(searchMatches)·요청 생성·수락은 이미 양방향으로 이 문서를 확인한다.
- * - 대기 요청: 두 사람 사이 PENDING 을 같은 트랜잭션에서 끝낸다. 내가 보낸 것은 CANCELED, 받은 것은 REJECTED,
- *   terminalReason = "BLOCKED". 직접 취소가 아니므로 60초 재신청 제한(cooldownUntil)을 만들지 않는다.
+ * - 대기 요청: 두 사람 사이 PENDING 을 같은 트랜잭션에서 끝낸다. 내가 보낸 것은 CANCELED, 받은 것은 REJECTED.
+ *   공유 요청 문서에는 상태만 남기고 terminalReason 은 쓰지 않는다(차단 사실 비공개).
+ *   직접 취소가 아니므로 60초 재신청 제한(cooldownUntil)을 만들지 않는다.
+ * - 동시성: 요청 생성(후보 재검증)·수락은 같은 트랜잭션에서 blockedUsers 문서를 읽으므로, 차단이 먼저 커밋되면
+ *   뒤따르는 생성·수락은 다시 실행되어 거부된다. 수락이 먼저 커밋된 확정 매칭은 그대로 둔다(BT-046 결정).
  * - 채팅: 기록은 그대로 두고 새 메시지만 막는다. 두 사람이 함께 쓰는 모든 방에
  *   chatRooms/{roomId}/blocks/{blockerUid} = true 를 쓰면 database.rules.json 이 전송을 거부한다.
  *   control(BT-034/038/043 이 관리)과 다른 노드라 방 상태 작업과 겹치지 않는다.
@@ -55,8 +58,10 @@ export class BlockService {
         : [];
       const at = Timestamp.fromDate(this.now());
       if (!existing.exists) tx.create(ref, { blockedUid: targetUid, createdAt: at });
+      // 요청 문서는 두 사람이 모두 읽으므로 상태만 바꾼다. 차단 사유(terminalReason)를 남기면 상대가 차단 사실을 알게 된다(#129 리뷰 D).
+      // 상대에게는 일반 거절·취소와 같게 보인다. 차단 기록은 본인만 읽는 blockedUsers 에만 있다.
       const close = (doc: QueryDocumentSnapshot, status: "CANCELED" | "REJECTED") =>
-        tx.update(doc.ref, { status, terminalReason: "BLOCKED", updatedAt: at });
+        tx.update(doc.ref, { status, updatedAt: at });
       sent.docs.forEach(doc => close(doc, "CANCELED"));
       received.docs.forEach(doc => close(doc, "REJECTED"));
       // 요청 생성·수락과 같은 사용자 잠금 문서에서 경합하게 한다(BT-031). cooldownUntil 은 건드리지 않는다.
