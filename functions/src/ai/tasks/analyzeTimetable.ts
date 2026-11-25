@@ -158,8 +158,9 @@ export const analyzeTimetableTask: AiTask<AnalyzeTimetableInput, AnalyzeTimetabl
   input,
   output,
   // BT-048: gemini-3.8-flash 는 이미지 한 장에 평균 15~20초, 30초 제한에서 14회 중 5회 실패했다(E 비교).
-  // 한 번 호출 90초는 함수 제한 120초·앱 제한 130초 안에 들어간다. 재시도까지 포함한 최악값은 docs/BT-048.md 참고.
-  timeoutMs: 90_000,
+  // 제한은 SDK 가 Gemini 서버 마감(X-Server-Timeout)으로도 보내 504 가 마감 직전에 오고, gemini.ts 가 504 를
+  // 한 번 재시도하므로 최악값은 약 2배다. 55초 × 2 + 0.5초 ≈ 110초로 함수 제한 120초 안에 둔다(docs/BT-048.md).
+  timeoutMs: 55_000,
   dailyLimit: 10,
   // 수업 최대 60개 배열 안의 정수 범위(분 0~1440 등)·문자열 길이 제약을 그대로 보내면 Gemini 가
   // 400 "too many states for serving" 으로 거부한다(2026-11-18 운영 1회, 로컬 재현). 구조만 보내고

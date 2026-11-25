@@ -203,9 +203,9 @@ describe("analyzeTimetable live: 요청 본문", () => {
     expect(call.systemInstruction).toContain("0.9 이상");
     expect(call.temperature).toBe(0);
     expect(call.maxOutputTokens).toBe(8192);
-    // BT-048: 모델 호출 제한 90초. 함수 제한(index.ts timeoutSeconds 120)보다 짧아야 AI_TIMEOUT 으로 끝난다.
-    expect(call.timeoutMs).toBe(90_000);
-    expect(call.timeoutMs).toBeLessThan(120_000);
+    // BT-048: 모델 호출 제한 55초. 마감 504 를 한 번 재시도해도(2회 + 0.5초) 함수 제한 120초 안에 들어가야 한다.
+    expect(call.timeoutMs).toBe(55_000);
+    expect(call.timeoutMs * 2 + 500).toBeLessThan(120_000);
     const contents = call.contents as Array<{ role: string; parts: Array<Record<string, any>> }>;
     expect(contents).toHaveLength(1);
     expect(contents[0].role).toBe("user");
