@@ -18,6 +18,8 @@ import java.util.UUID;
 final class RecognitionDrafts {
 
     private static final String DAY_LABELS = "월화수목금토일";
+    /** [BT-048] 검수 화면 빠른 조정 단위(분). */
+    static final int SHIFT_MINUTES = 30;
 
     private RecognitionDrafts() {
     }
@@ -62,6 +64,38 @@ final class RecognitionDrafts {
 
     static List<Set<RecognitionReview.Flag>> check(TimetableDraft draft) {
         return RecognitionReview.check(reviewRows(draft));
+    }
+
+    /**
+     * [BT-048] 행 index 의 시작(start=true) 또는 종료 시각이 delta 분 옮겨질 수 있는지.
+     * 0 이상 1440 이하, 시작 &lt; 종료를 지켜야 한다. 시각을 읽을 수 없는 행(수정 필요)은 옮기지 않는다.
+     */
+    static boolean canShift(TimetableDraft draft, int index, boolean start, int delta) {
+        Course row = row(draft, index);
+        if (row == null) return false;
+        int from = minutes(row.getStartTime());
+        int to = minutes(row.getEndTime());
+        if (from < 0 || to < 0 || from >= to || to > 1440) return false;
+        if (start) from += delta;
+        else to += delta;
+        return from >= 0 && to <= 1440 && from < to;
+    }
+
+    /** [BT-048] {@link #canShift}가 참이면 그 행의 시각만 바꾸고 true. 판정(겹침·확인 필요)은 화면이 다시 계산한다. */
+    static boolean shift(TimetableDraft draft, int index, boolean start, int delta) {
+        if (!canShift(draft, index, start, delta)) return false;
+        Course row = row(draft, index);
+        if (start) {
+            row.setStartTime(TimeSlot.minutesToTimeString(minutes(row.getStartTime()) + delta));
+        } else {
+            row.setEndTime(TimeSlot.minutesToTimeString(minutes(row.getEndTime()) + delta));
+        }
+        return true;
+    }
+
+    private static Course row(TimetableDraft draft, int index) {
+        if (draft == null || index < 0 || index >= draft.courses.size()) return null;
+        return draft.courses.get(index);
     }
 
     /** "HH:mm" → 분. 자정 끝("24:00")은 1440. 틀린 값은 -1(시간 수정 필요로 표시된다). */

@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- [BT-048] 검수 화면 원본 보기(전체 화면). 배경은 대화상자 테마(Theme.Black 전체 화면)의 검정. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true">
+
+    <com.team4.bintime.timetable.ZoomImageView
+        android:id="@+id/original_image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="56dp"
+        android:layout_marginBottom="64dp" />
+
+    <TextView
+        android:id="@+id/original_missing"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:padding="24dp"
+        android:text="@string/timetable_original_missing"
+        android:textAppearance="@style/TextAppearance.BinTime.BodyM"
+        android:textColor="@android:color/white"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_gravity="top"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="20dp">
+
+        <TextView
+            android:id="@+id/original_counter"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textAppearance="@style/TextAppearance.BinTime.BodyM"
+            android:textColor="@android:color/white" />
+
+        <TextView
+            android:id="@+id/original_close"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackground"
+            android:gravity="center"
+            android:minWidth="48dp"
+            android:paddingHorizontal="8dp"
+            android:text="@string/timetable_original_close"
+            android:textAppearance="@style/TextAppearance.BinTime.BodyM"
+            android:textColor="@android:color/white" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_gravity="bottom"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="20dp">
+
+        <TextView
+            android:id="@+id/original_previous"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackground"
+            android:gravity="center"
+            android:minWidth="64dp"
+            android:text="@string/timetable_original_previous"
+            android:textAppearance="@style/TextAppearance.BinTime.BodyM"
+            android:textColor="@android:color/white" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="@string/timetable_original_hint"
+            android:textAppearance="@style/TextAppearance.BinTime.BodyS"
+            android:textColor="@android:color/darker_gray" />
+
+        <TextView
+            android:id="@+id/original_next"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackground"
+            android:gravity="center"
+            android:minWidth="64dp"
+            android:text="@string/timetable_original_next"
+            android:textAppearance="@style/TextAppearance.BinTime.BodyM"
+            android:textColor="@android:color/white" />
+    </LinearLayout>
+</FrameLayout>

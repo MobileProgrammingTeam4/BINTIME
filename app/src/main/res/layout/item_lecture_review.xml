@@ -48,6 +48,65 @@
             android:visibility="gone"
             tools:text="확인 필요 · 인식 신뢰도 52%"
             tools:visibility="visible" />
+
+        <!-- [BT-048] 인식 검수에서만: 시작·종료 30분 빠른 조정 -->
+        <LinearLayout
+            android:id="@+id/layoutTimeShift"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="vertical"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="36dp"
+                    android:layout_height="wrap_content"
+                    android:text="@string/timetable_shift_start"
+                    android:textAppearance="@style/TextAppearance.BinTime.BodyS"
+                    android:textColor="@color/text_secondary" />
+
+                <TextView
+                    android:id="@+id/btnStartEarlier"
+                    style="@style/TimetableShiftButton"
+                    android:text="@string/timetable_shift_earlier" />
+
+                <TextView
+                    android:id="@+id/btnStartLater"
+                    style="@style/TimetableShiftButton"
+                    android:text="@string/timetable_shift_later" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="36dp"
+                    android:layout_height="wrap_content"
+                    android:text="@string/timetable_shift_end"
+                    android:textAppearance="@style/TextAppearance.BinTime.BodyS"
+                    android:textColor="@color/text_secondary" />
+
+                <TextView
+                    android:id="@+id/btnEndEarlier"
+                    style="@style/TimetableShiftButton"
+                    android:text="@string/timetable_shift_earlier" />
+
+                <TextView
+                    android:id="@+id/btnEndLater"
+                    style="@style/TimetableShiftButton"
+                    android:text="@string/timetable_shift_later" />
+            </LinearLayout>
+        </LinearLayout>
     </LinearLayout>
 
     <TextView

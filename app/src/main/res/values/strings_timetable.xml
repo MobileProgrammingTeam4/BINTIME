@@ -71,4 +71,22 @@
     <string name="timetable_replace_cancel">취소</string>
     <!-- [BT-026 B 제안 ②] 저장 전 오프라인 안내. 프로필 저장(profile_save_offline)과 같은 톤. -->
     <string name="timetable_save_offline">네트워크 연결을 확인해 주세요. 연결된 뒤 다시 저장할 수 있어요</string>
+    <!-- [BT-048] 검수 화면 원본 보기 -->
+    <string name="timetable_original_open">원본 보기</string>
+    <string name="timetable_original_open_description">올린 시간표 이미지 원본 보기</string>
+    <string name="timetable_original_counter">%1$d / %2$d</string>
+    <string name="timetable_original_image_description">시간표 원본 이미지 %1$d번</string>
+    <string name="timetable_original_close">닫기</string>
+    <string name="timetable_original_previous">이전</string>
+    <string name="timetable_original_next">다음</string>
+    <string name="timetable_original_hint">두 손가락으로 확대, 두 번 탭하면 원래 크기</string>
+    <string name="timetable_original_missing">원본 이미지를 찾을 수 없어요. 앱을 다시 시작하면 원본은 지워져요</string>
+    <!-- [BT-048] 검수 화면 시각 빠른 조정 -->
+    <string name="timetable_shift_start">시작</string>
+    <string name="timetable_shift_end">종료</string>
+    <string name="timetable_shift_earlier">30분 앞</string>
+    <string name="timetable_shift_later">30분 뒤</string>
+    <string name="timetable_shift_description">%1$s %2$s 시각 30분 %3$s</string>
+    <string name="timetable_shift_earlier_word">앞으로</string>
+    <string name="timetable_shift_later_word">뒤로</string>
 </resources>
