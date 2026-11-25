@@ -16,6 +16,7 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
 
 import com.google.android.material.chip.ChipGroup;
 import com.team4.bintime.R;
@@ -60,9 +61,32 @@ public class MyPageFragment extends Fragment {
         super.onCreate(savedInstanceState);
         profileRepo = ProfileRepositories.get(requireContext());
         getChildFragmentManager().setFragmentResultListener(KEY_LOGOUT, this, (key, result) -> logout());
-        // 실제 계정 삭제는 후속 이슈 범위라, 완료된 것처럼 안내하지 않는다.
+        // BT-045: 확인하면 서버에서 탈퇴를 처리한다. 진행 상태는 ViewModel 이 들고 있어 회전 후에도 이어진다.
+        deletion = new ViewModelProvider(this).get(AccountDeletionViewModel.class);
         getChildFragmentManager().setFragmentResultListener(KEY_DELETE_ACCOUNT, this, (key, result) ->
-                Toast.makeText(requireContext(), R.string.my_delete_not_ready, Toast.LENGTH_SHORT).show());
+                deletion.delete(AuthRepositories.get(requireContext())));
+        deletion.getState().observe(this, this::onDeletionState);
+    }
+
+    private AccountDeletionViewModel deletion;
+
+    private void onDeletionState(AccountDeletionViewModel.State state) {
+        if (state == null || !state.consume()) return;
+        switch (state.status) {
+            case RUNNING:
+                AccountDeletionProgressDialog.show(getChildFragmentManager());
+                break;
+            case DONE:
+                AccountDeletionProgressDialog.hide(getChildFragmentManager());
+                Toast.makeText(requireContext(), R.string.my_delete_done, Toast.LENGTH_SHORT).show();
+                // 서버가 계정을 지웠다. 캐시·기기 로그인을 정리하고 온보딩으로 간다(BT-030 경로 재사용).
+                SessionGuard.signOutByUser(requireActivity());
+                break;
+            case FAILED:
+                AccountDeletionProgressDialog.hide(getChildFragmentManager());
+                Toast.makeText(requireContext(), state.message, Toast.LENGTH_SHORT).show();
+                break;
+        }
     }
 
     @Nullable
@@ -192,7 +216,7 @@ public class MyPageFragment extends Fragment {
     }
 
     private void showDeleteAccountDialog() {
-        if (getChildFragmentManager().findFragmentByTag(KEY_DELETE_ACCOUNT) != null) return;
+        if (deletion.isRunning() || getChildFragmentManager().findFragmentByTag(KEY_DELETE_ACCOUNT) != null) return;
         ConfirmDialog.show(getChildFragmentManager(), KEY_DELETE_ACCOUNT,
                 getString(R.string.my_delete_title), getString(R.string.my_delete_message),
                 getString(R.string.my_delete_confirm));

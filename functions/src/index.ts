@@ -14,6 +14,7 @@ import { createSearchCallable } from "./matching/callable";
 import { createMessageTrigger } from "./chat/trigger";
 import { createRequestMaintenanceSchedule } from "./requests/scheduled";
 import { createChatLinkCallable, createChatLinkTrigger } from "./chat/linkCallable";
+import { createDeleteAccountCallable } from "./account/callable";
 
 /** D · BT-019 요청 생성. */
 export const createMatchRequest = createRequestCallable();
@@ -40,6 +41,9 @@ export const generateProfile = createAiCallable(generateProfileTask);
 export const recommendPlace = createAiCallable(recommendPlaceTask);
 /** E · BT-041 */
 export const suggestChatReplies = createAiCallable(suggestChatRepliesTask);
+
+/** B · BT-045 회원 탈퇴. 개인 데이터 삭제·대기 요청/진행 매칭 정리·채팅방 나가기 후 Auth 계정을 지운다. */
+export const deleteAccount = createDeleteAccountCallable();
 
 /** A · BT-017 매칭 후보 검색 */
 export const searchMatches = createSearchCallable();

@@ -69,7 +69,8 @@
     <string name="my_logout_message">다시 이용하려면 학교 이메일 인증이 필요해요</string>
     <string name="my_logout_done">로그아웃 되었어요</string>
     <string name="my_delete_title">회원 탈퇴할까요</string>
-    <string name="my_delete_message">탈퇴하면 시간표와 매칭 기록이 모두 삭제돼요</string>
+    <string name="my_delete_message">프로필·시간표가 삭제되고 진행 중인 매칭과 채팅은 종료돼요</string>
+    <string name="my_delete_progress">탈퇴 처리 중이에요</string>
+    <string name="my_delete_done">탈퇴했어요. 이용해 주셔서 감사해요</string>
     <string name="my_delete_confirm">탈퇴하기</string>
-    <string name="my_delete_not_ready">회원 탈퇴는 계정 연동 후 제공돼요 (목업)</string>
 </resources>

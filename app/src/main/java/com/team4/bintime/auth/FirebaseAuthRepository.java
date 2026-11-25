@@ -10,8 +10,10 @@ import com.google.firebase.auth.ActionCodeSettings;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.functions.FirebaseFunctions;
 
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Firebase Authentication 비밀번호 없는 이메일 링크 로그인 (BT-013).
@@ -110,6 +112,28 @@ public final class FirebaseAuthRepository implements AuthRepository {
     public void signOut() {
         auth.signOut();
         prefs().edit().remove(KEY_PENDING_EMAIL).apply();
+    }
+
+    /** BT-045: deleteAccount Callable(asia-northeast3). 입력 없이 토큰 UID 로만 탈퇴한다. */
+    @Override
+    public void deleteAccount(Callback<Void> callback) {
+        if (auth.getCurrentUser() == null) {
+            callback.onError("로그인이 필요해요.");
+            return;
+        }
+        FirebaseFunctions.getInstance("asia-northeast3").getHttpsCallable("deleteAccount")
+                .withTimeout(130, TimeUnit.SECONDS) // 서버 제한 120초보다 조금 길게
+                .call()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        callback.onSuccess(null);
+                        return;
+                    }
+                    Exception e = task.getException();
+                    boolean network = e instanceof FirebaseNetworkException
+                            || (e != null && e.getCause() instanceof FirebaseNetworkException);
+                    callback.onError(network ? MSG_DELETE_NETWORK : MSG_DELETE_FAILED);
+                });
     }
 
     /**
