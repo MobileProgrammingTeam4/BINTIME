@@ -31,7 +31,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="인식 결과확인"
+            android:text="인식 결과 확인"
             android:textAppearance="@style/TextAppearance.BinTime.H1" />
 
         <!-- [BT-048] 인식 검수에서 원본 사본이 있을 때만 보인다. -->
