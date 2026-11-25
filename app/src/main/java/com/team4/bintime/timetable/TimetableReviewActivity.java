@@ -41,6 +41,7 @@ public class TimetableReviewActivity extends AppCompatActivity {
     private static final String LOADED = "timetable_review_loaded";
     private static final String EXTRA_DROPPED = "timetable_recognition_dropped";
     private static final String EXTRA_WARNINGS = "timetable_recognition_warnings";
+    private static final String EXTRA_ORIGINALS = "timetable_recognition_originals";
     private TimetableDraft draft;
     private int pendingDelete = -1;
     private boolean editingExisting;
@@ -51,11 +52,17 @@ public class TimetableReviewActivity extends AppCompatActivity {
         return new Intent(context, TimetableReviewActivity.class).putExtra(EDIT_EXISTING, true);
     }
 
-    /** [BT-026] 인식 결과 검수. warnings 는 서버(모델) 안내 문장, dropped 는 형식이 틀려 뺀 수업 수. */
-    static Intent forRecognition(Context context, TimetableDraft draft, int dropped, List<String> warnings) {
+    /**
+     * [BT-026] 인식 결과 검수. warnings 는 서버(모델) 안내 문장, dropped 는 형식이 틀려 뺀 수업 수.
+     * [BT-048] originals 는 '원본 보기'용 앱 캐시 사본 경로(업로드 순서). 없으면 버튼을 숨긴다.
+     */
+    static Intent forRecognition(Context context, TimetableDraft draft, int dropped, List<String> warnings,
+                                 List<String> originals) {
         return TimetableDraft.open(context, TimetableReviewActivity.class, draft)
                 .putExtra(EXTRA_DROPPED, dropped)
-                .putStringArrayListExtra(EXTRA_WARNINGS, new ArrayList<>(warnings));
+                .putStringArrayListExtra(EXTRA_WARNINGS, new ArrayList<>(warnings))
+                .putStringArrayListExtra(EXTRA_ORIGINALS,
+                        originals == null ? new ArrayList<>() : new ArrayList<>(originals));
     }
 
     private final ActivityResultLauncher<Intent> editCourse = registerForActivityResult(
@@ -110,6 +117,7 @@ public class TimetableReviewActivity extends AppCompatActivity {
         }
 
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
+        bindOriginals();
         findViewById(R.id.timetable_add_course).setOnClickListener(v ->
                 editCourse.launch(CourseModifyActivity.open(this, draft, -1)));
         findViewById(R.id.btnConfirm).setOnClickListener(v ->
@@ -124,6 +132,24 @@ public class TimetableReviewActivity extends AppCompatActivity {
         showCourses();
         setEditable(loaded);
         if (!loaded) loadExisting();
+    }
+
+    /** [BT-048] 원본 사본이 아직 있으면(프로세스 재시작 뒤 지워졌을 수 있다) '원본 보기'를 보인다. */
+    private void bindOriginals() {
+        View button = findViewById(R.id.timetable_view_original);
+        boolean available = reviewingRecognition()
+                && !RecognitionImageCache.existing(getIntent().getStringArrayListExtra(EXTRA_ORIGINALS)).isEmpty();
+        button.setVisibility(available ? View.VISIBLE : View.GONE);
+        button.setOnClickListener(v -> {
+            ArrayList<String> found = new ArrayList<>(
+                    RecognitionImageCache.existing(getIntent().getStringArrayListExtra(EXTRA_ORIGINALS)));
+            if (found.isEmpty()) {
+                button.setVisibility(View.GONE);
+                Toast.makeText(this, R.string.timetable_original_missing, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            OriginalImagesDialog.show(getSupportFragmentManager(), found);
+        });
     }
 
     private boolean reviewingRecognition() {

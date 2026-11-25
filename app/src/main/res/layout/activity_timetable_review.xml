@@ -34,6 +34,21 @@
             android:text="인식 결과확인"
             android:textAppearance="@style/TextAppearance.BinTime.H1" />
 
+        <!-- [BT-048] 인식 검수에서 원본 사본이 있을 때만 보인다. -->
+        <TextView
+            android:id="@+id/timetable_view_original"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginEnd="4dp"
+            android:background="?attr/selectableItemBackground"
+            android:contentDescription="@string/timetable_original_open_description"
+            android:gravity="center"
+            android:paddingHorizontal="8dp"
+            android:text="@string/timetable_original_open"
+            android:textAppearance="@style/TextAppearance.BinTime.BodyM"
+            android:textColor="@color/action_primary"
+            android:visibility="gone" />
+
         <ImageView
             android:id="@+id/timetable_add_course"
             android:layout_width="40dp"
