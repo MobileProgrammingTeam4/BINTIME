@@ -3,6 +3,7 @@
  * BT-024: Gemini 공통 게이트웨이. 앱은 아래 Callable 만 호출하고 Gemini 를 직접 부르지 않는다.
  * 리전: asia-northeast3 (앱은 FirebaseFunctions.getInstance("asia-northeast3") 사용)
  */
+import "./security/appCheck";
 import { createAiCallable } from "./ai/callable";
 import { aiPingTask } from "./ai/tasks/aiPing";
 import { analyzeTimetableTask } from "./ai/tasks/analyzeTimetable";

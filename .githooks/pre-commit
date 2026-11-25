@@ -1,0 +1,3 @@
+#!/bin/sh
+# Opt in per checkout: git config --local core.hooksPath .githooks
+exec node scripts/secret_scan.cjs --staged
