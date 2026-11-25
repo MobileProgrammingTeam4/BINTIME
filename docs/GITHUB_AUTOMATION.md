@@ -41,6 +41,7 @@ GitHub 자체의 closing keyword 기능은 기본 브랜치 병합에서만 동�
 ## 적용 파일
 
 - CI: `.github/workflows/android-ci.yml`
+- CI 실행 범위 판별: `scripts/ci_plan.cjs`, 검증: `tests/ci-plan.test.cjs`
 - 이슈 상태 및 종료: `.github/workflows/pr-issue-status.yml`, `scripts/pr_issue_status.cjs`
 - 선택적 Project: `.github/workflows/pr-project-status.yml`, `scripts/pr_project_status.cjs`
 - 검증: `tests/*.test.cjs`
@@ -61,12 +62,32 @@ main을 전혀 수정하지 않는 정책을 유지한다면 현재 pull_request
 
 ## Android CI와 리뷰
 
-- develop 및 main 대상 PR, develop/main push, 수동 실행에서 자동화 테스트를 실행합니다. PR 재오픈·추가 커밋·리뷰 준비·본문/대상 편집도 검사합니다.
+- develop/main 대상 PR의 생성·재오픈·추가 커밋·리뷰 준비, develop/main push, 수동 실행을 처리합니다. CI에서는 `edited`를 제외해 제목/본문 편집만으로 빌드를 반복하지 않습니다. PR 대상 브랜치를 바꿨을 때도 자동 재검사되지 않으므로 새 커밋 또는 재오픈으로 새 병합 결과를 검사합니다. 수동 실행은 선택한 브랜치 전체 검사이며 PR 병합 결과 검사와 구분합니다.
+- 같은 PR/브랜치의 새 CI가 시작되면 이전 CI를 자동 취소합니다. 그룹에 workflow 이름·PR 번호 또는 ref를 사용해 다른 PR의 실행을 취소하지 않습니다. 이슈/Project 상태 동기화의 `edited`와 직렬화는 유지합니다.
+- 워크플로 전체를 경로 필터로 생략하지 않습니다. `detect-android`에서 실행 범위를 정하고 불필요한 작업만 SKIPPED로 표시해 필수 검사가 Pending에 남는 문제를 피합니다. 판별 작업이 실패하면 두 검사 작업도 명시적으로 실패합니다.
+
+| 변경 범위 | Android | 자동화 테스트 |
+|---|---|---|
+| README·AGENTS·docs·PR/Issue 템플릿만 | 생략 | 생략 |
+| functions·Firebase Rules/인덱스/설정만 | 생략 | 생략 (서버 검증 성공을 뜻하지 않음) |
+| app·android·Gradle·buildSrc/build-logic | 실행 | 해당 자동화 변경이 있으면 실행 |
+| scripts·tests·상태 동기화 workflow | CI 판별 코드 외에는 생략 | 실행 |
+| android-ci.yml·ci_plan.cjs·해당 테스트·공용 Actions | 실행 | 실행 |
+| 수동 실행·비교 불가·미분류 경로 | 실행 가능한 Android 프로젝트 검사 | 실행 |
+
+- PR은 이벤트의 대상 SHA와 체크아웃된 임시 병합 커밋 전체를 비교합니다. 작업 브랜치의 마지막 커밋만 보지 않으며, 대상 브랜치에만 추가된 파일은 PR 변경으로 오인하지 않습니다. push는 before~현재 SHA 전체를 비교합니다. depth 2로 비교할 수 없는 다중 커밋 push·새 브랜치·이력 부족은 전체 검사로 전환합니다. 삭제/이동도 검사하며 파일명은 NUL 구분으로 처리하고 셸에 보간하지 않습니다.
 - Gradle Wrapper가 루트 또는 android/에 있으면 Java 17 환경에서 `assembleDebug testDebugUnitTest lintDebug`를 실행합니다. 현재 저장소에는 루트 Android 프로젝트가 있습니다.
 - APK는 빌드 검증만 하고 Actions 보관 파일로 업로드하지 않습니다.
-- Wrapper가 없으면 Android 작업은 SKIPPED이며 빌드 통과 증거로 취급하지 않습니다.
-- 병합 전 다른 팀원 **최소 1명 승인**, `Automation logic tests`와 `android-build` 성공 및 최신 develop 통합 결과를 확인합니다. 리뷰 요청만으로 승인을 대신하지 않습니다.
-- 조사 시 main/develop의 protected 값은 false였습니다. 보호 규칙 조회는 연결 권한으로 거부되고 규칙셋 API는 비공개 저장소의 플랜 제한을 반환했습니다. 따라서 CI·리뷰의 **강제 병합 차단을 설정했다고 주장하지 않습니다**. 지원되는 플랜/권한이 마련되면 develop 보호 규칙에 필수 승인 1명과 위 두 체크, 최신 브랜치 요구를 설정하세요. 그 전에는 팀이 수동으로 병합 기준을 지켜야 합니다.
+- Gradle 캐시 설정은 유지하며 판별/자동화/Android 작업에 각각 3/5/20분 제한을 둡니다. 빌드·단위 테스트·lint 검증 자체를 줄이지 않습니다.
+- Wrapper가 없거나 변경 범위상 필요하지 않으면 Android 작업은 SKIPPED이며 빌드 통과 증거로 취급하지 않습니다. 실행 요약에서 RUN/SKIPPED·비교 불가 사유를 확인합니다.
+- 병합 전 다른 팀원 **최소 1명 승인**, `detect-android` 성공과 필요한 `Automation logic tests`·`android-build`의 성공을 확인합니다. 필요 없는 작업의 명시적 SKIPPED는 실제 테스트 통과와 구분합니다. 리뷰 요청만으로 승인을 대신하지 않습니다.
+- 조사 시 main/develop의 protected 값은 false였습니다. 보호 규칙 조회는 연결 권한으로 거부되고 규칙셋 API는 비공개 저장소의 플랜 제한을 반환했습니다. 따라서 CI·리뷰의 **강제 병합 차단을 설정했다고 주장하지 않습니다**. 지원되는 플랜/권한이 마련되면 develop 보호 규칙에 필수 승인 1명과 위 세 체크, 최신 브랜치 요구를 설정하세요. 그 전에는 팀이 수동으로 병합 기준을 지켜야 합니다.
+
+### CI 최적화 반영 순서
+
+CI 전용 PR을 develop에 반영하고 main에도 동일 CI 파일·판별 스크립트·테스트·이 문서만 별도 PR로 반영합니다. 제품 기능 커밋이나 기본 브랜치/보호 규칙·요금 설정 변경은 포함하지 않습니다. 생성한 PR의 병합은 팀 리뷰 후 진행합니다.
+
+열린 develop 대상 PR은 이후 실행되는 임시 병합 결과에 새 CI 설정이 포함되는지 확인합니다. 그 PR이 CI 파일을 별도로 수정하지 않았다면 각 작업 브랜치에 같은 커밋을 다시 복사할 필요는 없습니다. 기존 실행 결과와 실행 중인 CI는 소급 변경되지 않으며 develop 갱신만으로 열린 PR의 CI가 자동 재실행되는 것도 아닙니다. CI 파일 충돌/덮어쓰기가 있으면 해당 PR에서 정리합니다.
 
 ## 선택적 조직 Project 설정
 
