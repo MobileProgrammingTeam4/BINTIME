@@ -1,9 +1,15 @@
 name: BIN TIME - CI
 on:
   pull_request:
+    branches: [develop, main]
+    types: [opened, reopened, synchronize, ready_for_review]
   push:
-    branches: [main]
+    branches: [develop, main]
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -11,9 +17,18 @@ permissions:
 jobs:
   automation-tests:
     name: Automation logic tests
+    needs: detect-android
+    if: ${{ !cancelled() && (needs.detect-android.result != 'success' || needs.detect-android.outputs.automation == 'true') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
+      - name: Require successful change detection
+        env:
+          DETECTION_RESULT: ${{ needs.detect-android.result }}
+        run: test "$DETECTION_RESULT" = success
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -21,28 +36,32 @@ jobs:
 
   detect-android:
     runs-on: ubuntu-latest
+    timeout-minutes: 3
     outputs:
       directory: ${{ steps.detect.outputs.directory }}
+      android: ${{ steps.detect.outputs.android }}
+      automation: ${{ steps.detect.outputs.automation }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
       - id: detect
-        shell: bash
-        run: |
-          if [[ -f gradlew && ( -f settings.gradle || -f settings.gradle.kts ) ]]; then
-            echo 'directory=.' >> "$GITHUB_OUTPUT"
-          elif [[ -f android/gradlew && ( -f android/settings.gradle || -f android/settings.gradle.kts ) ]]; then
-            echo 'directory=android' >> "$GITHUB_OUTPUT"
-          else
-            echo 'directory=none' >> "$GITHUB_OUTPUT"
-            echo '::notice::Android Gradle Wrapper not present. Android build is SKIPPED, not PASS.'
-          fi
+        run: node scripts/ci_plan.cjs
 
   android-build:
     needs: detect-android
-    if: needs.detect-android.outputs.directory != 'none'
+    if: ${{ !cancelled() && (needs.detect-android.result != 'success' || needs.detect-android.outputs.android == 'true') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
+      - name: Require successful change detection
+        env:
+          DETECTION_RESULT: ${{ needs.detect-android.result }}
+        run: test "$DETECTION_RESULT" = success
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
