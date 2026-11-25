@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 신고 (Figma 116:3693). BT-010 목업, 실제 접수·차단은 BT-051·BT-046(B) -->
+<!-- 신고 (Figma 116:3693). BT-010(E) 화면, 실제 접수·함께 차단은 BT-051·BT-046(B) -->
 <resources>
     <string name="report_back">뒤로가기</string>
     <string name="report_missing">신고할 사용자를 찾을 수 없어요.</string>
@@ -11,8 +11,12 @@
     <string name="report_detail_hint">신고할 내용을 입력해주세요(선택)</string>
     <string name="report_also_block">이 사용자를 함께 차단하기 (더 이상 매칭·채팅에 노출되지 않아요)</string>
     <string name="report_submit">신고하기</string>
-    <string name="report_done_title">신고 내용을 확인했어요</string>
-    <string name="report_done_message">지금은 목업이라 실제로 접수되지 않아요.\n접수와 차단은 이후 업데이트에서 연결돼요.</string>
+    <string name="report_done_title">신고가 접수됐어요</string>
+    <string name="report_done_message">검토 후 필요한 조치를 할게요.\n신고 내용은 상대에게 알리지 않아요.</string>
+    <string name="report_done_blocked">이 사용자를 차단했어요.</string>
+    <string name="report_done_block_failed">차단은 하지 못했어요. 다시 신고하면 차단을 다시 시도해요.</string>
+    <string name="report_already_title">이미 신고한 내용이에요</string>
+    <string name="report_already_message">같은 매칭은 한 번만 신고할 수 있어요. 검토 중이에요.</string>
     <string name="report_done_close">확인</string>
 
     <string name="report_reason_no_show">⏰ 약속 장소에 나타나지 않았어요 (노쇼)</string>

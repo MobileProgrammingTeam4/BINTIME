@@ -205,6 +205,10 @@ service cloud.firestore {
     match /chatPairs/{pairId} {
       allow read, write: if false;
     }
+    // B · BT-051 신고 기록: 신고자·대상을 포함한 일반 사용자는 읽기·쓰기 모두 거부. 접수는 submitReport, 검토는 Admin.
+    match /reports/{reportId} {
+      allow read, write: if false;
+    }
     match /chatRoomLinks/{roomId} {
       allow read: if request.auth != null && request.auth.uid in resource.data.participantUids;
       allow write: if false;

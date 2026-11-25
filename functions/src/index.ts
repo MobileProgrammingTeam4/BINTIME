@@ -15,6 +15,7 @@ import { createMessageTrigger } from "./chat/trigger";
 import { createRequestMaintenanceSchedule } from "./requests/scheduled";
 import { createChatLinkCallable, createChatLinkTrigger } from "./chat/linkCallable";
 import { createBlockCallable, createUnblockCallable } from "./safety/callable";
+import { createReportCallable } from "./safety/reportCallable";
 
 /** D · BT-019 요청 생성. */
 export const createMatchRequest = createRequestCallable();
@@ -45,6 +46,8 @@ export const suggestChatReplies = createAiCallable(suggestChatRepliesTask);
 /** B · BT-046 차단·해제. 대기 요청 정리와 채팅 전송 차단 표시를 서버가 함께 한다. */
 export const blockUser = createBlockCallable();
 export const unblockUser = createUnblockCallable();
+/** B · BT-051 신고 접수(같은 매칭당 1회)와 선택적 함께 차단. 신고 기록은 서버 전용. */
+export const submitReport = createReportCallable();
 
 /** A · BT-017 매칭 후보 검색 */
 export const searchMatches = createSearchCallable();
