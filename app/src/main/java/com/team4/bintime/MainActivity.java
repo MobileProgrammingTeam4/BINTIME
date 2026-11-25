@@ -18,6 +18,7 @@ import com.team4.bintime.auth.SessionGuard;
 import com.team4.bintime.chat.ChatListFragment;
 import com.team4.bintime.matching.MatchingFragment;
 import com.team4.bintime.notification.NotificationListFragment;
+import com.team4.bintime.notification.NotificationPermission;
 import com.team4.bintime.profile.MyPageFragment;
 import com.team4.bintime.request.MockRequestRepository;
 import com.team4.bintime.request.RequestRepository;
@@ -105,6 +106,11 @@ public class MainActivity extends AppCompatActivity {
 
     /** BT-030(B): 다시 보일 때 로그인이 끊겼으면 온보딩으로, 보이는 동안 끊기면 바로 온보딩으로. */
     private SessionGuard.Watch sessionWatch;
+
+    @Override protected void onPostResume() {
+        super.onPostResume();
+        NotificationPermission.requestOnce(this);
+    }
 
     @Override
     protected void onStart() {
