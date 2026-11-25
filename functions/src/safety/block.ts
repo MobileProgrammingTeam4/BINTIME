@@ -3,6 +3,7 @@ import { FieldValue, Timestamp, type Firestore, type QueryDocumentSnapshot } fro
 import { HttpsError } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { chatPairKey } from "../chat/link";
+import { endsAt, type RequestTime } from "../requests/policy";
 
 /**
  * B · BT-046 사용자 차단·차단 해제 (docs/BT-046.md).
@@ -58,12 +59,22 @@ export class BlockService {
         : [];
       const at = Timestamp.fromDate(this.now());
       if (!existing.exists) tx.create(ref, { blockedUid: targetUid, createdAt: at });
-      // 요청 문서는 두 사람이 모두 읽으므로 상태만 바꾼다. 차단 사유(terminalReason)를 남기면 상대가 차단 사실을 알게 된다(#129 리뷰 D).
-      // 상대에게는 일반 거절·취소와 같게 보인다. 차단 기록은 본인만 읽는 blockedUsers 에만 있다.
-      const close = (doc: QueryDocumentSnapshot, status: "CANCELED" | "REJECTED") =>
-        tx.update(doc.ref, { status, updatedAt: at });
-      sent.docs.forEach(doc => close(doc, "CANCELED"));
-      received.docs.forEach(doc => close(doc, "REJECTED"));
+      // 요청 문서는 두 사람이 모두 읽는다. 'BLOCKED' 사유(#129 리뷰 D)도, 사유가 비어 있는 것(#129 리뷰 A)도 차단 단서가 되므로
+      // 일반 처리와 똑같은 상태·사유를 쓴다: 이미 끝난 시각이면 CANCELED/EXPIRED, 내가 보낸 것은 CANCELED/MANUAL_CANCEL,
+      // 받은 것은 REJECTED/RECIPIENT_REJECTED(BT-020·031 과 같은 값). 차단 기록은 본인만 읽는 blockedUsers 에만 있다.
+      // 사유는 같아도 재신청 제한(cooldownUntil)은 만들지 않는다(아래 잠금 갱신은 revision 만).
+      const close = (doc: QueryDocumentSnapshot, mine: boolean) => {
+        let expired: boolean;
+        try { expired = endsAt(doc.data() as RequestTime) <= at.toMillis(); }
+        catch { expired = true; } // 시간 정보가 깨진 요청은 차단 전체를 막지 않고 만료로 끝낸다
+
+        tx.update(doc.ref, expired
+          ? { status: "CANCELED", terminalReason: "EXPIRED", updatedAt: at }
+          : mine ? { status: "CANCELED", terminalReason: "MANUAL_CANCEL", updatedAt: at }
+            : { status: "REJECTED", terminalReason: "RECIPIENT_REJECTED", updatedAt: at });
+      };
+      sent.docs.forEach(doc => close(doc, true));
+      received.docs.forEach(doc => close(doc, false));
       // 요청 생성·수락과 같은 사용자 잠금 문서에서 경합하게 한다(BT-031). cooldownUntil 은 건드리지 않는다.
       guards.forEach((guard, i) => tx.set(this.db.doc(`requestUserGuards/${[uid, targetUid][i]}`),
         { revision: FieldValue.increment(1) }, { merge: true }));
