@@ -166,6 +166,7 @@ export const analyzeTimetableTask: AiTask<AnalyzeTimetableInput, AnalyzeTimetabl
   // 400 "too many states for serving" 으로 거부한다(2026-11-18 운영 1회, 로컬 재현). 구조만 보내고
   // 범위·길이·개수는 위 output 스키마와 verify 가 검사한다.
   geminiSchema: "typesOnly",
+  geminiOptions: { modelEnv: "GEMINI_MODEL_ANALYZE_TIMETABLE", mediaResolution: "ULTRA_HIGH" },
   authorize: async ({ imagePaths }, ctx, deps) => {
     checkPaths(imagePaths, ctx.uid);
     // mock 모드(에뮬레이터·앱 개발)는 Storage 를 읽지 않는다.

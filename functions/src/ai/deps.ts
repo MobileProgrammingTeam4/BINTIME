@@ -88,6 +88,7 @@ export function defaultDeps(): AiDeps {
   cached = {
     mode: resolveMode(),
     model: process.env.GEMINI_MODEL?.trim() ?? "",
+    taskModel: (name) => process.env[name],
     modelClient: () => {
       if (client) return client;
       const apiKey = normalizeApiKey(GEMINI_API_KEY.value());
