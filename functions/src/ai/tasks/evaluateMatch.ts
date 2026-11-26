@@ -107,10 +107,11 @@ export function isGrounded(reason: string, input: EvaluateMatchInput): boolean {
   const known = [
     "상대", ...courses, ...(input.purposes ?? []),
     ...[input.searcher, input.candidate].flatMap((s) => [s.department, ...(s.tags ?? [])]),
-  ];
+  ].map((k) => k.replace(/^#/, ""));
+  // 인용문은 입력 낱말 그 자체이거나 그 일부여야 한다. 낱말을 품은 긴 인용('밥 먹고 산책해요')은 지어낸 말로 본다.
   for (const q of reason.matchAll(QUOTED)) {
     const term = q[1].trim().replace(/^#/, "");
-    if (term && !known.some((k) => k.includes(term) || term.includes(k))) return false;
+    if (term && !known.some((k) => k.includes(term))) return false;
   }
   return true;
 }

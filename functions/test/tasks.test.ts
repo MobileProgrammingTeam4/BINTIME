@@ -160,6 +160,10 @@ describe("evaluateMatch (서버 내부)", () => {
     expect(isGrounded("'자료구조' 수업을 함께 들어요", base)).toBe(true);
     expect(isGrounded("'운영체제' 수업을 함께 들어요", base)).toBe(false);
     expect(isGrounded("'카페'를 둘 다 좋아해요", base)).toBe(true); // 태그 "#카페"
+    expect(isGrounded("'#카페' 태그가 같아요", base)).toBe(true);
+    // 입력 낱말을 품었을 뿐인 지어낸 인용은 뺀다(#145 리뷰).
+    expect(isGrounded("'카페에서 공부하자'고 했어요", base)).toBe(false);
+    expect(isGrounded("'상대도 좋아해요'라고 적었어요", base)).toBe(false);
     const noCourse = { ...base, commonCourses: [] };
     expect(isGrounded("같은 수업을 들어서 이야기하기 좋아요", noCourse)).toBe(false);
     expect(isGrounded("수업을 함께 들어요", noCourse)).toBe(false);
