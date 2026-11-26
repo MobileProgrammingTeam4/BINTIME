@@ -59,7 +59,7 @@ final class ChatRtdbMapper {
                 map.containsKey("chatReady") ? Boolean.TRUE.equals(map.get("chatReady")) : null,
                 linkedAt == null ? 0L : linkedAt,
                 Boolean.TRUE.equals(map.get(ChatRtdbPaths.BLOCKED_BY_ME)) ? ChatRoom.BlockState.BY_ME
-                        : Boolean.TRUE.equals(map.get(ChatRtdbPaths.BLOCKED_BY_PARTNER)) ? ChatRoom.BlockState.BY_PARTNER
+                        : Boolean.TRUE.equals(map.get(ChatRtdbPaths.SEND_DISABLED)) ? ChatRoom.BlockState.BY_PARTNER
                         : ChatRoom.BlockState.NONE);
     }
 

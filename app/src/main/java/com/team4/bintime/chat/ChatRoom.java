@@ -46,7 +46,7 @@ public final class ChatRoom {
     public final String recommendedPlace;
 
     /**
-     * BT-046 차단 상태. 서버(blockUser)가 userChatRooms 에 쓴 blockedByMe·blockedByPartner 로 정한다.
+     * BT-046 차단 상태. 서버(blockUser)가 userChatRooms 에 쓴 blockedByMe·sendDisabled 로 정한다.
      * NONE 이 아니면 서버 Rules 가 이 방의 새 메시지를 거부하므로 입력창을 막는다. 기록은 그대로 읽는다.
      */
     public enum BlockState { NONE, BY_ME, BY_PARTNER }

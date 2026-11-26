@@ -18,7 +18,8 @@ import { endsAt, type RequestTime } from "../requests/policy";
  * - 채팅: 기록은 그대로 두고 새 메시지만 막는다. 두 사람이 함께 쓰는 모든 방에
  *   chatRooms/{roomId}/blocks/{blockerUid} = true 를 쓰면 database.rules.json 이 전송을 거부한다.
  *   control(BT-034/038/043 이 관리)과 다른 노드라 방 상태 작업과 겹치지 않는다.
- *   화면 표시는 userChatRooms 의 blockedByMe(차단한 사람)·blockedByPartner(차단당한 사람)로 한다.
+ *   화면 표시는 userChatRooms 의 blockedByMe(차단한 사람)·sendDisabled(차단당한 사람)로 한다. 차단당한 사람은 자기 목록을
+ *   읽을 수 있으므로 그쪽 필드 이름에는 차단이라는 사유를 넣지 않는다(#129 리뷰 E, 차단 사실 비공개).
  * - Firestore 와 RTDB 는 한 트랜잭션이 아니다. RTDB 반영이 실패하면 오류를 돌려주고, 같은 요청을 다시 보내면
  *   차단 문서가 이미 있어도 RTDB 반영을 다시 한다(멱등).
  */
@@ -111,7 +112,7 @@ export class BlockService {
         this.rtdb.ref(`userChatRooms/${targetUid}/${roomId}/otherUid`).get(),
       ]);
       if (mine.val() === targetUid) patch[`userChatRooms/${uid}/${roomId}/blockedByMe`] = value;
-      if (theirs.val() === uid) patch[`userChatRooms/${targetUid}/${roomId}/blockedByPartner`] = value;
+      if (theirs.val() === uid) patch[`userChatRooms/${targetUid}/${roomId}/sendDisabled`] = value;
     }
     if (Object.keys(patch).length > 0) await this.rtdb.ref().update(patch);
     return roomIds.size;

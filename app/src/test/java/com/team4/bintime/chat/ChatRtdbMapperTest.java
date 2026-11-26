@@ -211,7 +211,7 @@ public class ChatRtdbMapperTest {
         assertEquals(ChatRoom.BlockState.NONE, ChatRtdbMapper.userChatRoom(MATCH, node).blockState);
         assertFalse(ChatRtdbMapper.room(ME, ChatRtdbMapper.userChatRoom(MATCH, node), match, null, "상대").blocked());
 
-        node.put("blockedByPartner", true);
+        node.put("sendDisabled", true);
         ChatRoom partner = ChatRtdbMapper.room(ME, ChatRtdbMapper.userChatRoom(MATCH, node), match, null, "상대");
         assertEquals(ChatRoom.BlockState.BY_PARTNER, partner.blockState);
         // 차단은 전송만 막는다. 방 준비·상태·기록 표시용 값은 그대로다.

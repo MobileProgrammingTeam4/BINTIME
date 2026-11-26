@@ -133,15 +133,24 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_DA
     await assertSucceeds(env.authenticatedContext(OTHER).database().ref(`chatRooms/${MATCH}/messages`).get());
     expect((await rtdb.ref(`chatRooms/${MATCH}/messages/before/content`).get()).val()).toBe("안녕하세요");
     expect((await rtdb.ref(`userChatRooms/${ME}/${MATCH}`).get()).val()).toMatchObject({ blockedByMe: true, otherUid: OTHER });
-    expect((await rtdb.ref(`userChatRooms/${OTHER}/${MATCH}`).get()).val()).toMatchObject({ blockedByPartner: true, otherUid: ME });
+    expect((await rtdb.ref(`userChatRooms/${OTHER}/${MATCH}`).get()).val()).toMatchObject({ sendDisabled: true, otherUid: ME });
     // 차단 표시는 서버 전용: 앱이 지우거나 쓸 수 없다.
     await assertFails(env.authenticatedContext(OTHER).database().ref(`chatRooms/${MATCH}/blocks/${ME}`).remove());
     await assertFails(env.authenticatedContext(ME).database().ref(`userChatRooms/${ME}/${MATCH}/blockedByMe`).remove());
+    // #129 리뷰 E: 멤버도 blocks 를 읽지 못하고(상대가 차단 여부를 직접 확인 불가), 자기 차단 키를 직접 쓰거나 지우지 못한다.
+    for (const uid of [ME, OTHER]) {
+      const member = env.authenticatedContext(uid).database();
+      await assertFails(member.ref(`chatRooms/${MATCH}/blocks`).get());
+      await assertFails(member.ref(`chatRooms/${MATCH}/blocks/${ME}`).get());
+      await assertFails(member.ref(`chatRooms/${MATCH}/blocks/${uid}`).set(true));
+    }
+    await assertFails(env.authenticatedContext(ME).database().ref(`chatRooms/${MATCH}/blocks/${ME}`).remove());
+    await assertFails(env.authenticatedContext(THIRD).database().ref(`chatRooms/${MATCH}/blocks`).get());
 
     await service().unblock(ME, OTHER);
     expect((await db.doc(`users/${ME}/blockedUsers/${OTHER}`).get()).exists).toBe(false);
     expect((await rtdb.ref(`userChatRooms/${ME}/${MATCH}/blockedByMe`).get()).exists()).toBe(false);
-    expect((await rtdb.ref(`userChatRooms/${OTHER}/${MATCH}/blockedByPartner`).get()).exists()).toBe(false);
+    expect((await rtdb.ref(`userChatRooms/${OTHER}/${MATCH}/sendDisabled`).get()).exists()).toBe(false);
     await assertSucceeds(send(ME, "m3"));
     await assertSucceeds(send(OTHER, "m4"));
   });
@@ -152,7 +161,7 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_DA
     await service().block(OTHER, ME);
     await service().unblock(ME, OTHER);
     await assertFails(send(ME, "m1"));
-    expect((await rtdb.ref(`userChatRooms/${ME}/${MATCH}`).get()).val()).toMatchObject({ blockedByPartner: true });
+    expect((await rtdb.ref(`userChatRooms/${ME}/${MATCH}`).get()).val()).toMatchObject({ sendDisabled: true });
     expect((await rtdb.ref(`userChatRooms/${ME}/${MATCH}/blockedByMe`).get()).exists()).toBe(false);
     await service().unblock(OTHER, ME);
     await assertSucceeds(send(ME, "m2"));
