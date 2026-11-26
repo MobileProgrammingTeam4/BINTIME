@@ -142,6 +142,7 @@ reviews/{reviewId}
 reports/{reportId}
 aiUsage/{uid}_{YYYY-MM-DD}
 matchScores/{searcherUid}_{candidateUid}
+placeRecommendations/{matchId}   # BT-042 서버 전용(규칙 없음 = 앱 접근 거부), docs/BT-042.md
 
 Realtime Database
 chatRooms/{chatRoomId}/members/{uid}

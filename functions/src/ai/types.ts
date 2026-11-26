@@ -3,6 +3,7 @@ import type { ModelClient, ModelRequest } from "./gemini";
 import type { UsageStore } from "./usage";
 import type { MatchAccess } from "./access";
 import type { ChatContextAccess } from "./chatContext";
+import type { PlaceStore } from "./placeStore";
 
 export type AiMode = "mock" | "live";
 
@@ -41,6 +42,8 @@ export interface AiDeps {
    * Storage 오류는 바꾸지 않고 그대로 던진다(작업이 AiError 로 바꾼다).
    */
   readImage: (path: string, maxBytes: number) => Promise<StoredImage>;
+  /** BT-042 장소 추천의 매칭·수업·저장된 추천. live recommendPlace 만 쓴다. 없으면 AI_UNAVAILABLE */
+  places?: PlaceStore;
 }
 
 /** Storage 파일 메타데이터와 내용. bytes 는 크기 상한 이내일 때만 있다. */
@@ -82,6 +85,14 @@ export interface AiTask<I, O> {
   mock: (input: I, ctx: AiContext) => O;
   /** live 프롬프트. 없으면 AI_NOT_IMPLEMENTED(담당 이슈에서 추가). */
   buildRequest?: (input: I, ctx: AiContext, deps: AiDeps) => Promise<ModelRequest>;
+  /**
+   * live 모드에서 권한 검사 뒤, 하루 호출량을 차감하기 전에 부른다. 저장된 결과가 있으면 돌려주고(차감·Gemini 호출 없음),
+   * 없으면 null. 호출해도 소용없는 요청(예: 열려 있는 장소가 없음)은 여기서 AiError 를 던져 횟수를 쓰지 않게 한다(BT-042).
+   * 돌려준 값도 output 스키마·verify 를 통과해야 한다.
+   */
+  fromCache?: (input: I, ctx: AiContext, deps: AiDeps) => Promise<O | null>;
+  /** live Gemini 결과가 검증을 통과한 뒤 저장한다. 실패해도 응답은 그대로 돌려준다(로그만 남김). */
+  saveCache?: (output: O, input: I, ctx: AiContext, deps: AiDeps) => Promise<void>;
 }
 
 export interface AiResponse<O> {

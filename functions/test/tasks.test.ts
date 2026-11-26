@@ -85,10 +85,11 @@ describe("suggestChatReplies", () => {
 describe("recommendPlace", () => {
   const live = { ...recommendPlaceTask, buildRequest: async () => ({ contents: "test" }) };
 
-  it("검증된 장소 목록이 비어 있는 live 모드에서는 어떤 장소도 통과하지 않는다", async () => {
+  it("live 모드에 장소 저장소가 없으면 Gemini 를 부르지 않고 AI_UNAVAILABLE (live 흐름은 recommendPlace.test.ts)", async () => {
     const out = '{"places":[{"placeId":"mock-bugak-library","name":"북악도서관","reason":"조용해요"}]}';
-    const deps = makeDeps({ mode: "live", matches, steps: [{ text: out }, { text: out }] });
-    await expectReason(runAiTask(live, { matchId: "match-1" }, ctx(me), deps), "AI_INVALID_OUTPUT");
+    const deps = makeDeps({ mode: "live", matches, steps: [{ text: out }] });
+    await expectReason(runAiTask(live, { matchId: "match-1" }, ctx(me), deps), "AI_UNAVAILABLE");
+    expect(deps.client.calls).toHaveLength(0);
   });
 
   it("목록 밖 id 는 버리고 이름은 서버 목록 값으로 바꾼다", () => {

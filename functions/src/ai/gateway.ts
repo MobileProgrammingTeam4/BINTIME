@@ -26,6 +26,16 @@ export async function runAiTask<I, O>(
     const input = parseInput(task, rawInput);
     if (task.authorize) await task.authorize(input, ctx, deps);
 
+    // 저장된 결과는 호출량을 쓰지 않는다(BT-042). Mock 은 저장하지 않는다.
+    if (deps.mode === "live" && task.fromCache) {
+      const hit = await task.fromCache(input, ctx, deps);
+      if (hit !== null) {
+        const data = checkOutput(task, hit, input, deps);
+        outcome = "cache";
+        return { task: task.name, data, meta: { model: deps.model, requestId: ctx.requestId, latencyMs: Date.now() - startedAt, mock: false } };
+      }
+    }
+
     const now = deps.now();
     const usage = await deps.usage.consume(
       ctx.uid,
@@ -43,6 +53,10 @@ export async function runAiTask<I, O>(
       data = checkOutput(task, task.mock(input, ctx), input, deps);
     } else {
       data = await callModel(task, input, ctx, deps, stats);
+      if (task.saveCache) {
+        await task.saveCache(data, input, ctx, deps).catch((error: unknown) =>
+          logger.warn("ai_cache_save_failed", { task: task.name, requestId: ctx.requestId, ...describeError(error) }));
+      }
     }
     return {
       task: task.name,

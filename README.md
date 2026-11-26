@@ -134,6 +134,7 @@ notifications/{uid}/items/{notificationId}
 reviews/{reviewId}
 reports/{reportId}
 aiUsage/{uid}_{YYYY-MM-DD}
+placeRecommendations/{matchId}   # BT-042 서버 전용 장소 추천 저장(docs/BT-042.md)
 
 Realtime Database
 chatRooms/{chatRoomId}/members/{uid}
