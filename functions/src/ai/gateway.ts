@@ -1,6 +1,6 @@
 import { logger } from "firebase-functions";
 import { z } from "zod";
-import { MAX_ATTEMPTS, RETRY_DELAY_MS, seoulDateKey } from "./config";
+import { MAX_ATTEMPTS, MIN_RETRY_BUDGET_RATIO, RETRY_DELAY_MS, seoulDateKey } from "./config";
 import { AiError, describeError } from "./errors";
 import type { ModelUsage } from "./gemini";
 import type { AiContext, AiDeps, AiResponse, AiTask, GeminiSchemaMode } from "./types";
@@ -87,6 +87,7 @@ export async function runAiTask<I, O>(
       // 실패 원인 진단용. Gemini HTTP 상태 코드만 남기고 오류 본문은 남기지 않는다.
       upstreamStatus,
       attempts: stats.attempts,
+      retrySkipped: stats.retrySkipped,
       latencyMs: Date.now() - startedAt,
       promptTokens: stats.usage?.promptTokens,
       outputTokens: stats.usage?.outputTokens,
@@ -114,6 +115,8 @@ function checkOutput<I, O>(task: AiTask<I, O>, candidate: unknown, input: I, dep
 interface CallStats {
   attempts: number;
   usage?: ModelUsage;
+  /** 일시적 오류였지만 다시 시도하지 않은 이유. budget: 남은 시간이 제한 시간의 절반보다 적었다. */
+  retrySkipped?: "budget";
 }
 
 async function callModel<I, O>(task: AiTask<I, O>, input: I, ctx: AiContext, deps: AiDeps, stats: CallStats): Promise<O> {
@@ -124,11 +127,15 @@ async function callModel<I, O>(task: AiTask<I, O>, input: I, ctx: AiContext, dep
   const client = deps.modelClient();
   const jsonSchema = toGeminiSchema(task.output, task.geminiSchema);
 
+  // task.timeoutMs 는 재시도까지 포함한 전체 시간이다(#48). 두 번째 시도는 남은 시간만 쓴다.
+  const clock = deps.clockMs ?? Date.now;
+  const deadline = clock() + task.timeoutMs;
   let lastError: AiError = new AiError("AI_UNAVAILABLE");
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     stats.attempts = attempt;
+    const timeoutMs = attempt === 1 ? task.timeoutMs : Math.max(1, deadline - clock());
     try {
-      const result = await client.generate({ ...request, model: deps.model, jsonSchema, timeoutMs: task.timeoutMs });
+      const result = await client.generate({ ...request, model: deps.model, jsonSchema, timeoutMs });
       stats.usage = result.usage;
       let json: unknown;
       try {
@@ -139,8 +146,13 @@ async function callModel<I, O>(task: AiTask<I, O>, input: I, ctx: AiContext, dep
       return checkOutput(task, json, input, deps);
     } catch (error) {
       lastError = error instanceof AiError ? error : new AiError("INTERNAL", String(error));
-      // 시간 초과는 다시 기다리면 전체 응답이 두 배로 늦어지므로 재시도하지 않는다.
+      // 시간 초과(우리 타이머·Google 마감 504)는 transient 가 아니라 재시도하지 않는다.
       if (!lastError.transient || attempt === MAX_ATTEMPTS) break;
+      // 기다린 뒤 남을 시간이 제한 시간의 절반보다 적으면 다시 보내도 시간 초과로 끝나기 쉬우므로 첫 오류를 그대로 돌려준다.
+      if (deadline - clock() - RETRY_DELAY_MS < task.timeoutMs * MIN_RETRY_BUDGET_RATIO) {
+        stats.retrySkipped = "budget";
+        break;
+      }
       await deps.sleep(RETRY_DELAY_MS);
     }
   }

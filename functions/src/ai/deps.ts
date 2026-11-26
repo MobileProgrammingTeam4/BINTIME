@@ -1,8 +1,10 @@
 import { getApps, initializeApp } from "firebase-admin/app";
+import { getDatabase, type Database } from "firebase-admin/database";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { defineSecret } from "firebase-functions/params";
 import { FirestoreMatchAccess } from "./access";
+import { FirebaseChatContextAccess } from "./chatContext";
 import { resolveMode } from "./config";
 import { ALLOWED_EMAIL_SUFFIXES_ENV, parseAllowedEmailSuffixes } from "./emailPolicy";
 import { AiError } from "./errors";
@@ -59,6 +61,21 @@ export async function readStorageImage(
   return { contentType, size: bytes.length, bytes };
 }
 
+/**
+ * RTDB 를 처음 쓸 때 연결한다(답장 추천만 쓰므로 다른 AI 함수는 RTDB 에 연결하지 않는다).
+ * 에뮬레이터인데 RTDB 에뮬레이터 주소가 없으면 Admin SDK 가 운영 RTDB 를 읽게 되므로 연결 전에 거부한다.
+ */
+export function lazyDatabase(open: () => Database, env: NodeJS.ProcessEnv = process.env): () => Database {
+  let database: Database | undefined;
+  return () => {
+    if (env.FUNCTIONS_EMULATOR === "true" && !env.FIREBASE_DATABASE_EMULATOR_HOST) {
+      throw new AiError("AI_UNAVAILABLE", "database emulator required", { retryable: false });
+    }
+    database ??= open();
+    return database;
+  };
+}
+
 let cached: AiDeps | undefined;
 let client: ModelClient | undefined;
 
@@ -81,6 +98,7 @@ export function defaultDeps(): AiDeps {
     },
     usage: new FirestoreUsageStore(db),
     matches: new FirestoreMatchAccess(db),
+    chatContext: new FirebaseChatContextAccess(db, lazyDatabase(() => getDatabase(app))),
     now: () => new Date(),
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     allowedEmailSuffixes: parseAllowedEmailSuffixes(process.env[ALLOWED_EMAIL_SUFFIXES_ENV]),

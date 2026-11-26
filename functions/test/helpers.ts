@@ -1,4 +1,5 @@
 import { MemoryMatchAccess } from "../src/ai/access";
+import { MemoryChatContextAccess, type MemoryChatRoom } from "../src/ai/chatContext";
 import { AiError } from "../src/ai/errors";
 import type { ModelCall, ModelClient, ModelResult } from "../src/ai/gemini";
 import type { AiDeps } from "../src/ai/types";
@@ -32,6 +33,8 @@ export function makeDeps(options: {
   model?: string;
   steps?: Step[];
   matches?: Record<string, string[]>;
+  /** 생략하면 matches 의 각 매칭을 같은 키의 준비된 방(멤버 = 참여자, 메시지 없음)으로 본다. */
+  chatRooms?: Record<string, MemoryChatRoom | null>;
   now?: Date;
   allowedEmailSuffixes?: string[];
 } = {}): TestDeps {
@@ -44,6 +47,12 @@ export function makeDeps(options: {
     modelClient: () => client,
     usage: usageStore,
     matches: new MemoryMatchAccess(options.matches ?? {}),
+    chatContext: new MemoryChatContextAccess(
+      options.chatRooms ??
+        Object.fromEntries(
+          Object.entries(options.matches ?? {}).map(([id, uids]) => [id, { chatRoomId: id, participantUids: uids }]),
+        ),
+    ),
     now: () => options.now ?? new Date("2026-11-09T03:00:00Z"),
     sleep: async (ms) => {
       sleeps.push(ms);

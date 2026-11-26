@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.function.BooleanSupplier;
 
 /**
- * BT-010 UI 시연 전용 더미 답장. LLM 결과가 아니며 BT-041 에서 Gemini 구현으로 교체한다.
+ * BT-010 UI 시연 전용 더미 답장. LLM 결과가 아니다. Firebase 를 설정하지 않은 Mock 모드에서만 쓴다(BT-041).
  * 채팅 데모 상태가 오류이면 실패를 돌려줘 대체 UI 를 확인할 수 있게 한다.
  */
 public final class MockReplySuggestionRepository implements ReplySuggestionRepository {
@@ -45,7 +45,7 @@ public final class MockReplySuggestionRepository implements ReplySuggestionRepos
         scheduler.schedule(() -> {
             if (canceled[0]) return;
             if (matchId == null || failing.getAsBoolean()) {
-                callback.onError();
+                callback.onError(ReplySuggestionFailure.RETRY);
                 return;
             }
             callback.onSuccess(MOCK_SETS.get(nextSet++ % MOCK_SETS.size()));
