@@ -528,4 +528,60 @@ public class MockAsyncTimetableRepositoryTest {
     public void constructor_nullArgs_throw() {
         new MockAsyncTimetableRepository(null, () -> "x");
     }
+
+    // ── [BT-047] 시간표 변경은 새 검색 데이터(availability)만 갱신 ─────────────
+
+    @Test
+    public void replaceCourses_removingCourse_doesNotReselectFreedCells_andRefreshesAvailability() {
+        ok(replace(course("a", MON, 600, 660), course("b", MON, 720, 780)));
+        ok(saveFree(new TimeSlot(MON, 540, 600), new TimeSlot(MON, 660, 720)));
+
+        ok(replace(course("b", MON, 720, 780))); // 10:00~11:00 수업 삭제 → 그 칸은 비지만 선택되지 않는다
+        int revision = MockTimetableRepositoryImpl.getInstance().getTimetable("uid-a").getRevision();
+
+        List<TimeSlot> expected = Arrays.asList(new TimeSlot(MON, 540, 600), new TimeSlot(MON, 660, 720));
+        Recorder rec = new Recorder();
+        repo.observeTimetable(rec);
+        assertEquals(expected, rec.last().getFreeSlots());
+        Availability a = repo.getAvailability("uid-a");
+        assertEquals(expected, a.getSlots()); // 09:00~12:00으로 합쳐지지 않는다
+        assertEquals(revision, a.getSourceRevision());
+    }
+
+    @Test
+    public void replaceThenSaveFreeSlots_availabilityFollowsLatestSelectionAndRevision() {
+        ok(replace(course("a", MON, 600, 690)));
+        ok(saveFree(new TimeSlot(MON, 690, 810))); // 11:30~13:30
+        int before = MockTimetableRepositoryImpl.getInstance().getTimetable("uid-a").getRevision();
+
+        // 12:00~12:30 수업 추가 → 11:30~12:00(30분, 원본에만 남음) / 12:30~13:30(60분, 매칭 대상)
+        ok(replace(course("a", MON, 600, 690), course("c", MON, 720, 750)));
+        int afterReplace = MockTimetableRepositoryImpl.getInstance().getTimetable("uid-a").getRevision();
+        assertEquals(before + 1, afterReplace);
+        Availability replaced = repo.getAvailability("uid-a");
+        assertEquals(Collections.singletonList(new TimeSlot(MON, 750, 810)), replaced.getSlots());
+        assertEquals(afterReplace, replaced.getSourceRevision());
+
+        // 공강만 다시 고르면 revision은 그대로, availability는 새 선택으로 전부 바뀐다
+        ok(saveFree(new TimeSlot(MON, 780, 900)));
+        assertEquals(afterReplace, MockTimetableRepositoryImpl.getInstance().getTimetable("uid-a").getRevision());
+        Availability saved = repo.getAvailability("uid-a");
+        assertEquals(Collections.singletonList(new TimeSlot(MON, 780, 900)), saved.getSlots());
+        assertEquals(afterReplace, saved.getSourceRevision());
+    }
+
+    @Test
+    public void replaceCourses_multiSlotCourse_clearsCellsOnEveryDay() {
+        Course multi = new Course("m", "수업m", null, null, null, new ArrayList<>(Arrays.asList(
+                new TimeSlot(MON, 600, 660), new TimeSlot(TUE, 600, 660))));
+        ok(saveFree(new TimeSlot(MON, 540, 720), new TimeSlot(TUE, 540, 720)));
+
+        ok(replace(multi));
+        int revision = MockTimetableRepositoryImpl.getInstance().getTimetable("uid-a").getRevision();
+        List<TimeSlot> expected = Arrays.asList(new TimeSlot(MON, 540, 600), new TimeSlot(MON, 660, 720),
+                new TimeSlot(TUE, 540, 600), new TimeSlot(TUE, 660, 720));
+        Availability a = repo.getAvailability("uid-a");
+        assertEquals(expected, a.getSlots());
+        assertEquals(revision, a.getSourceRevision());
+    }
 }

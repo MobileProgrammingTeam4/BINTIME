@@ -18,6 +18,14 @@ captures/
 *.jks
 *.pem
 *.key
+# Service-account credentials and App Check debug configuration (not all JSON files).
+*firebase-adminsdk*.json
+*service-account*.json
+*service_account*.json
+*serviceAccount*.json
+application_default_credentials.json
+appcheck-debug-token*
+.appcheck-debug-token*
 
 # Firebase local configuration
 google-services.json
