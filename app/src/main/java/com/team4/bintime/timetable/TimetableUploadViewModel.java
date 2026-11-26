@@ -41,12 +41,12 @@ public class TimetableUploadViewModel extends ViewModel {
      * resolver는 Application의 것을 넘긴다(화면 Context를 붙잡지 않도록).
      */
     void attach(TimetableImageRepository repository, TimetableRecognitionRepository recognizer,
-                ContentResolver resolver) {
+                ContentResolver resolver, RecognitionImageCache originals) {
         if (controller != null) return;
         controller = new TimetableUploadController<>(repository, recognizer, background, mainHandler::post,
                 uri -> TimetableImageCompressor.inspect(resolver, uri),
                 (uri, limit) -> TimetableImageCompressor.prepare(resolver, uri, limit),
-                screen::setValue);
+                screen::setValue, originals);
     }
 
     List<Uri> selection() {
@@ -80,6 +80,11 @@ public class TimetableUploadViewModel extends ViewModel {
     /** 검수 화면이 끝나면(저장·뒤로) 인식에 쓴 이미지를 지운다. */
     void onReviewFinished() {
         if (controller != null) controller.onReviewFinished();
+    }
+
+    /** [BT-048] 검수 화면 '원본 보기'용 기기 안 사본 경로. 없으면 빈 목록. */
+    List<String> localImagePaths() {
+        return controller == null ? new ArrayList<>() : controller.localImagePaths();
     }
 
     /** analyzeTimetable 에 넘긴 경로. UPLOADED가 아니면 빈 목록. */

@@ -95,8 +95,16 @@ final class TimetableUploadController<K> {
     TimetableUploadController(TimetableImageRepository repository, TimetableRecognitionRepository recognizer,
                               Executor background, Executor main, Inspector<K> inspector, Preparer<K> preparer,
                               Listener listener) {
+        this(repository, recognizer, background, main, inspector, preparer, listener,
+                TimetableImageUploader.LocalCopy.NONE);
+    }
+
+    /** [BT-048] localCopy: 검수 화면 '원본 보기'용 기기 안 사본(앱 캐시). */
+    TimetableUploadController(TimetableImageRepository repository, TimetableRecognitionRepository recognizer,
+                              Executor background, Executor main, Inspector<K> inspector, Preparer<K> preparer,
+                              Listener listener, TimetableImageUploader.LocalCopy localCopy) {
         if (repository == null || recognizer == null || background == null || main == null || inspector == null
-                || preparer == null || listener == null) {
+                || preparer == null || listener == null || localCopy == null) {
             throw new IllegalArgumentException("null argument");
         }
         this.recognizer = recognizer;
@@ -105,7 +113,7 @@ final class TimetableUploadController<K> {
         this.inspector = inspector;
         this.preparer = preparer;
         this.listener = listener;
-        this.uploader = new TimetableImageUploader(repository, background, main, this::onUploadState);
+        this.uploader = new TimetableImageUploader(repository, background, main, this::onUploadState, localCopy);
     }
 
     /** 현재 선택(순서 = 업로드 index). */
@@ -209,6 +217,11 @@ final class TimetableUploadController<K> {
     void onReviewFinished() {
         if (recognition == null || recognizing) return;
         uploader.deleteUploadedBatch();
+    }
+
+    /** [BT-048] 검수 화면 '원본 보기'용 기기 안 사본 경로(업로드 index 순서). 지웠거나 없으면 빈 목록. */
+    List<String> localImagePaths() {
+        return uploader.getLocalPaths();
     }
 
     /** analyzeTimetable 에 넘긴(넘길) 경로. UPLOADED가 아니면 빈 목록. */

@@ -90,10 +90,14 @@ describe.skipIf(!process.env.FIREBASE_STORAGE_EMULATOR_HOST)("storage.rules", ()
   describe("BT-014 profileImages/{uid}/profile.jpg (회귀)", () => {
     const photo = (uid: string) => `profileImages/${uid}/profile.jpg`;
 
-    it("로그인 사용자는 읽고, 본인만 5MB 미만 JPEG 를 쓰고 지운다", async () => {
+    // #135: 읽기는 인증된 학교 계정만. 상세 경우는 school-email-rules.test.ts 에서 본다.
+    const school = (uid: string) => env.authenticatedContext(uid, { email: `${uid}@school.ac.kr`, email_verified: true }).storage();
+
+    it("인증된 학교 계정은 읽고, 본인만 5MB 미만 JPEG 를 쓰고 지운다", async () => {
       await assertSucceeds(as("u1").ref(photo("u1")).put(jpeg(), JPEG));
       await assertSucceeds(as("u1").ref(photo("u1")).put(jpeg(), JPEG)); // 같은 경로 덮어쓰기 허용
-      await assertSucceeds(as("u2").ref(photo("u1")).getMetadata());
+      await assertSucceeds(school("u2").ref(photo("u1")).getMetadata());
+      await assertFails(as("u2").ref(photo("u1")).getMetadata()); // 이메일 없는 토큰
       await assertFails(anonymous().ref(photo("u1")).getMetadata());
       await assertFails(as("u2").ref(photo("u1")).put(jpeg(), JPEG));
       await assertFails(as("u2").ref(photo("u1")).delete());

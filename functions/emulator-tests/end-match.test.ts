@@ -63,6 +63,25 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_DA
     expect((await rtdb.ref(`userChatRooms/a/${id}/status`).get()).val()).toBe("ENDED");
     expect((await db.doc(`matches/${other}`).get()).get("reviewEligible")).toBe(false);
   });
+  it("a delayed old-room state job preserves the archived room and the new active room", async () => {
+    const linker = new ChatLinkService(db, rtdb, now);
+    await linker.link(id);
+    await service().end(id, "a");
+    // BT-043's one-member-left state is a fixture, not an implementation of leaving.
+    await rtdb.ref(`chatRooms/${id}/members/a`).remove();
+    await seed(other, { meetingDate: "2026-11-25" });
+    await linker.link(other);
+    const snapshot = (await rtdb.ref().get()).val();
+    const pair = (await db.collection("chatPairs").get()).docs[0];
+    expect(pair.get("roomId")).toBe(other);
+    expect((await db.doc(`chatRoomLinks/${id}`).get()).get("archived")).toBe(true);
+    await db.doc(`roomStateJobs/${id}`).set({ roomId: id, participantUids: ["a", "b"], status: "PENDING" });
+    expect(await rooms().sync(id, ["a", "b"])).toBe(false);
+    expect((await db.doc(`roomStateJobs/${id}`).get()).get("status")).toBe("DONE");
+    expect((await rtdb.ref().get()).val()).toEqual(snapshot);
+    expect((await pair.ref.get()).get("roomId")).toBe(other);
+    expect((await rtdb.ref(`userChatRooms/a/${other}/status`).get()).val()).toBe("ACTIVE");
+  });
   it("ENDING before chat linking does not resurrect ACTIVE", async () => {
     await service().end(id, "a");
     await new ChatLinkService(db, rtdb, now).link(id);
