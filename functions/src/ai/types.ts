@@ -32,6 +32,8 @@ export interface AiDeps {
   chatContext: ChatContextAccess;
   now: () => Date;
   sleep: (ms: number) => Promise<void>;
+  /** 제한 시간 계산용 현재 시각(ms). 없으면 Date.now(). 테스트가 시계를 직접 움직일 때만 넣는다. */
+  clockMs?: () => number;
   /** 학교 이메일 허용 접미사(ALLOWED_EMAIL_SUFFIXES). 비어 있으면 Callable 호출을 모두 거부한다. */
   allowedEmailSuffixes: readonly string[];
   /**
