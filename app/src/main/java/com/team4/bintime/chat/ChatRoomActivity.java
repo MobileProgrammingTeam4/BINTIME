@@ -88,6 +88,11 @@ public class ChatRoomActivity extends AppCompatActivity {
     private ChatLinkRetry linkRetry;
     @Nullable private ChatLinkFailure linkFailure;
     private boolean linkUnavailable;
+    /** BT-042 추천 장소(Firebase 모드). Mock 모드는 null 이고 room.recommendedPlace 시안 문구를 쓴다. */
+    @Nullable private PlaceRecommendationRepository placeRepository;
+    @Nullable private PlaceRecommendationRepository.Request placeRequest;
+    /** 마지막으로 요청한 약속 ID와 받은 표시 문구(실패·없음이면 null). 1초마다 다시 그려도 같은 약속은 한 번만 요청한다. */
+    @Nullable private String placeMatchId, placeText;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -98,6 +103,7 @@ public class ChatRoomActivity extends AppCompatActivity {
             return;
         }
         repository = ChatRepositories.get(this);
+        placeRepository = PlaceRecommendations.get(this);
         String myUid = repository.currentUid();
         if (myUid == null || myUid.trim().isEmpty()) {
             // 로그인 전이면 내 메시지를 구분할 수 없다. 구독을 시작하지 않고 닫는다.
@@ -190,6 +196,7 @@ public class ChatRoomActivity extends AppCompatActivity {
         if (roomRegistration != null) roomRegistration.remove();
         if (messageRegistration != null) messageRegistration.remove();
         if (replyRequest != null) replyRequest.cancel();
+        if (placeRequest != null) placeRequest.cancel();
         if (linkRetry != null) linkRetry.cancel(); // 늦게 온 준비 결과로 닫힌 화면을 바꾸지 않는다
         ticker.removeCallbacks(tick);
         super.onDestroy();
@@ -341,12 +348,39 @@ public class ChatRoomActivity extends AppCompatActivity {
         ((TextView) findViewById(R.id.chatMatchTime)).setText(additional > 0 ? getString(R.string.appointment_additional, time, additional) : time);
         ((TextView) findViewById(R.id.chatMatchRemaining)).setText(appointment != null && appointment.startAtMillis() > now
                 ? getString(R.string.appointment_upcoming) : getString(R.string.chat_remaining, ChatTimeFormatter.remaining(display, now)));
-        boolean hasPlace = room.recommendedPlace != null;
+        String place = placeRepository == null ? room.recommendedPlace : placeFor(now);
+        boolean hasPlace = place != null;
         findViewById(R.id.chatPlaceRow).setVisibility(hasPlace ? View.VISIBLE : View.GONE);
         if (hasPlace) {
-            ((TextView) findViewById(R.id.chatPlace)).setText(getString(R.string.chat_recommended_place,
-                    room.recommendedPlace));
+            ((TextView) findViewById(R.id.chatPlace)).setText(getString(R.string.chat_recommended_place, place));
         }
+    }
+
+    /**
+     * BT-042: 상단 카드 약속의 추천 장소. 처음 보이는 약속이면 서버에 한 번 요청하고, 받기 전·실패하면 null(장소 줄 숨김).
+     * 대표 약속이 바뀌면(다음 약속) 새로 요청한다. 서버가 약속별로 저장하므로 다시 열어도 횟수를 쓰지 않는다.
+     */
+    @Nullable
+    private String placeFor(long now) {
+        String target = PlaceRecommendations.targetMatchId(room.appointments, matchId, now);
+        if (target == null) return null;
+        if (target.equals(placeMatchId)) return placeText;
+        if (placeRequest != null) placeRequest.cancel();
+        placeMatchId = target;
+        placeText = null;
+        placeRequest = placeRepository.recommend(target, new PlaceRecommendationRepository.Callback() {
+            @Override public void onSuccess(List<String> names) {
+                if (isFinishing() || isDestroyed() || !target.equals(placeMatchId)) return;
+                placeRequest = null;
+                placeText = PlaceRecommendations.join(names);
+                if (room != null) bindRoom();
+            }
+            @Override public void onError() {
+                if (isFinishing() || isDestroyed() || !target.equals(placeMatchId)) return;
+                placeRequest = null; // 같은 약속은 다시 요청하지 않는다. 화면을 다시 열면 재시도한다.
+            }
+        });
+        return placeText;
     }
 
     // ---- 후기 ----
