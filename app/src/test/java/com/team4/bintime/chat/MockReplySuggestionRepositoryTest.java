@@ -27,7 +27,8 @@ public class MockReplySuggestionRepositoryTest {
         }
 
         @Override
-        public void onError() {
+        public void onError(ReplySuggestionFailure failure) {
+            assertEquals(ReplySuggestionFailure.RETRY, failure);
             errors++;
         }
     }
