@@ -3,7 +3,7 @@ import { evaluateMatch } from "../src/ai/internal";
 import { runAiTask } from "../src/ai/gateway";
 import { aiPingTask } from "../src/ai/tasks/aiPing";
 import { analyzeTimetableTask } from "../src/ai/tasks/analyzeTimetable";
-import { evaluateMatchTask, stripBuildings } from "../src/ai/tasks/evaluateMatch";
+import { evaluateMatchTask, groundReasons, isGrounded, stripBuildings } from "../src/ai/tasks/evaluateMatch";
 import { DAILY_LIMIT, MIN_INTERVAL_MS, generateProfileTask, stripContacts } from "../src/ai/tasks/generateProfile";
 import { recommendPlaceTask } from "../src/ai/tasks/recommendPlace";
 import { suggestChatRepliesTask } from "../src/ai/tasks/suggestChatReplies";
@@ -143,6 +143,36 @@ describe("evaluateMatch (서버 내부)", () => {
     expect(() => stripBuildings({ ...out, reasons: ["미래관 근처예요"] }, ["미래관"])).toThrow();
     const verified = evaluateMatchTask.verify!(out, { ...input, searcher: { ...input.searcher, nearbyBuildings: [] }, candidate: { ...input.candidate, nearbyBuildings: ["미래관"] } } as never, makeDeps());
     expect(verified.reasons).toEqual(["관심사가 비슷해요"]);
+  });
+
+  it("BT-049: 프롬프트에 점수 기준과 예시가 고정되어 있다", async () => {
+    const req = await evaluateMatchTask.buildRequest!(input as never, ctx(me), makeDeps());
+    expect(req.systemInstruction).toContain("50에서 시작");
+    expect(req.systemInstruction).toContain("예시 1");
+    expect(req.systemInstruction).toContain("예시 2");
+  });
+
+  it("BT-049: 입력에 근거가 없는 이유는 빼고, 다 빠지면 형식 오류", () => {
+    const base = { ...input, overlapMinutes: 90, commonCourses: ["자료구조"] } as Parameters<typeof isGrounded>[1];
+    expect(isGrounded("공강이 90분 겹쳐요", base)).toBe(true);
+    expect(isGrounded("공강이 1시간 30분 겹쳐요", base)).toBe(true);
+    expect(isGrounded("공강이 2시간 겹쳐요", base)).toBe(false);
+    expect(isGrounded("'자료구조' 수업을 함께 들어요", base)).toBe(true);
+    expect(isGrounded("'운영체제' 수업을 함께 들어요", base)).toBe(false);
+    expect(isGrounded("'카페'를 둘 다 좋아해요", base)).toBe(true); // 태그 "#카페"
+    const noCourse = { ...base, commonCourses: [] };
+    expect(isGrounded("같은 수업을 들어서 이야기하기 좋아요", noCourse)).toBe(false);
+    expect(isGrounded("수업을 함께 들어요", noCourse)).toBe(false);
+    expect(isGrounded("가까운 건물에서 수업이 끝나요", noCourse)).toBe(true);
+    const out = { score: 70, reasons: ["공강이 3시간 겹쳐요", "관심사가 비슷해요"], suggestedActivity: "카페" };
+    expect(groundReasons(out, base).reasons).toEqual(["관심사가 비슷해요"]);
+    expect(() => groundReasons({ ...out, reasons: ["공강이 3시간 겹쳐요"] }, base)).toThrow();
+  });
+
+  it("BT-049: live 응답의 근거 없는 이유는 검색자에게 가지 않는다", async () => {
+    const text = '{"score":70,"reasons":["\'운영체제\' 수업을 함께 들어요","공강이 90분 겹쳐요"],"suggestedActivity":"카페"}';
+    const res = await evaluateMatch(me, input, makeDeps({ mode: "live", steps: [{ text }] }));
+    expect(res.data.reasons).toEqual(["공강이 90분 겹쳐요"]);
   });
 
   it("범위 밖 점수는 형식 오류", async () => {

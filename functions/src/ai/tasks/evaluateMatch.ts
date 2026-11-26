@@ -16,9 +16,18 @@ import { text } from "./shared";
 export const SYSTEM_INSTRUCTION = [
   "너는 대학생 공강 매칭 앱의 추천 평가기다. 두 학생은 이미 공강 겹침·목적 같은 필수 조건을 통과했다.",
   "입력 JSON 만 근거로 두 학생이 이번 공강을 함께 보내기 좋은 정도를 score(0~100 정수)로 평가한다.",
-  "기준: 겹친 시간(길수록 유리), 공통 관심 태그, 함께 듣는 수업, 공강 전후 수업 건물이 같거나 가까운지, 목적과 자기소개의 어울림.",
-  "같은 입력에는 항상 같은 점수를 준다. 정보가 적으면 50 근처로 준다.",
+  "점수는 50에서 시작해 아래 기준을 더하고 빼며, 0~100 밖이면 끝값으로 자른다.",
+  "- 겹친 시간 overlapMinutes: 60~89분 +0, 90~119분 +5, 120~179분 +10, 180분 이상 +15",
+  "- 두 학생 tags 에 모두 있는 태그: 1개당 +5, 최대 +15",
+  "- commonCourses(함께 듣는 수업): 1개당 +5, 최대 +10",
+  "- 두 학생 nearbyBuildings 에 같은 이름이 있으면 +5",
+  "- purposes 와 두 학생의 태그·자기소개가 잘 어울리면 +5, 뚜렷하게 어긋나면 -10. purposes 가 비어 있으면 0",
+  "예시 1: 겹침 90분, 공통 태그 1개, 공통 수업 0개, 같은 건물 없음, 목적이 어울림 → 50+5+5+0+0+5 = 65",
+  "예시 2: 겹침 180분, 공통 태그 2개, 공통 수업 1개, 같은 건물 있음, 목적 없음 → 50+15+10+5+5+0 = 85",
+  "같은 입력에는 항상 같은 점수를 준다.",
   "reasons 는 검색한 학생에게 보여줄 한국어 문장 1~3개(각 80자 이내)다. 상대는 '상대'로 부르고 입력에 있는 사실만 쓴다.",
+  "시간은 overlapMinutes 값만 쓴다(예: 90이면 '90분' 또는 '1시간 30분'). 따옴표로 인용할 때는 입력에 있는 낱말을 그대로 쓴다.",
+  "commonCourses 가 비어 있으면 수업을 함께 듣는다고 쓰지 않는다.",
   "외모·성별·종교·건강 같은 민감한 추측이나 단정은 쓰지 않는다.",
   "수업 이름은 두 학생이 함께 듣는 commonCourses 에 있는 것만 언급한다.",
   "상대의 위치가 드러나지 않도록 reasons 와 suggestedActivity 에 건물 이름을 쓰지 않는다. 필요하면 '가까운 건물에서 수업이 끝나요'처럼 쓴다.",
@@ -72,6 +81,46 @@ export function stripBuildings(out: EvaluateMatchOutput, buildings: string[]): E
   return { ...out, reasons, suggestedActivity: leaks(out.suggestedActivity) ? ACTIVITY_FALLBACK : out.suggestedActivity };
 }
 
+/**
+ * BT-049: 입력에 근거가 없는 이유 문장은 검색자 화면에 내보내지 않는다(패턴 검사라 모든 지어낸 말을 잡지는 못한다).
+ * - 함께 듣는 수업이 없는데 함께 듣는다고 한 문장
+ * - overlapMinutes 와 다른 시간(N분·N시간 M분)을 말한 문장
+ * - 따옴표로 인용한 말이 입력 어디에도 없는 문장
+ */
+const SHARED_CLASS = /(함께|같이)\s*(듣|들어|들으|수강)|같은\s*수업|공통\s*(수업|과목)/;
+const QUOTED = /['‘“"]([^'’”"]{1,60})['’”"]/g;
+const DURATION = /(?:(\d+)\s*시간)?\s*(?:(\d+)\s*분)?/g;
+
+function minutesMentioned(s: string): number[] {
+  const found: number[] = [];
+  for (const m of s.matchAll(DURATION)) {
+    if (!m[1] && !m[2]) continue;
+    found.push(Number(m[1] ?? 0) * 60 + Number(m[2] ?? 0));
+  }
+  return found;
+}
+
+export function isGrounded(reason: string, input: EvaluateMatchInput): boolean {
+  const courses = input.commonCourses ?? [];
+  if (courses.length === 0 && SHARED_CLASS.test(reason)) return false;
+  if (minutesMentioned(reason).some((m) => m !== input.overlapMinutes)) return false;
+  const known = [
+    "상대", ...courses, ...(input.purposes ?? []),
+    ...[input.searcher, input.candidate].flatMap((s) => [s.department, ...(s.tags ?? [])]),
+  ];
+  for (const q of reason.matchAll(QUOTED)) {
+    const term = q[1].trim().replace(/^#/, "");
+    if (term && !known.some((k) => k.includes(term) || term.includes(k))) return false;
+  }
+  return true;
+}
+
+export function groundReasons(out: EvaluateMatchOutput, input: EvaluateMatchInput): EvaluateMatchOutput {
+  const reasons = out.reasons.filter((r) => isGrounded(r, input));
+  if (reasons.length === 0) throw new AiError("AI_INVALID_OUTPUT", "reasons not grounded", { transient: false });
+  return { ...out, reasons };
+}
+
 export const evaluateMatchTask: AiTask<z.infer<typeof input>, EvaluateMatchOutput> = {
   name: "evaluateMatch",
   input,
@@ -79,7 +128,8 @@ export const evaluateMatchTask: AiTask<z.infer<typeof input>, EvaluateMatchOutpu
   timeoutMs: 10_000,
   /** 검색한 사용자 기준. 후보마다 1회라 다른 기능보다 크게 잡는다(BT-028 캐시로 줄인다). */
   dailyLimit: 300,
-  verify: (out, input) => stripBuildings(out, [...input.searcher.nearbyBuildings, ...input.candidate.nearbyBuildings]),
+  verify: (out, input) =>
+    groundReasons(stripBuildings(out, [...input.searcher.nearbyBuildings, ...input.candidate.nearbyBuildings]), input),
   // 같은 입력이면 같은 점수가 나오도록 결정적으로 만든다.
   mock: ({ overlapMinutes, commonCourses, searcher, candidate }) => {
     const sharedTags = searcher.tags.filter((tag) => candidate.tags.includes(tag));

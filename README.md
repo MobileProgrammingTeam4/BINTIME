@@ -149,6 +149,7 @@ userChatRooms/{uid}/{chatRoomId}: {..., chatReady, archived, hidden, linkedAt}
 - 매칭 검색은 `searchMatches()` Callable이 저장된 `matchSettings/{uid}`로 판정합니다. 지금 겹치는 공강, 없으면 가장 가까운 미래 공강 **하나**를 기준으로 양측 ON·검색자가 고른 최소 겹침·목적·차단을 확인하고, 상대 UID(`candidateId`)와 겹침 시간·목적만 돌려줍니다. 이름·사진은 앱이 `publicProfiles`에서 읽습니다. 상세 계약은 [`docs/BT-017.md`](./docs/BT-017.md)를 따릅니다.
 - AI 매칭률(BT-027)은 검색 서버가 조건을 통과한 상위 5명에게만 Gemini 점수·추천 이유를 붙이고, 실패하면 점수 없이 결과를 돌려줍니다. 자기소개의 연락처(이메일·전화번호·링크)는 지우고 보냅니다. 앱은 Gemini를 직접 부르지 않습니다. 상세는 [`docs/BT-027.md`](./docs/BT-027.md)를 따릅니다.
 - AI 추천순(BT-028)은 점수가 붙은 후보를 점수 높은 순으로 앞에 두고, 같은 입력이면 24시간 동안 서버 전용 `matchScores` 캐시를 써서 Gemini를 다시 부르지 않습니다. 상세는 [`docs/BT-028.md`](./docs/BT-028.md)를 따릅니다.
+- AI 평가 품질·비용(BT-049)은 점수 기준·예시를 프롬프트에 고정하고, 입력에 근거가 없는 추천 이유는 서버가 빼며, 같은 평가가 동시에 오거나 앱이 같은 조건으로 검색을 겹쳐 부르면 Gemini를 한 번만 부릅니다. 상세는 [`docs/BT-049.md`](./docs/BT-049.md)를 따릅니다.
 - 요청 생성 입력은 `{candidateId, clientRequestId}`이며 `candidateId`는 상대 UID, `clientRequestId`는 재시도 동안 유지하는 UUID입니다. 서버는 검색자가 선택한 최소 겹침, 프로필 완료·공개 프로필 존재, 차단·확정 매칭 충돌을 확인한 뒤 시간·목적 스냅샷을 정합니다. 상세 계약은 [`docs/BT-019.md`](./docs/BT-019.md)를 따릅니다.
 - 요청 정책은 보낸 대기 3개·받은 대기 5개, 직접 취소 후 모든 상대에 신규 신청 60초 제한, 역방향 대기 요청 차단입니다. 기존 초과 요청은 보존합니다. 실제 수락·거절은 `respondToMatchRequest({requestId, action})`로 처리하며 수락과 확정 매칭 생성을 같은 트랜잭션으로 보호합니다. 상세는 [`docs/BT-031.md`](./docs/BT-031.md)를 따릅니다.
 - 수락 시 양측의 겹치는 대기 요청을 정리하고 종료 시각이 지난 요청은 만료 취소합니다. 자동 정리의 서버 전용 작업·5분 예약 코드·운영 활성화 조건은 [`docs/BT-032.md`](./docs/BT-032.md)를 따릅니다.
