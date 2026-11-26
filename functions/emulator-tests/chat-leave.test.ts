@@ -152,4 +152,34 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_DA
     expect(await val(`userChatRooms/u1/${first}`)).toMatchObject({ hidden: false, archived: true });
     await assertSucceeds(send("u0", third));
   });
+
+  it("같은 두 사람의 새 방에 ACTIVE 약속이 있어도 남은 사람은 이전 보관 방을 나갈 수 있고, 새 방은 그대로다(#121)", async () => {
+    await seed(first);
+    await leaver().leave(first, "u0");
+    await seed(third, "ACTIVE");
+    expect((await db.doc(`chatPairs/${pairId}`).get()).get("roomId")).toBe(third);
+    const newRoomBefore = { members: await val(`chatRooms/${third}/members`), control: await val(`chatRooms/${third}/control`),
+      u0: await val(`userChatRooms/u0/${third}`), u1: await val(`userChatRooms/u1/${third}`) };
+
+    // 이전 방에 연결된 약속은 ENDED 뿐이므로 ACTIVE_MATCH 가 아니다. pair 의 현재 방이 달라도 막지 않는다.
+    expect(await leaver().leave(first, "u1")).toEqual({ chatRoomId: first, left: true });
+
+    expect(await val(`chatRooms/${first}/members`)).toBeNull();
+    expect(await val(`userChatRooms/u1/${first}/hidden`)).toBe(true);
+    expect((await db.doc(`chatRoomLinks/${first}`).get()).get("participantUids")).toEqual([]);
+
+    // 새 방의 멤버·control·양측 목록 항목은 바뀌지 않고, pair 는 계속 새 방을 가리킨다. lease 는 풀려 있다.
+    expect(await val(`chatRooms/${third}/members`)).toEqual(newRoomBefore.members);
+    expect(await val(`chatRooms/${third}/control`)).toEqual(newRoomBefore.control);
+    expect(await val(`userChatRooms/u0/${third}`)).toEqual(newRoomBefore.u0);
+    expect(await val(`userChatRooms/u1/${third}`)).toEqual(newRoomBefore.u1);
+    expect(newRoomBefore.u1).toMatchObject({ status: "ACTIVE", hidden: false });
+    expect((await db.doc(`chatRoomLinks/${third}`).get()).get("participantUids")).toEqual(["u0", "u1"]);
+    expect((await db.doc(`chatPairs/${pairId}`).get()).data()).toMatchObject({ roomId: third, roomStateOwner: null, roomStateLeaseUntil: null });
+    expect((await db.doc(`matches/${third}`).get()).get("status")).toBe("ACTIVE");
+
+    await assertFails(read("u1", first));
+    await assertSucceeds(send("u0", third));
+    await assertSucceeds(send("u1", third));
+  });
 });
