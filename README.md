@@ -140,7 +140,7 @@ chatRooms/{chatRoomId}/members/{uid}
 chatRooms/{chatRoomId}/messages/{messageId}
 chatRooms/{chatRoomId}/control: {chatReady, writable, archived}
 chatRooms/{chatRoomId}/blocks/{blockerUid}: true
-userChatRooms/{uid}/{chatRoomId}: {..., chatReady, archived, hidden, linkedAt, blockedByMe, blockedByPartner}
+userChatRooms/{uid}/{chatRoomId}: {..., chatReady, archived, hidden, linkedAt, blockedByMe, sendDisabled}
 ```
 
 - `uid`는 Firebase Auth UID입니다. 영업/민감 데이터는 클라이언트 소유권 규칙과 서버 검증으로 보호합니다.

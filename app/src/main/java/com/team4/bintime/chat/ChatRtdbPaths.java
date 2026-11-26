@@ -31,9 +31,9 @@ final class ChatRtdbPaths {
     static final String HIDDEN = "hidden";
     /** BT-034: 목록 항목을 처음 만든 서버 시각(ms). 메시지 없는 방의 정렬 기준. 없는 이전 방은 0 */
     static final String LINKED_AT = "linkedAt";
-    /** BT-046: 서버(blockUser)만 쓴다. 내가 상대를 차단했으면 blockedByMe, 상대가 나를 차단했으면 blockedByPartner = true */
+    /** BT-046: 서버(blockUser)만 쓴다. 내가 상대를 차단했으면 blockedByMe, 상대가 나를 차단했으면 sendDisabled = true */
     static final String BLOCKED_BY_ME = "blockedByMe";
-    static final String BLOCKED_BY_PARTNER = "blockedByPartner";
+    static final String SEND_DISABLED = "sendDisabled";
 
     /** 메시지 본문 최대 길이. database.rules.json 의 검증 값과 같아야 한다. */
     static final int MAX_CONTENT_LENGTH = 1000;
