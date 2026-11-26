@@ -7,6 +7,7 @@ import { resolveMode } from "./config";
 import { ALLOWED_EMAIL_SUFFIXES_ENV, parseAllowedEmailSuffixes } from "./emailPolicy";
 import { AiError } from "./errors";
 import { GenAiModelClient, type ModelClient } from "./gemini";
+import { FirestorePlaceStore } from "./placeStore";
 import type { AiDeps, StoredImage } from "./types";
 import { FirestoreUsageStore } from "./usage";
 
@@ -84,6 +85,7 @@ export function defaultDeps(): AiDeps {
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     allowedEmailSuffixes: parseAllowedEmailSuffixes(process.env[ALLOWED_EMAIL_SUFFIXES_ENV]),
     readImage: (path, maxBytes) => readStorageImage(() => getStorage(app).bucket().file(path), maxBytes),
+    places: new FirestorePlaceStore(db),
   };
   return cached;
 }
