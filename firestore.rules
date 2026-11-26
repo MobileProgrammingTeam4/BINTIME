@@ -14,6 +14,18 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
+    // #135: 인증된 학교 이메일 계정. 앱(auth/EmailVerificationState.java)·서버(functions/src/ai/emailPolicy.ts,
+    // ALLOWED_EMAIL_SUFFIXES=.ac.kr,.edu)와 같은 판단이다. Rules는 Functions 환경 설정을 읽을 수 없어
+    // 도메인을 여기에 같이 적는다. 바꿀 때는 storage.rules·.env.*·앱 정규식을 함께 바꾼다
+    // (functions/test/schoolEmailRulesParity.test.ts 가 어긋남을 잡는다).
+    // 판단 근거는 Auth 토큰뿐이다. 클라이언트가 쓴 users/publicProfiles 필드는 쓰지 않는다.
+    function isSchoolUser() {
+      return signedIn()
+          && request.auth.token.email_verified == true
+          && request.auth.token.email is string
+          && request.auth.token.email.lower().matches('^[a-z0-9._%+-]+@[a-z0-9.-]+[.](ac[.]kr|edu)$');
+    }
+
     // 앱 ProfileValidator 와 같은 필수값·길이 제한 (닉네임 1~10자, 학과 필수, 소개 150자 이하)
     function validProfile() {
       let d = request.resource.data;
@@ -34,9 +46,9 @@ service cloud.firestore {
       allow delete: if false; // 회원 탈퇴는 후속 이슈에서 서버로 처리
     }
 
-    // 공개 프로필: 로그인 사용자만 읽고, 본인만 쓴다. 이메일 등 개인정보 필드는 금지.
+    // 공개 프로필: 인증된 학교 계정만 읽고(#135), 본인만 쓴다. 이메일 등 개인정보 필드는 금지.
     match /publicProfiles/{uid} {
-      allow read: if signedIn();
+      allow read: if isSchoolUser();
       allow create, update: if isOwner(uid) && validProfile()
           && !('email' in request.resource.data);
       allow delete: if false;

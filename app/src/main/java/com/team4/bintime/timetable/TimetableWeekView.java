@@ -18,8 +18,10 @@ import com.team4.bintime.common.ChipViews;
 import java.util.Locale;
 
 public class TimetableWeekView extends LinearLayout {
+    /** 기본 표시 시작 칸(자정 기준 30분 칸, 18 = 09:00). */
     static final int FIRST_DEFAULT_SLOT = 18;
-    private static final int END_DEFAULT_SLOT = 36;
+    /** 기본 표시 끝 칸(exclusive, 42 = 21:00). 수업 뒤 저녁 공강도 고를 수 있게 21시까지 보인다. */
+    static final int END_DEFAULT_SLOT = 42;
     private static final int MINUTES = TimetableDraft.SLOT_MINUTES;
     private final LinearLayout table;
 
@@ -36,17 +38,31 @@ public class TimetableWeekView extends LinearLayout {
 
     void bind(TimetableDraft draft, Runnable onChange) {
         table.removeAllViews();
-        int first = FIRST_DEFAULT_SLOT;
-        int end = END_DEFAULT_SLOT;
-        for (Course course : draft.courses) {
-            first = Math.min(first, course.getStartSlotIndex(0) / 2 * 2);
-            end = Math.max(end, (course.getEndSlotIndex(0) + 1) / 2 * 2);
-        }
+        int[] range = visibleSlots(draft.courses);
+        int first = range[0];
+        int end = range[1];
         int rowHeight = ChipViews.dp(getContext(), 32);
         addTimeAxis(first, end, rowHeight);
         for (int day = 0; day < TimetableDraft.DAYS.length; day++) {
             addDay(draft, day, first, end, rowHeight, onChange);
         }
+    }
+
+    /**
+     * 표시할 칸 범위 {first, end(exclusive)}. 기본 09:00~21:00이고, 그 밖의 수업이 있으면 정시 단위로 넓힌다.
+     * 데이터(freeCells 48칸)와 무관한 화면 범위다.
+     */
+    static int[] visibleSlots(java.util.List<Course> courses) {
+        int first = FIRST_DEFAULT_SLOT;
+        int end = END_DEFAULT_SLOT;
+        if (courses != null) {
+            for (Course course : courses) {
+                if (course == null) continue;
+                first = Math.min(first, course.getStartSlotIndex(0) / 2 * 2);
+                end = Math.max(end, (course.getEndSlotIndex(0) + 1) / 2 * 2);
+            }
+        }
+        return new int[]{first, end};
     }
 
     private void addTimeAxis(int first, int end, int rowHeight) {

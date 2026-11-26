@@ -35,6 +35,11 @@
     <string name="chat_overlap_duration">%1$s 겹침</string>
     <!-- BT-010 AI 답장 · 채팅 옵션 (Figma 120:2575) -->
     <string name="chat_ai_reply_failed">답장 추천을 불러오지 못했어요. 직접 입력해주세요.</string>
+    <string name="chat_ai_reply_retry">답장 추천을 잠시 불러오지 못했어요. 반짝이 버튼을 다시 눌러주세요.</string>
+    <string name="chat_ai_reply_quota">오늘 답장 추천 횟수를 모두 썼어요. 직접 입력해주세요.</string>
+    <string name="chat_ai_reply_denied">이 채팅방에서는 답장 추천을 쓸 수 없어요.</string>
+    <string name="chat_ai_reply_blocked">AI가 이 대화에는 답장을 추천할 수 없어요. 직접 입력해주세요.</string>
+    <string name="chat_ai_reply_unavailable">지금은 답장 추천을 쓸 수 없어요. 직접 입력해주세요.</string>
     <string name="chat_option_end">매칭 종료하기</string>
     <string name="chat_option_leave">채팅방 나가기</string>
     <string name="chat_option_report">신고하기</string>

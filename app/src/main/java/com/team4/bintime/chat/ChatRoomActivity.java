@@ -66,9 +66,12 @@ public class ChatRoomActivity extends AppCompatActivity {
         return new Intent(context, ChatRoomActivity.class).putExtra(EXTRA_MATCH_ID, matchId);
     }
 
-    /** Firebase 가 설정되면 RTDB, 아니면 Mock (ChatRepositories). AI 답장·후기는 아직 Mock 이다(BT-041·BT-044). */
+    /** Firebase 가 설정되면 RTDB, 아니면 Mock (ChatRepositories). 후기는 아직 Mock 이다(BT-044). */
     private ChatRepository repository;
-    private final ReplySuggestionRepository replyRepository = MockReplySuggestionRepository.shared();
+    /** Firebase 가 설정되면 suggestChatReplies(Gemini, BT-041), 아니면 Mock (ReplySuggestionRepositories). */
+    private ReplySuggestionRepository replyRepository;
+    /** 키·모델 설정 문제나 미구현이면 이 화면에서 반짝이 버튼을 숨긴다(BT-024 오류 표). */
+    private boolean aiReplyUnavailable;
     private final ReviewRepository reviewRepository = MockReviewRepository.shared();
 
     private String matchId;
@@ -99,6 +102,7 @@ public class ChatRoomActivity extends AppCompatActivity {
             return;
         }
         repository = ChatRepositories.get(this);
+        replyRepository = ReplySuggestionRepositories.get(this);
         String myUid = repository.currentUid();
         if (myUid == null || myUid.trim().isEmpty()) {
             // 로그인 전이면 내 메시지를 구분할 수 없다. 구독을 시작하지 않고 닫는다.
@@ -553,28 +557,48 @@ public class ChatRoomActivity extends AppCompatActivity {
 
     /** 버튼을 눌렀을 때만 요청한다. 요청 중에는 버튼을 잠가 중복 호출을 막는다. */
     private void requestReplies() {
-        if (replyRequest != null || room == null || room.archived || !room.chatReady) return;
+        if (replyRequest != null || aiReplyUnavailable || room == null || room.archived || !room.chatReady) return;
+        // 서버는 이 약속의 chatRoomId 로 실제 방을 찾는다(재사용 방은 방 키와 약속 ID 가 다르다, BT-034).
+        String target = ReplySuggestionRepositories.targetMatchId(room.appointments, matchId, repository.nowMillis());
         setAiButtonEnabled(false);
-        replyRequest = replyRepository.requestReplies(matchId, new ReplySuggestionRepository.Callback() {
+        replyRequest = replyRepository.requestReplies(target, new ReplySuggestionRepository.Callback() {
             @Override
             public void onSuccess(List<String> result) {
+                if (isFinishing() || isDestroyed()) return;
                 replyRequest = null;
                 setAiButtonEnabled(true);
                 showReplies(new ArrayList<>(result));
             }
 
             @Override
-            public void onError() {
+            public void onError(ReplySuggestionFailure failure) {
+                if (isFinishing() || isDestroyed()) return;
                 replyRequest = null;
-                setAiButtonEnabled(true);
                 hideReplies();
-                Toast.makeText(ChatRoomActivity.this, R.string.chat_ai_reply_failed, Toast.LENGTH_SHORT).show();
+                if (failure == ReplySuggestionFailure.UNAVAILABLE) aiReplyUnavailable = true;
+                setAiButtonEnabled(true);
+                if (failure == ReplySuggestionFailure.SIGNED_OUT && SessionGuard.redirectIfSignedOut(ChatRoomActivity.this)) return;
+                Toast.makeText(ChatRoomActivity.this, replyFailureMessage(failure), Toast.LENGTH_SHORT).show();
             }
         });
     }
 
+    /** 실패마다 안내만 바꾼다. 재시도는 반짝이 버튼을 다시 누르는 것으로 하고, 자동으로 다시 부르지 않는다. */
+    private static int replyFailureMessage(ReplySuggestionFailure failure) {
+        switch (failure) {
+            case RETRY: return R.string.chat_ai_reply_retry;
+            case QUOTA: return R.string.chat_ai_reply_quota;
+            case PERMISSION: return R.string.chat_ai_reply_denied;
+            case BLOCKED: return R.string.chat_ai_reply_blocked;
+            case UNAVAILABLE: return R.string.chat_ai_reply_unavailable;
+            case SIGNED_OUT: return R.string.chat_login_required;
+            default: return R.string.chat_ai_reply_failed;
+        }
+    }
+
     private void setAiButtonEnabled(boolean enabled) {
-        enabled = enabled && room != null && !room.archived && room.chatReady;
+        aiButton.setVisibility(aiReplyUnavailable ? View.GONE : View.VISIBLE);
+        enabled = enabled && !aiReplyUnavailable && room != null && !room.archived && room.chatReady;
         aiButton.setEnabled(enabled);
         aiButton.setAlpha(enabled ? 1f : 0.4f);
     }
