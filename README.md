@@ -243,6 +243,7 @@ npm run build
 - 팀 정책상 `google-services.json`은 각자 Firebase Console에서 받아 로컬에 두고 Git에서 제외합니다.
 - `firebase.json`, Firestore/RTDB/Storage Rules, 인덱스 설정 파일은 팀 검토 후 버전 관리합니다.
 - **Gemini는 Cloud Functions에서 호출**하고 키는 Firebase Secrets 등 서버 비밀 저장소로 관리합니다.
+- Android App Check는 debug에서 Debug provider, release에서 Play Integrity를 사용합니다. Callable은 공통 `APP_CHECK_ENFORCED` 설정을 따르며, 앱 등록·모니터링 후 승인된 배포에서만 강제합니다. [보안 설정 안내](./docs/SECURITY-135.md)에 콘솔 설정과 로컬 시크릿 검사 명령을 정리했습니다.
 - 운영 환경 배포·유료 기능 활성화·비용 설정 변경은 프로젝트 소유자 승인 없이 진행하지 않습니다.
 
 ## 8. 협업 규칙 — 커밋 · 브랜치 · PR · Issues
