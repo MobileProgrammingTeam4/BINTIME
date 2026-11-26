@@ -4,10 +4,11 @@
  * - 국민대 공식 페이지(kookmin.ac.kr)에 적힌 장소만 넣는다. 장소마다 출처(source)와 확인 날짜(verifiedAt)를 둔다.
  * - 운영 시간(hours)은 학기 기준이며 약속 시간에 열려 있지 않은 곳을 후보에서 빼는 데만 쓴다. 이유 문구·프롬프트에는 넣지 않는다.
  *   페이지에 요일이 없으면 days 는 null(요일로는 거르지 않음), 시간이 불확실하면 hours 를 null 로 두어 거르지 않는다.
+ *   구간마다 요일이 다르면(예: 금요일 석식 미운영) 그 구간에만 days 를 둔다.
  * - 장소를 더하거나 빼거나 고치면 CAMPUS_PLACES_VERSION 을 올린다. 저장된 추천(placeRecommendations)은 버전이 다르면 다시 만든다.
  */
 
-export const CAMPUS_PLACES_VERSION = 1;
+export const CAMPUS_PLACES_VERSION = 2;
 export const CAMPUS_PLACES_VERIFIED_AT = "2026-11-26";
 
 /** 교내복지시설(식당·카페·편의점·기타 매장) */
@@ -22,8 +23,8 @@ export type PlaceCategory = "CAFE" | "RESTAURANT" | "DRINK" | "BAKERY";
 export interface OpeningHours {
   /** 1(월)~7(일). 페이지에 요일이 없으면 null */
   days: number[] | null;
-  /** 자정부터의 분, [open, close) */
-  ranges: { open: number; close: number }[];
+  /** 자정부터의 분, [open, close). days 가 있으면 그 구간은 그 요일에만 연다(장소 전체 days 와 함께 적용) */
+  ranges: { open: number; close: number; days?: number[] }[];
 }
 
 export interface CampusPlace {
@@ -47,8 +48,8 @@ const t = (hhmm: string) => {
   return h * 60 + m;
 };
 const WEEKDAYS = [1, 2, 3, 4, 5];
-const range = (open: string, close: string) => ({ open: t(open), close: t(close) });
-const hours = (days: number[] | null, ...ranges: { open: number; close: number }[]): OpeningHours => ({ days, ranges });
+const range = (open: string, close: string, days?: number[]) => (days ? { open: t(open), close: t(close), days } : { open: t(open), close: t(close) });
+const hours = (days: number[] | null, ...ranges: OpeningHours["ranges"]): OpeningHours => ({ days, ranges });
 
 const CAFE: Purpose[] = ["카페·디저트", "스터디"];
 const MEAL: Purpose[] = ["밥"];
@@ -71,6 +72,9 @@ export const VERIFIED_CAMPUS_PLACES: readonly CampusPlace[] = [
   place("bugak-gongcha", "공차", "북악관", "1층", "DRINK", DESSERT, hours(null, range("10:00", "18:00"))),
   place("welfare-student-cafeteria", "학생식당", "종합복지관", "1층", "RESTAURANT", MEAL,
     hours(null, range("08:00", "15:00"), range("17:00", "18:30"))),
+  // 학기: 중식 11:30~14:00, 석식 17:00~18:30(금요일 석식 미운영), 주말·공휴일 휴점. 페이지에 이용 대상 제한 표기 없음.
+  place("welfare-staff-cafeteria", "교직원식당", "종합복지관", "1층", "RESTAURANT", MEAL,
+    hours(WEEKDAYS, range("11:30", "14:00"), range("17:00", "18:30", [1, 2, 3, 4]))),
   place("law-hanul", "한울식당", "법학관", "지하1층", "RESTAURANT", MEAL, hours(null, range("10:30", "18:30")), [SOURCE_WELFARE, SOURCE_COOP]),
   place("law-cheonghyang-korean", "청향 (한식당)", "법학관", "5층", "RESTAURANT", MEAL,
     hours(null, range("11:30", "14:00"), range("17:00", "19:00")), [SOURCE_WELFARE, SOURCE_COOP]),
@@ -95,7 +99,8 @@ export function isOpenDuring(place: CampusPlace, dayOfWeek: number, start: numbe
   if (!place.hours) return true;
   if (place.hours.days && !place.hours.days.includes(dayOfWeek)) return false;
   const need = Math.min(30, Math.max(0, end - start));
-  const open = place.hours.ranges.reduce((sum, r) => sum + Math.max(0, Math.min(end, r.close) - Math.max(start, r.open)), 0);
+  const open = place.hours.ranges.filter((r) => !r.days || r.days.includes(dayOfWeek))
+    .reduce((sum, r) => sum + Math.max(0, Math.min(end, r.close) - Math.max(start, r.open)), 0);
   return open >= need && open > 0;
 }
 

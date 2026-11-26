@@ -15,8 +15,8 @@ const byId = (id: string) => VERIFIED_CAMPUS_PLACES.find((p) => p.placeId === id
 
 describe("검증된 교내 장소 목록", () => {
   it("모든 장소에 국민대 공식 출처·확인 날짜·고유 id 가 있다", () => {
-    expect(VERIFIED_CAMPUS_PLACES).toHaveLength(20);
-    expect(new Set(VERIFIED_CAMPUS_PLACES.map((p) => p.placeId)).size).toBe(20);
+    expect(VERIFIED_CAMPUS_PLACES).toHaveLength(21);
+    expect(new Set(VERIFIED_CAMPUS_PLACES.map((p) => p.placeId)).size).toBe(21);
     for (const p of VERIFIED_CAMPUS_PLACES) {
       expect(p.source.length).toBeGreaterThan(0);
       for (const url of p.source) expect(new URL(url).hostname.endsWith("kookmin.ac.kr")).toBe(true);
@@ -46,6 +46,18 @@ describe("검증된 교내 장소 목록", () => {
     expect(isOpenDuring(byId("welfare-student-cafeteria"), 2, 900, 1020)).toBe(false);
   });
 
+  it("교직원식당은 평일 중식·석식, 금요일은 중식만, 주말은 휴점", () => {
+    const staff = byId("welfare-staff-cafeteria");
+    expect(displayName(staff)).toBe("교직원식당 (종합복지관 1층)");
+    expect(isOpenDuring(staff, 1, 720, 810)).toBe(true); // 월 12:00~13:30 중식
+    expect(isOpenDuring(staff, 4, 1020, 1110)).toBe(true); // 목 17:00~18:30 석식
+    expect(isOpenDuring(staff, 5, 720, 810)).toBe(true); // 금 중식
+    expect(isOpenDuring(staff, 5, 1020, 1110)).toBe(false); // 금 석식 미운영
+    expect(isOpenDuring(staff, 6, 720, 810)).toBe(false); // 토 휴점
+    expect(isOpenDuring(staff, 1, 870, 1020)).toBe(false); // 14:30~17:00 쉬는 시간
+    expect(candidatePlaces("밥", 5, 1020, 1110).map((p) => p.placeId)).not.toContain("welfare-staff-cafeteria");
+  });
+
   it("운영 시간이 불확실한 장소(hours=null)는 거르지 않는다", () => {
     const unknown: CampusPlace = { ...byId("law-cafe"), placeId: "x", hours: null };
     expect(isOpenDuring(unknown, 7, 0, 60)).toBe(true);
@@ -57,7 +69,7 @@ describe("검증된 교내 장소 목록", () => {
     expect(meal.every((p) => p.purposes.includes("밥"))).toBe(true);
     expect(candidatePlaces("스터디", 1, 720, 810).every((p) => p.category === "CAFE")).toBe(true);
     expect(candidatePlaces("산책", 1, 720, 810)).toHaveLength(candidatePlaces("전체", 1, 720, 810).length);
-    expect(candidatePlaces(null, 1, 720, 810).length).toBe(20);
+    expect(candidatePlaces(null, 1, 720, 810).length).toBe(21);
   });
 });
 
