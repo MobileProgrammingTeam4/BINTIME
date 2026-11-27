@@ -79,6 +79,21 @@ public class MatchSearchMapperTest {
         assertFalse(c.hasScore());
         assertEquals("profileImages/u9/profile.jpg", c.photoPath);
         assertTrue(c.reasons.isEmpty());
+        assertNull(c.aiPlace); // 서버가 장소를 안 주면 줄 숨김
+    }
+
+    @Test
+    public void toCandidate_검색추천장소() {
+        Map<String, Object> raw = new HashMap<>();
+        raw.put("candidateId", "u9");
+        raw.put("meetingDate", "2026-11-17");
+        raw.put("placeName", "공차 (북악관 1층)");
+        raw.put("placeCount", 5L);
+        assertEquals("공차 (북악관 1층) 외 4곳", MatchSearchMapper.toCandidate(raw, new UserProfile(), 2, "2026-11-16").aiPlace);
+        raw.put("placeCount", 1);
+        assertEquals("공차 (북악관 1층)", MatchSearchMapper.toCandidate(raw, new UserProfile(), 2, "2026-11-16").aiPlace);
+        raw.put("placeName", "");
+        assertNull(MatchSearchMapper.toCandidate(raw, new UserProfile(), 2, "2026-11-16").aiPlace);
     }
 
     @Test

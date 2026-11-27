@@ -152,7 +152,7 @@ userChatRooms/{uid}/{chatRoomId}: {..., chatReady, archived, hidden, linkedAt}
 - `dayOfWeek`: 월=1 ~ 일=7, `startMinute/endMinute`: 자정부터 지난 정수 분, **`meetingDate`: `YYYY-MM-DD`**, 시간대는 `Asia/Seoul` 기준으로 통일합니다.
 - 공강 계산의 입력 버전(`timetables.revision`)과 파생 결과(`availability.sourceRevision`)를 비교해 오래된 공강으로 매칭하지 않습니다.
 - `timetables/{uid}.freeCells`는 월~일 7개의 48비트 정수로 선택 원본을 보존합니다. 수업 변경은 `revision`을 증가시키고 공강 선택만 변경할 때는 유지합니다. `semester`는 없거나 null일 수 있습니다. `availability.slots`는 연속 칸을 병합한 60분 이상 구간이며, 서버는 원본 선택·수업·revision과 일치하는지 다시 검증합니다.
-- 매칭 검색은 `searchMatches()` Callable이 저장된 `matchSettings/{uid}`로 판정합니다. 지금 겹치는 공강, 없으면 가장 가까운 미래 공강 **하나**를 기준으로 양측 ON·검색자가 고른 최소 겹침·목적·차단을 확인하고, 상대 UID(`candidateId`)와 겹침 시간·목적만 돌려줍니다. 이름·사진은 앱이 `publicProfiles`에서 읽습니다. 상세 계약은 [`docs/BT-017.md`](./docs/BT-017.md)를 따릅니다.
+- 매칭 검색은 `searchMatches()` Callable이 저장된 `matchSettings/{uid}`로 판정합니다. 지금 겹치는 공강, 없으면 가장 가까운 미래 공강 **하나**를 기준으로 양측 ON·검색자가 고른 최소 겹침·목적·차단을 확인하고, 상대 UID(`candidateId`)와 겹침 시간·목적만 돌려줍니다. 후보마다 그 시간에 여는 검증된 교내 장소 하나와 개수(`placeName`·`placeCount`)도 붙이며, AI를 쓰지 않고 두 사람의 수업 건물도 쓰지 않습니다(프로필 상세에 "추천 장소: ○○ 외 N곳"). 이름·사진은 앱이 `publicProfiles`에서 읽습니다. 상세 계약은 [`docs/BT-017.md`](./docs/BT-017.md)를 따릅니다.
 - AI 매칭률(BT-027)은 검색 서버가 조건을 통과한 상위 5명에게만 Gemini 점수·추천 이유를 붙이고, 실패하면 점수 없이 결과를 돌려줍니다. 자기소개의 연락처(이메일·전화번호·링크)는 지우고 보냅니다. 앱은 Gemini를 직접 부르지 않습니다. 상세는 [`docs/BT-027.md`](./docs/BT-027.md)를 따릅니다.
 - AI 추천순(BT-028)은 점수가 붙은 후보를 점수 높은 순으로 앞에 두고, 같은 입력이면 24시간 동안 서버 전용 `matchScores` 캐시를 써서 Gemini를 다시 부르지 않습니다. 상세는 [`docs/BT-028.md`](./docs/BT-028.md)를 따릅니다.
 - AI 평가 품질·비용(BT-049)은 점수 기준·예시를 프롬프트에 고정하고, 입력에 근거가 없는 추천 이유는 서버가 빼며, 같은 평가가 동시에 오거나 앱이 같은 조건으로 검색을 겹쳐 부르면 Gemini를 한 번만 부릅니다. 상세는 [`docs/BT-049.md`](./docs/BT-049.md)를 따릅니다.
