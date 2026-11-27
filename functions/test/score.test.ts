@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { AiError } from "../src/ai/errors";
+import { evaluateMatch } from "../src/ai/internal";
 import type { Candidate } from "../src/matching/eligibility";
+import { makeDeps } from "./helpers";
 import {
   AI_SCORE_LIMIT,
   addScores,
@@ -184,6 +187,64 @@ describe("BT-028 점수 캐시·추천순", () => {
     const out = await addScores(data, flaky, "me", list, now);
     expect(out.map((c) => c.candidateId)).toEqual(["b", "a", "c", "d", "e", "f"]);
     expect(rankByScore([{ ...cand("x"), score: 0 }, cand("y")]).map((c) => c.candidateId)).toEqual(["x", "y"]);
+  });
+});
+
+describe("BT-049 호출 줄이기·AI 장애", () => {
+  const now = Date.UTC(2026, 10, 26);
+  const delayedLive = () => {
+    const fn = (async (u, i) => {
+      fn.calls++;
+      await new Promise((r) => setTimeout(r, 20));
+      return { ...(await fixed(u, i)), meta: { model: "m", requestId: "r", latencyMs: 1, mock: false } };
+    }) as Evaluator & { calls: number };
+    fn.calls = 0;
+    return fn;
+  };
+
+  it("같은 사람·후보·입력 평가가 동시에 오면 한 번만 부르고 둘 다 점수를 받는다", async () => {
+    const data = new MemoryData({ me: side, a: side });
+    const ev = delayedLive();
+    const [x, y] = await Promise.all([addScores(data, ev, "me", [cand("a")], now), addScores(data, ev, "me", [cand("a")], now)]);
+    expect(ev.calls).toBe(1);
+    expect([x[0].score, y[0].score]).toEqual([77, 77]);
+  });
+
+  it("검색한 사람이 다르면 합치지 않는다", async () => {
+    const data = new MemoryData({ me: side, you: side, a: side });
+    const ev = delayedLive();
+    await Promise.all([addScores(data, ev, "me", [cand("a")], now), addScores(data, ev, "you", [cand("a")], now)]);
+    expect(ev.calls).toBe(2);
+  });
+
+  it("함께 기다리던 평가가 실패하면 둘 다 점수 없이, 다음 검색은 다시 부른다", async () => {
+    let calls = 0;
+    const failing: Evaluator = async () => { calls++; await new Promise((r) => setTimeout(r, 20)); throw new Error("429"); };
+    const data = new MemoryData({ me: side, a: side });
+    const both = await Promise.all([addScores(data, failing, "me", [cand("a")], now), addScores(data, failing, "me", [cand("a")], now)]);
+    expect(calls).toBe(1);
+    expect(both.map((r) => r[0].score)).toEqual([undefined, undefined]);
+    await addScores(data, failing, "me", [cand("a")], now);
+    expect(calls).toBe(2);
+  });
+
+  it.each([
+    ["429 두 번", [new AiError("AI_RATE_LIMITED", "429", { transient: true }), new AiError("AI_RATE_LIMITED", "429", { transient: true })]],
+    ["시간 초과", [new AiError("AI_TIMEOUT")]],
+    ["결제·키 오류", [new AiError("AI_UNAVAILABLE", "402", { retryable: false })]],
+  ])("Gemini %s: 후보는 그대로 오고 점수만 없다", async (_name, steps) => {
+    const deps = makeDeps({ mode: "live", steps });
+    const out = await addScores(new MemoryData({ me: side, a: side }), (u, i) => evaluateMatch(u, i, deps), "me", [cand("a")], now);
+    expect(out).toHaveLength(1);
+    expect(out[0].candidateId).toBe("a");
+    expect(out[0].score).toBeUndefined();
+  });
+
+  it("하루 한도를 넘으면 Gemini 를 부르지 않고 점수 없이 돌려준다", async () => {
+    const deps = { ...makeDeps({ mode: "live" }), usage: { consume: async () => "DAILY_LIMIT" as const } };
+    const out = await addScores(new MemoryData({ me: side, a: side }), (u, i) => evaluateMatch(u, i, deps), "me", [cand("a")], now);
+    expect(out[0].score).toBeUndefined();
+    expect(deps.client.calls).toHaveLength(0);
   });
 });
 

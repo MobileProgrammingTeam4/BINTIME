@@ -7,6 +7,7 @@ import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestE
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { beforeAll, beforeEach, afterAll, describe, expect, it, vi } from "vitest";
 import { ChatLinkService, chatPairKey } from "../src/chat/link";
+import { RoomStateService } from "../src/chat/roomState";
 
 const projectId = "demo-bintime-link", first = "a".repeat(64), second = "b".repeat(64);
 const app = initializeApp({ projectId, databaseURL: `http://${process.env.FIREBASE_DATABASE_EMULATOR_HOST ?? "127.0.0.1:9000"}?ns=${projectId}` }, `link-${randomUUID()}`);
@@ -76,6 +77,26 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_DA
     expect((await rtdb.ref(`chatRooms/${first}/messages/old/content`).get()).val()).toBe("기존 대화");
     expect((await db.doc(`matches/${first}`).get()).get("status")).toBe("ENDED");
     expect((await rtdb.ref("chatRooms").get()).numChildren()).toBe(1);
+  });
+  it.each(["failed", "leased"])("집계가 %s여도 재사용 방의 새 ACTIVE 약속을 즉시 목록에 반영한다", async mode => {
+    await linker().link(first);
+    await db.doc(`matches/${first}`).update({ status: "ENDED" });
+    await new RoomStateService(db, rtdb, () => new Date(clock)).sync(first, ["u0", "u1"]);
+    await rtdb.ref(`userChatRooms/u1/${first}`).update({ unreadCount: 7, lastMessage: "보존할 대화" });
+    await seed(second);
+    const sync = vi.spyOn(RoomStateService.prototype, "sync");
+    if (mode === "failed") sync.mockRejectedValueOnce(new Error("offline"));
+    else sync.mockResolvedValueOnce(false);
+    expect((await linker().link(second)).chatRoomId).toBe(first);
+    for (const uid of ["u0", "u1"]) expect((await rtdb.ref(`userChatRooms/${uid}/${first}/status`).get()).val()).toBe("ACTIVE");
+    expect((await rtdb.ref(`userChatRooms/u1/${first}`).get()).val()).toMatchObject({ unreadCount: 7, lastMessage: "보존할 대화" });
+    expect((await db.doc(`roomStateJobs/${first}`).get()).get("status")).toBe("PENDING");
+  });
+  it("연결 전에 종료된 약속은 집계 실패 시에도 ACTIVE로 되살리지 않는다", async () => {
+    await db.doc(`matches/${first}`).update({ status: "ENDED" });
+    vi.spyOn(RoomStateService.prototype, "sync").mockRejectedValueOnce(new Error("offline"));
+    await linker().link(first);
+    for (const uid of ["u0", "u1"]) expect((await rtdb.ref(`userChatRooms/${uid}/${first}/status`).get()).val()).toBe("ENDED");
   });
   it("한 명 이탈은 이전 방을 읽기 전용 보관하고 새 방에 과거 기록을 공개하지 않는다", async () => {
     await linker().link(first);
