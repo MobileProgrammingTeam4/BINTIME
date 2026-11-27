@@ -57,7 +57,8 @@ public class ChatRoomActivity extends AppCompatActivity {
     private static final String TAG_LEAVE_BLOCKED = "chat.leaveBlocked";
     private static final String STATE_REPLIES = "replies";
     private static final String KEY_SELECT_END = "chat.selectEnd", KEY_SELECT_REVIEW = "chat.selectReview";
-    private final java.util.Map<String, Boolean> reviewStatuses = new java.util.HashMap<>();
+    /** matchId → 서버가 알려 준 후기 상태(작성 여부·canWrite). 없으면 아직 조회 전 */
+    private final java.util.Map<String, ReviewTargets.State> reviewStatuses = new java.util.HashMap<>();
     private final android.os.Handler ticker = new android.os.Handler(android.os.Looper.getMainLooper());
     private final Runnable tick = new Runnable() {
         @Override public void run() { if (room != null) bindRoom(); ticker.postDelayed(this, 1000); }
@@ -407,7 +408,7 @@ public class ChatRoomActivity extends AppCompatActivity {
                 @Override public void onResult(MatchReview review) {
                     reviewLoading.remove(item.matchId);
                     if (isFinishing() || isDestroyed()) return;
-                    reviewStatuses.put(item.matchId, review.myReviewWritten());
+                    reviewStatuses.put(item.matchId, new ReviewTargets.State(review.myReviewWritten(), review.canWrite));
                     if (room != null && room.status == ChatRoom.Status.ENDED) bindReviewLink();
                 }
                 @Override public void onError(ReviewFailure failure) {
@@ -434,10 +435,7 @@ public class ChatRoomActivity extends AppCompatActivity {
     }
 
     private List<MatchAppointment> reviewAppointments() {
-        List<MatchAppointment> result = new ArrayList<>();
-        if (room != null) for (MatchAppointment a : room.appointments) result.add(new MatchAppointment(a.matchId, a.chatRoomId, a.meetingDate, a.startMinute,
-                a.endMinute, a.purpose, a.status, a.reviewEligible, reviewStatuses.getOrDefault(a.matchId, a.reviewWritten)));
-        return result;
+        return room == null ? new ArrayList<>() : ReviewTargets.apply(room.appointments, reviewStatuses);
     }
     private void openSelectedReview(String id) {
         if (room == null || isFinishing() || isDestroyed()) return;
@@ -459,7 +457,7 @@ public class ChatRoomActivity extends AppCompatActivity {
             labels.add(getString(R.string.chat_option_end));
             actions.add(this::confirmEndMatch);
         }
-        if (!room.archived && !MatchAppointmentPolicy.targets(room.appointments, MatchAppointmentPolicy.Action.REVIEW).isEmpty()) {
+        if (!room.archived && !MatchAppointmentPolicy.targets(reviewAppointments(), MatchAppointmentPolicy.Action.REVIEW).isEmpty()) {
             labels.add(getString(R.string.chat_review_write)); actions.add(this::openReview);
         }
         labels.add(getString(R.string.chat_option_leave));
