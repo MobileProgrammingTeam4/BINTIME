@@ -15,6 +15,17 @@ import { createSearchCallable } from "./matching/callable";
 import { createMessageTrigger } from "./chat/trigger";
 import { createRequestMaintenanceSchedule } from "./requests/scheduled";
 import { createChatLinkCallable, createChatLinkTrigger } from "./chat/linkCallable";
+export { notificationOnRequestCreated, notificationOnMatchChanged, notificationOnReviewCreated,
+  notificationOnMessageCreated, notificationOnPushQueued, notificationOnAvailabilityChanged,
+  notificationOnTimetableChanged, notificationOnSettingsChanged, notificationOnUserChanged, maintainNotifications,
+  registerNotificationDevice, updateNotificationSettings, requestPopupPolicy } from "./notification/functions";
+
+import { createEndMatchCallable, createMatchEndSchedule } from "./requests/endCallable";
+
+/** D · BT-038. Only participants end a match; server time drives automatic ending. */
+export const endMatch = createEndMatchCallable();
+export const maintainMatches = createMatchEndSchedule();
+
 import { createChatLeaveCallable } from "./chat/leaveCallable";
 
 /** D · BT-019 요청 생성. */
