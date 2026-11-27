@@ -191,6 +191,12 @@ public class MatchingFragment extends Fragment {
         if (!find) requestTabs.show(MockRequestRepository.Tab.values()[selectedTab - 1]);
     }
 
+    /** Notification entry point; null opens matching search, otherwise the existing request tab. */
+    public void openRequestTab(com.team4.bintime.request.RequestRepository.Tab tab) {
+        selectedTab = tab == null ? 0 : tab.ordinal() + 1;
+        if (tabs != null && getView() != null) selectTopTab(tabs[selectedTab]);
+    }
+
     @Override public void onHiddenChanged(boolean hidden) {
         super.onHiddenChanged(hidden);
         if (!hidden && getView() != null) {

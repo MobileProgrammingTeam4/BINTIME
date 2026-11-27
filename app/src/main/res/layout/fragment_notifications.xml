@@ -9,7 +9,7 @@
             <TextView android:id="@+id/notificationDate" android:layout_width="match_parent" android:layout_height="wrap_content" android:textAppearance="@style/TextAppearance.BinTime.H3" android:layout_marginBottom="16dp"/>
             <com.team4.bintime.common.StateView android:id="@+id/notificationEmpty" android:layout_width="match_parent" android:layout_height="wrap_content"/>
             <LinearLayout android:id="@+id/notificationRows" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical"/>
-            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/notification_footer" android:textAppearance="@style/TextAppearance.BinTime.Caption" android:textColor="@color/text_tertiary"/>
+            <TextView android:id="@+id/notificationFooter" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/notification_footer" android:textAppearance="@style/TextAppearance.BinTime.Caption" android:textColor="@color/text_tertiary"/>
         </LinearLayout>
     </com.team4.bintime.common.MouseWheelScrollView>
 </LinearLayout>

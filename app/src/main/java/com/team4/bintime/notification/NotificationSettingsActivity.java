@@ -37,5 +37,6 @@ public class NotificationSettingsActivity extends AppCompatActivity {
             toggle.setOnCheckedChangeListener((button, checked) -> prefs.set(key, checked));
             rows.addView(toggle, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         }
+        NotificationPermission.requestOnce(this);
     }
 }

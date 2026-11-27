@@ -198,6 +198,20 @@ service cloud.firestore {
     match /matchRequestGuards/{guardId} {
       allow read, write: if false;
     }
+    // BT-039 prototype: inbox is owned by UID; only an initial read timestamp is client-editable.
+    function validNotificationRead() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt'])
+        && request.resource.data.readAt == request.time;
+    }
+    match /notifications/{uid}/items/{notificationId} {
+      allow read: if isOwner(uid);
+      allow update: if isOwner(uid) && validNotificationRead();
+      allow create, delete: if false;
+    }
+    match /notificationDevices/{deviceId} { allow read, write: if false; }
+    match /notificationPushJobs/{jobId} { allow read, write: if false; }
+    match /availabilityNotificationJobs/{uid} { allow read, write: if false; }
+    match /notificationSettings/{uid} { allow read: if isOwner(uid); allow write: if false; }
     match /requestUserGuards/{uid} {
       allow read, write: if false;
     }
