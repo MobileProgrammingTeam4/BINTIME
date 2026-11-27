@@ -511,11 +511,13 @@ public class ChatRoomActivity extends AppCompatActivity {
             @Override
             public void onSuccess() {
                 // 화면 전환은 observeRoom 이 ENDED 를 전달하며 처리한다.
+                if (isFinishing() || isDestroyed()) return;
                 actionInProgress = false;
             }
 
             @Override
             public void onError() {
+                if (isFinishing() || isDestroyed()) return;
                 actionInProgress = false;
                 Toast.makeText(ChatRoomActivity.this, R.string.chat_end_failed, Toast.LENGTH_SHORT).show();
             }

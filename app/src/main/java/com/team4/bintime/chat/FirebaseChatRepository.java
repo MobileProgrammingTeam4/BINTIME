@@ -14,6 +14,8 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.Query;
 import com.google.firebase.database.ServerValue;
 import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.functions.FirebaseFunctions;
+import com.team4.bintime.auth.AuthRepositories;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -282,7 +284,14 @@ final class FirebaseChatRepository implements ChatRepository {
     /** D 의 매칭 종료 서버 함수(BT-038)를 호출한다. 그 전에는 실패로 알린다. */
     @Override
     public void endMatch(String matchId, ActionCallback callback) {
-        callback.onError();
+        if (uid == null || matchId == null || !matchId.matches("[a-f0-9]{64}")
+                || !uid.equals(AuthRepositories.currentUid())) { callback.onError(); return; }
+        FirebaseFunctions.getInstance("asia-northeast3").getHttpsCallable("endMatch")
+                .call(Collections.singletonMap("matchId", matchId))
+                .addOnSuccessListener(result -> {
+                    if (uid.equals(AuthRepositories.currentUid())) callback.onSuccess();
+                    else callback.onError();
+                }).addOnFailureListener(error -> callback.onError());
     }
 
     /** BT-043 Callable(ENDED 검사 후 hidden 설정)로 구현한다. 그 전에는 실패로 알린다. */
