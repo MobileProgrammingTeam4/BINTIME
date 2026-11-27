@@ -8,6 +8,8 @@ import { doc, getDoc } from "firebase/firestore";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ChatLeaveService } from "../src/chat/leave";
 import { ChatLinkService, chatPairKey } from "../src/chat/link";
+import { RoomStateService } from "../src/chat/roomState";
+import { MatchEndService } from "../src/requests/endMatch";
 
 /** BT-043: 실제 연결 함수(BT-033)가 만든 방에서 나가기 정책·잠금·Rules 를 확인한다. */
 const projectId = "demo-bintime-leave", first = "a".repeat(64), second = "b".repeat(64), third = "c".repeat(64);
@@ -181,5 +183,52 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_DA
     await assertFails(read("u1", first));
     await assertSucceeds(send("u0", third));
     await assertSucceeds(send("u1", third));
+  });
+
+  // #121(BT-038) 병합 뒤 실제 endMatch·RoomStateService 와 나가기를 동시에 실행한다. 순서가 바뀔 수 있어 3번 반복한다.
+  const rooms = () => new RoomStateService(db, rtdb, () => new Date(clock));
+  const ender = () => new MatchEndService(db, rooms(), () => new Date(clock));
+  const leaveSettled = async (uid: string, first_: PromiseSettledResult<unknown>) => {
+    if (first_.status === "fulfilled") return;
+    // 종료 전에 읽었으면 ACTIVE_MATCH, 상태 집계가 lease 를 잡고 있었으면 RETRY_LATER. 그 밖의 실패는 없어야 한다.
+    expect(["ACTIVE_MATCH", "RETRY_LATER"]).toContain((first_.reason as { details?: { reason?: string } }).details?.reason);
+    await expect(leaver().leave(first, uid)).resolves.toEqual({ chatRoomId: first, left: true });
+  };
+  const expectLeftCleanly = async (leaverUid: string, stayerUid: string) => {
+    expect(Object.keys(await val(`chatRooms/${first}/members`))).toEqual([stayerUid]);
+    expect(await val(`chatRooms/${first}/control`)).toEqual({ archived: true, writable: false, chatReady: false });
+    expect(await val(`userChatRooms/${leaverUid}/${first}`)).toMatchObject({ hidden: true, archived: true, status: "ENDED" });
+    expect(await val(`userChatRooms/${stayerUid}/${first}`)).toMatchObject({ hidden: false, archived: true, status: "ENDED" });
+    expect((await db.doc(`chatPairs/${pairId}`).get()).data()).toMatchObject({ roomStateOwner: null, roomStateLeaseUntil: null });
+    // 늦게 도는 상태 집계도 나간 방을 되살리지 않는다(archived 방은 건너뜀).
+    expect(await rooms().sync(first, ["u0", "u1"])).toBe(false);
+    expect(await val(`userChatRooms/${leaverUid}/${first}/hidden`)).toBe(true);
+    expect(Object.keys(await val(`chatRooms/${first}/members`))).toEqual([stayerUid]);
+  };
+
+  it.each([1, 2, 3])("마지막 ACTIVE 약속의 endMatch 와 나가기가 동시에 와도 종료 → 나가기 순서로 정리된다(#121, %i회)", async () => {
+    await seed(first, "ACTIVE");
+    const [ended, left] = await Promise.allSettled([ender().end(first, "u0"), leaver().leave(first, "u1")]);
+    expect(ended).toMatchObject({ status: "fulfilled", value: { matchId: first, status: "ENDED" } });
+    await leaveSettled("u1", left);
+    expect((await db.doc(`matches/${first}`).get()).get("status")).toBe("ENDED");
+    await expectLeftCleanly("u1", "u0");
+  });
+
+  it.each([1, 2, 3])("ENDED 방의 RoomStateService.sync 와 나가기가 동시에 와도 lease 로 하나씩 처리된다(#121, %i회)", async () => {
+    await seed(first);
+    const [synced, left] = await Promise.allSettled([rooms().sync(first, ["u0", "u1"]), leaver().leave(first, "u0")]);
+    expect(synced.status).toBe("fulfilled"); // lease 를 못 잡으면 false(작업 보류), 잡으면 true
+    await leaveSettled("u0", left);
+    await expectLeftCleanly("u0", "u1");
+  });
+
+  it("나가기 lease 가 남아 있는 동안 endMatch 는 종료만 하고 방 집계는 보류한다(lease 공유)", async () => {
+    await seed(first);
+    await seed(second, "ACTIVE");
+    await db.doc(`chatPairs/${pairId}`).set({ roomStateOwner: "leave-worker", roomStateLeaseUntil: Timestamp.fromMillis(clock + 60_000) }, { merge: true });
+    await expect(ender().end(second, "u0")).resolves.toEqual({ matchId: second, status: "ENDED" });
+    expect((await db.doc(`roomStateJobs/${first}`).get()).get("status")).toBe("PENDING");
+    expect((await db.doc(`chatPairs/${pairId}`).get()).get("roomStateOwner")).toBe("leave-worker"); // 남의 lease 를 덮지 않는다
   });
 });
