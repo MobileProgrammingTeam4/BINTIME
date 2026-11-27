@@ -18,7 +18,7 @@ import { createChatLinkCallable, createChatLinkTrigger } from "./chat/linkCallab
 export { notificationOnRequestCreated, notificationOnMatchChanged, notificationOnReviewCreated,
   notificationOnMessageCreated, notificationOnPushQueued, notificationOnAvailabilityChanged,
   notificationOnTimetableChanged, notificationOnSettingsChanged, notificationOnUserChanged, maintainNotifications,
-  registerNotificationDevice } from "./notification/functions";
+  registerNotificationDevice, updateNotificationSettings, requestPopupPolicy } from "./notification/functions";
 
 import { createEndMatchCallable, createMatchEndSchedule } from "./requests/endCallable";
 

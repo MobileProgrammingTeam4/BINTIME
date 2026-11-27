@@ -34,6 +34,7 @@ import com.team4.bintime.request.RequestTabsController;
 import com.team4.bintime.request.MatchAcceptedActivity;
 import com.team4.bintime.notification.MatchRequestDialog;
 import com.team4.bintime.notification.NotificationPreferences;
+import com.team4.bintime.notification.RequestPopupCoordinator;
 
 import java.util.Collections;
 import java.util.List;
@@ -57,6 +58,7 @@ public class MatchingFragment extends Fragment {
     private RequestTabsController requestTabs;
     private View requestContent;
     private int selectedTab;
+    private RequestPopupCoordinator popupCoordinator;
     private StateView stateView;
     private TextView[] tabs;
     private MaterialSwitch switchMatching;
@@ -117,6 +119,10 @@ public class MatchingFragment extends Fragment {
         if (getView() != null) {
             reload(); // 시간표에서 공강을 바꾸고 돌아와도 서버 기준으로 다시 검색
             if (requestTabs != null) requestTabs.render();
+            if (!requestRepository.isMock()) {
+                if (popupCoordinator == null) popupCoordinator = new RequestPopupCoordinator(this, requestRepository);
+                popupCoordinator.start();
+            }
             getView().post(() -> {
                 if (!isResumed() || isHidden() || getView() == null || getChildFragmentManager().isStateSaved()) return;
                 NotificationPreferences prefs = new NotificationPreferences(requireContext());
@@ -192,18 +198,20 @@ public class MatchingFragment extends Fragment {
     }
 
     /** Notification entry point; null opens matching search, otherwise the existing request tab. */
-    public void openRequestTab(com.team4.bintime.request.RequestRepository.Tab tab) {
+    public void openRequestTab(RequestRepository.Tab tab) {
         selectedTab = tab == null ? 0 : tab.ordinal() + 1;
         if (tabs != null && getView() != null) selectTopTab(tabs[selectedTab]);
     }
 
     @Override public void onHiddenChanged(boolean hidden) {
         super.onHiddenChanged(hidden);
+        if (popupCoordinator != null) { if (hidden) popupCoordinator.close(); else popupCoordinator.start(); }
         if (!hidden && getView() != null) {
             reload();
             if (requestTabs != null) requestTabs.render();
         }
     }
+    @Override public void onPause() { if (popupCoordinator != null) popupCoordinator.close(); super.onPause(); }
 
     @Override
     public void onDestroyView() {
