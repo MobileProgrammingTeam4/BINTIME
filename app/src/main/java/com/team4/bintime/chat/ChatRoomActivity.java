@@ -31,14 +31,15 @@ import com.team4.bintime.common.ChipViews;
 import com.team4.bintime.common.ConfirmDialog;
 import com.team4.bintime.common.StateView;
 import com.team4.bintime.report.ReportActivity;
-import com.team4.bintime.review.MockReviewRepository;
+import com.team4.bintime.review.MatchReview;
 import com.team4.bintime.review.ReviewDetailActivity;
+import com.team4.bintime.review.ReviewFailure;
+import com.team4.bintime.review.ReviewRepositories;
 import com.team4.bintime.review.ReviewRepository;
 import com.team4.bintime.review.ReviewWriteActivity;
 import com.team4.bintime.request.MatchAppointment;
 import com.team4.bintime.request.MatchAppointmentPolicy;
 import com.team4.bintime.request.MatchSelectionSheet;
-import com.team4.bintime.auth.AuthRepositories;
 import com.team4.bintime.auth.SessionGuard;
 
 import java.util.ArrayList;
@@ -72,7 +73,9 @@ public class ChatRoomActivity extends AppCompatActivity {
     private ReplySuggestionRepository replyRepository;
     /** 키·모델 설정 문제나 미구현이면 이 화면에서 반짝이 버튼을 숨긴다(BT-024 오류 표). */
     private boolean aiReplyUnavailable;
-    private final ReviewRepository reviewRepository = MockReviewRepository.shared();
+    private ReviewRepository reviewRepository;
+    /** 서버에 후기 상태를 묻는 중인 matchId. 방 갱신(새 메시지)마다 같은 약속을 다시 묻지 않는다. */
+    private final java.util.Set<String> reviewLoading = new java.util.HashSet<>();
 
     private String matchId;
     private ChatRoom room;
@@ -109,6 +112,7 @@ public class ChatRoomActivity extends AppCompatActivity {
         repository = ChatRepositories.get(this);
         replyRepository = ReplySuggestionRepositories.get(this);
         placeRepository = PlaceRecommendations.get(this);
+        reviewRepository = ReviewRepositories.get(this);
         String myUid = repository.currentUid();
         if (myUid == null || myUid.trim().isEmpty()) {
             // 로그인 전이면 내 메시지를 구분할 수 없다. 구독을 시작하지 않고 닫는다.
@@ -162,7 +166,7 @@ public class ChatRoomActivity extends AppCompatActivity {
                 adapter.setRoom(data);
                 bindRoom();
                 if (data.archived) messageList.post(ChatRoomActivity.this::scrollToLast);
-                refreshReviewStatus();
+                refreshReviewStatus(false);
                 // 보고 있는 중에 서버 트리거가 내 안읽음 수를 올리면 바로 0 으로 되돌린다.
                 if (data.unreadCount > 0 && isResumedNow()) repository.markRead(matchId);
             }
@@ -184,7 +188,7 @@ public class ChatRoomActivity extends AppCompatActivity {
         // 오프라인·권한 오류로 끊긴 매칭 시간 구독이 있으면 복귀할 때 한 번만 다시 연다(BT-035). 없으면 아무 일도 없다.
         repository.retryFailedSources();
         // 후기 화면에서 돌아오면 배너 문구(남기기 → 보기)를 다시 맞춘다.
-        refreshReviewStatus();
+        refreshReviewStatus(true);
         if (room != null) bindRoom();
         ticker.removeCallbacks(tick); ticker.postDelayed(tick, 1000);
     }
@@ -390,16 +394,24 @@ public class ChatRoomActivity extends AppCompatActivity {
 
     // ---- 후기 ----
 
-    private void refreshReviewStatus() {
-        if (room == null || AuthRepositories.isFirebaseEnabled(this)) return; // 실제 후기는 BT-044에서 연결
+    /**
+     * 후기 대상 약속마다 내 후기 작성 여부를 서버(getMatchReview)에 묻는다(BT-044).
+     * force=false(방 갱신)는 아직 모르는 약속만, force=true(화면 복귀)는 전부 다시 묻는다. 묻는 중인 약속은 건너뛴다.
+     */
+    private void refreshReviewStatus(boolean force) {
+        if (room == null || reviewRepository == null) return;
         for (MatchAppointment item : MatchAppointmentPolicy.targets(room.appointments, MatchAppointmentPolicy.Action.REVIEW)) {
-            reviewRepository.loadMyReviewStatus(item.matchId, new ReviewRepository.StatusCallback() {
-                @Override public void onResult(boolean written) {
+            if (!force && reviewStatuses.containsKey(item.matchId)) continue;
+            if (!reviewLoading.add(item.matchId)) continue;
+            reviewRepository.loadMatchReview(item.matchId, new ReviewRepository.MatchReviewCallback() {
+                @Override public void onResult(MatchReview review) {
+                    reviewLoading.remove(item.matchId);
                     if (isFinishing() || isDestroyed()) return;
-                    reviewStatuses.put(item.matchId, written);
+                    reviewStatuses.put(item.matchId, review.myReviewWritten());
                     if (room != null && room.status == ChatRoom.Status.ENDED) bindReviewLink();
                 }
-                @Override public void onError() {
+                @Override public void onError(ReviewFailure failure) {
+                    reviewLoading.remove(item.matchId);
                     if (isFinishing() || isDestroyed()) return;
                     reviewStatuses.remove(item.matchId);
                     if (room != null && room.status == ChatRoom.Status.ENDED) bindReviewLink();
@@ -431,7 +443,7 @@ public class ChatRoomActivity extends AppCompatActivity {
         if (room == null || isFinishing() || isDestroyed()) return;
         MatchAppointment selected = MatchAppointmentPolicy.targets(reviewAppointments(), MatchAppointmentPolicy.Action.REVIEW).stream().filter(a -> a.matchId.equals(id)).findFirst().orElse(null);
         if (selected == null) return;
-        if (AuthRepositories.isFirebaseEnabled(this)) { Toast.makeText(this, R.string.request_review_pending, Toast.LENGTH_SHORT).show(); return; }
+        // 상태를 아직 못 읽었으면 작성 화면이 열리고, 이미 썼다면 서버의 ALREADY_REVIEWED 로 조회 화면으로 넘어간다.
         PartnerSummary partner = PartnerSummary.from(this, room.withDisplayAppointment(selected), repository.nowMillis());
         startActivity(selected.reviewWritten ? ReviewDetailActivity.intent(this, id, partner) : ReviewWriteActivity.intent(this, id, partner));
     }

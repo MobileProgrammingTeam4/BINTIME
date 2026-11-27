@@ -5,8 +5,8 @@ import androidx.annotation.Nullable;
 import java.util.Set;
 
 /**
- * 후기 데이터 경계. BT-010 은 Mock 구현을 쓰고, BT-044 에서 Firestore reviews 구현으로 교체한다.
- * 종료된 매칭 참여자만 작성할 수 있고, 내가 작성해야 상대 후기가 보이는 조건은 서버에서 검사한다.
+ * 후기 데이터 경계(BT-044). Firebase 모드는 submitReview·getMatchReview Callable, Mock 모드는 메모리 시연 데이터를 쓴다.
+ * reviews 는 앱이 직접 읽거나 쓰지 않는다(Rules 기본 거부). 작성 자격·중복·상대 후기 공개 조건은 서버가 검사한다.
  * 콜백은 메인 스레드에서 호출한다.
  */
 public interface ReviewRepository {
@@ -22,31 +22,22 @@ public interface ReviewRepository {
         VISIBLE
     }
 
-    interface StatusCallback {
-        void onResult(boolean myReviewWritten);
+    interface MatchReviewCallback {
+        void onResult(MatchReview review);
 
-        void onError();
-    }
-
-    interface ReceivedCallback {
-        /** VISIBLE 일 때만 review 가 있다. */
-        void onResult(Visibility visibility, @Nullable Review review);
-
-        void onError();
+        void onError(ReviewFailure failure);
     }
 
     interface SubmitCallback {
         void onSuccess();
 
-        /** 필수값 누락·길이 초과·중복 작성·네트워크 실패 */
-        void onError();
+        void onError(ReviewFailure failure);
     }
 
-    void loadMyReviewStatus(String matchId, StatusCallback callback);
+    /** 개별 matchId 의 내 후기·받은 후기(공개 조건 적용)·작성 가능 여부 */
+    void loadMatchReview(String matchId, MatchReviewCallback callback);
 
-    void loadReceivedReview(String matchId, ReceivedCallback callback);
-
-    /** 만족도는 필수, 키워드와 한 줄 후기는 선택이다. 같은 매칭에 두 번 작성할 수 없다. */
-    void submitReview(String matchId, String targetUid, Satisfaction satisfaction,
-                      Set<ReviewKeyword> keywords, @Nullable String comment, SubmitCallback callback);
+    /** 만족도는 필수, 키워드와 한 줄 후기는 선택이다. 같은 매칭에 두 번 작성할 수 없다. 상대 UID 는 서버가 정한다. */
+    void submitReview(String matchId, Satisfaction satisfaction, Set<ReviewKeyword> keywords,
+                      @Nullable String comment, SubmitCallback callback);
 }

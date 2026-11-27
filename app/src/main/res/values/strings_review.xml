@@ -17,6 +17,10 @@
     <string name="review_not_met">%1$s님과 만나지 못했나요?</string>
     <string name="review_submit">후기 남기기</string>
     <string name="review_submit_failed">후기를 남기지 못했어요. 다시 시도해주세요.</string>
+    <string name="review_already_written">이미 남긴 후기예요.</string>
+    <string name="review_not_eligible">이 매칭에는 후기를 남길 수 없어요.</string>
+    <string name="review_partner_deleted">탈퇴한 사용자에게는 후기를 남길 수 없어요.</string>
+    <string name="review_open_failed">후기 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.</string>
     <string name="review_done_title">후기를 남겼어요</string>
     <string name="review_done_message">소중한 후기 고마워요!\n%1$s님이 남긴 후기는 받은 후기 보기에서 확인할 수 있어요.</string>
     <string name="review_done_view">받은 후기 보기</string>
@@ -28,6 +32,8 @@
     <string name="review_detail_comment">한 줄 후기도 남겨주셨어요</string>
     <string name="review_locked_title">내 후기를 먼저 남겨주세요</string>
     <string name="review_locked_message">후기를 남기면 %1$s님이 남긴 후기를 볼 수 있어요.</string>
+    <string name="review_not_target_title">이 약속은 후기 대상이 아니에요</string>
+    <string name="review_not_target_message">진행 중이거나 시작 전에 끝난 약속,\n상대가 탈퇴한 약속에는 후기를 남길 수 없어요.</string>
     <string name="review_not_yet_title">아직 받은 후기가 없어요</string>
     <string name="review_not_yet_message">%1$s님이 후기를 남기면\n여기에서 볼 수 있어요.</string>
     <string name="review_load_error">후기를 불러오지 못했어요.\n잠시 후 다시 시도해주세요.</string>
