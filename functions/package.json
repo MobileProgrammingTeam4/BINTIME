@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "build:watch": "tsc -p tsconfig.json --watch",
-    "test": "vitest run --exclude emulator-tests/**",
+    "test": "vitest run --exclude \"emulator-tests/**\"",
     "test:emulator": "vitest run emulator-tests --testTimeout 30000 --hookTimeout 30000",
     "seed:chat": "node scripts/seed-chat-emulator.mjs",
     "serve": "npm run build && firebase emulators:start --project demo-bintime --only auth,functions,firestore"

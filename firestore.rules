@@ -14,6 +14,18 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
+    // #135: 인증된 학교 이메일 계정. 앱(auth/EmailVerificationState.java)·서버(functions/src/ai/emailPolicy.ts,
+    // ALLOWED_EMAIL_SUFFIXES=.ac.kr,.edu)와 같은 판단이다. Rules는 Functions 환경 설정을 읽을 수 없어
+    // 도메인을 여기에 같이 적는다. 바꿀 때는 storage.rules·.env.*·앱 정규식을 함께 바꾼다
+    // (functions/test/schoolEmailRulesParity.test.ts 가 어긋남을 잡는다).
+    // 판단 근거는 Auth 토큰뿐이다. 클라이언트가 쓴 users/publicProfiles 필드는 쓰지 않는다.
+    function isSchoolUser() {
+      return signedIn()
+          && request.auth.token.email_verified == true
+          && request.auth.token.email is string
+          && request.auth.token.email.lower().matches('^[a-z0-9._%+-]+@[a-z0-9.-]+[.](ac[.]kr|edu)$');
+    }
+
     // 앱 ProfileValidator 와 같은 필수값·길이 제한 (닉네임 1~10자, 학과 필수, 소개 150자 이하)
     function validProfile() {
       let d = request.resource.data;
@@ -41,9 +53,9 @@ service cloud.firestore {
       }
     }
 
-    // 공개 프로필: 로그인 사용자만 읽고, 본인만 쓴다. 이메일 등 개인정보 필드는 금지.
+    // 공개 프로필: 인증된 학교 계정만 읽고(#135), 본인만 쓴다. 이메일 등 개인정보 필드는 금지.
     match /publicProfiles/{uid} {
-      allow read: if signedIn();
+      allow read: if isSchoolUser();
       allow create, update: if isOwner(uid) && validProfile()
           && !('email' in request.resource.data);
       allow delete: if false;
@@ -193,10 +205,28 @@ service cloud.firestore {
     match /matchRequestGuards/{guardId} {
       allow read, write: if false;
     }
+    // BT-039 prototype: inbox is owned by UID; only an initial read timestamp is client-editable.
+    function validNotificationRead() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt'])
+        && request.resource.data.readAt == request.time;
+    }
+    match /notifications/{uid}/items/{notificationId} {
+      allow read: if isOwner(uid);
+      allow update: if isOwner(uid) && validNotificationRead();
+      allow create, delete: if false;
+    }
+    match /notificationDevices/{deviceId} { allow read, write: if false; }
+    match /notificationPushJobs/{jobId} { allow read, write: if false; }
+    match /availabilityNotificationJobs/{uid} { allow read, write: if false; }
+    match /notificationSettings/{uid} { allow read: if isOwner(uid); allow write: if false; }
     match /requestUserGuards/{uid} {
       allow read, write: if false;
     }
     match /matchCleanupJobs/{matchId} {
+      allow read, write: if false;
+    }
+    // BT-038: server-only retry of room status aggregation. No client access.
+    match /roomStateJobs/{roomId} {
       allow read, write: if false;
     }
     match /chatLinkJobs/{matchId} {

@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { logger } from "firebase-functions";
+import { classify, type ModelCall, type ModelClient } from "../src/ai/gemini";
+import { ApiError } from "@google/genai";
 import { resolveMode, seoulDateKey } from "../src/ai/config";
 import { AiError } from "../src/ai/errors";
 import { runAiTask, toGeminiSchema } from "../src/ai/gateway";
@@ -121,5 +124,82 @@ describe("설정", () => {
 
   it("Gemini 로 보내는 스키마에는 $schema 가 없다", () => {
     expect(toGeminiSchema(aiPingTask.output)).not.toHaveProperty("$schema");
+  });
+});
+
+describe("제한 시간은 재시도까지 포함한 전체 시간(#48)", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  /** 각 시도가 elapsedMs 만큼 시계를 움직인 뒤 결과를 내는 가짜 Gemini. 대기(sleep)도 시계를 움직인다. */
+  function timedDeps(steps: { elapsedMs: number; result: AiError | { text: string } }[]) {
+    let clock = 1_000_000;
+    const calls: ModelCall[] = [];
+    const client: ModelClient = {
+      async generate(call) {
+        calls.push(call);
+        const step = steps.shift();
+        if (!step) throw new Error("no more steps");
+        clock += step.elapsedMs;
+        if (step.result instanceof AiError) throw step.result;
+        return { text: step.result.text };
+      },
+    };
+    const deps = makeDeps({ mode: "live" });
+    return Object.assign(deps, {
+      modelClient: () => client,
+      clockMs: () => clock,
+      sleep: async (ms: number) => { deps.sleeps.push(ms); clock += ms; },
+      calls,
+    });
+  }
+  const unavailable = () => new AiError("AI_UNAVAILABLE", "503", { transient: true, upstreamStatus: 503 });
+  const budget = aiPingTask.timeoutMs; // 10초
+
+  it("마감 초과 504 는 재시도하지 않아 최악 시간이 timeoutMs 를 넘지 않는다", async () => {
+    const deadline504 = classify(new ApiError({ status: 504, message: '{"error":{"status":"DEADLINE_EXCEEDED"}}' }), false);
+    const deps = timedDeps([{ elapsedMs: budget - 300, result: deadline504 }, { elapsedMs: 100, result: { text: '{"reply":"late"}' } }]);
+    await expectReason(runAiTask(aiPingTask, {}, ctx(), deps), "AI_TIMEOUT");
+    expect(deps.calls).toHaveLength(1);
+    expect(deps.sleeps).toEqual([]);
+  });
+
+  it("일찍 돌아온 503 은 재시도하고, 두 번째 시도는 남은 시간만 쓴다", async () => {
+    const deps = timedDeps([{ elapsedMs: 2_000, result: unavailable() }, { elapsedMs: 1_000, result: { text: '{"reply":"ok"}' } }]);
+    expect((await runAiTask(aiPingTask, {}, ctx(), deps)).data.reply).toBe("ok");
+    expect(deps.calls.map((call) => call.timeoutMs)).toEqual([budget, budget - 2_000 - 500]);
+  });
+
+  it("남은 시간이 제한 시간의 절반보다 적으면 재시도하지 않고 첫 오류를 돌려준다", async () => {
+    const info = vi.spyOn(logger, "info").mockImplementation(() => undefined);
+    // 4.6초 + 대기 0.5초 → 남은 4.9초 < 5초
+    const deps = timedDeps([{ elapsedMs: 4_600, result: unavailable() }, { elapsedMs: 100, result: { text: '{"reply":"ok"}' } }]);
+    const error = await expectReason(runAiTask(aiPingTask, {}, ctx(), deps), "AI_UNAVAILABLE");
+    expect(error.upstreamStatus).toBe(503);
+    expect(deps.calls).toHaveLength(1);
+    expect(deps.sleeps).toEqual([]);
+    const entry = info.mock.calls.find(([message]) => message === "ai_call")?.[1] as Record<string, unknown>;
+    expect(entry).toMatchObject({ outcome: "AI_UNAVAILABLE", attempts: 1, retrySkipped: "budget" });
+  });
+
+  it("남은 시간이 딱 절반이면 재시도한다(경계)", async () => {
+    // 4.5초 + 대기 0.5초 → 남은 5초 = 절반
+    const deps = timedDeps([{ elapsedMs: 4_500, result: unavailable() }, { elapsedMs: 100, result: { text: '{"reply":"ok"}' } }]);
+    expect((await runAiTask(aiPingTask, {}, ctx(), deps)).data.reply).toBe("ok");
+    expect(deps.calls.map((call) => call.timeoutMs)).toEqual([budget, 5_000]);
+  });
+
+  it("형식 오류 재시도도 같은 시간 기준을 쓴다", async () => {
+    const deps = timedDeps([{ elapsedMs: 6_000, result: { text: "not json" } }, { elapsedMs: 100, result: { text: '{"reply":"ok"}' } }]);
+    await expectReason(runAiTask(aiPingTask, {}, ctx(), deps), "AI_INVALID_OUTPUT");
+    expect(deps.calls).toHaveLength(1);
+  });
+
+  it("429 가 바로 오면 기존처럼 한 번 재시도한다", async () => {
+    const deps = timedDeps([
+      { elapsedMs: 200, result: new AiError("AI_RATE_LIMITED", "429", { transient: true, upstreamStatus: 429 }) },
+      { elapsedMs: 1_000, result: { text: '{"reply":"ok"}' } },
+    ]);
+    expect((await runAiTask(aiPingTask, {}, ctx(), deps)).data.reply).toBe("ok");
+    expect(deps.sleeps).toEqual([500]);
   });
 });

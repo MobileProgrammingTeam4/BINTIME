@@ -32,11 +32,38 @@ final class TimetableImageUploader {
         void onState(TimetableUploadState state);
     }
 
+    /**
+     * [BT-048] 검수 화면 '원본 보기'용 기기 안 사본. 업로드할 JPEG(모델이 받는 것과 같은 이미지)를 앱 캐시에 둔다.
+     * {@link #save}는 background 스레드에서, {@link #delete}는 메인 스레드에서 부른다.
+     */
+    interface LocalCopy {
+        /** index 순서 파일 경로. 실패하면 빈 목록(원본 보기만 숨겨지고 업로드는 계속한다). */
+        List<String> save(String batchId, List<byte[]> jpegs);
+
+        /** 그 묶음의 사본을 지운다. 없으면 아무것도 하지 않는다. */
+        void delete(String batchId);
+
+        LocalCopy NONE = new LocalCopy() {
+            @Override
+            public List<String> save(String batchId, List<byte[]> jpegs) {
+                return Collections.emptyList();
+            }
+
+            @Override
+            public void delete(String batchId) {
+            }
+        };
+    }
+
     private final TimetableImageRepository repository;
     private final Executor background;
     private final Executor main;
     private final Listener listener;
+    private final LocalCopy localCopy;
     private final AtomicInteger generation = new AtomicInteger();
+    /** 기기 안 사본 경로와 그 묶음. 없으면 빈 목록·null. */
+    private List<String> localPaths = Collections.emptyList();
+    private String localBatchId;
 
     private TimetableImageRepository.Registration upload;
     private List<String> uploadedPaths = Collections.emptyList();
@@ -46,13 +73,24 @@ final class TimetableImageUploader {
 
     TimetableImageUploader(TimetableImageRepository repository, Executor background, Executor main,
                            Listener listener) {
-        if (repository == null || background == null || main == null || listener == null) {
+        this(repository, background, main, listener, LocalCopy.NONE);
+    }
+
+    TimetableImageUploader(TimetableImageRepository repository, Executor background, Executor main,
+                           Listener listener, LocalCopy localCopy) {
+        if (repository == null || background == null || main == null || listener == null || localCopy == null) {
             throw new IllegalArgumentException("null argument");
         }
         this.repository = repository;
         this.background = background;
         this.main = main;
         this.listener = listener;
+        this.localCopy = localCopy;
+    }
+
+    /** [BT-048] 마지막으로 준비한 묶음의 기기 안 사본 경로(index 순서). 지웠거나 없으면 빈 목록. */
+    List<String> getLocalPaths() {
+        return localPaths;
     }
 
     TimetableUploadState getState() {
@@ -96,11 +134,17 @@ final class TimetableImageUploader {
                 anyFailed |= failure != null;
             }
             boolean invalid = anyFailed;
+            List<String> local = invalid ? Collections.emptyList() : saveLocal(batchId, jpegs);
             main.execute(() -> {
-                if (gen != generation.get()) return;
+                if (gen != generation.get()) {
+                    if (!local.isEmpty()) localCopy.delete(batchId);
+                    return;
+                }
                 if (invalid) {
                     emit(TimetableUploadState.invalidImages(failures));
                 } else {
+                    localPaths = local;
+                    localBatchId = local.isEmpty() ? null : batchId;
                     upload(gen, batchId, jpegs);
                 }
             });
@@ -113,6 +157,7 @@ final class TimetableImageUploader {
      * Lifecycle(1일)이 정리한다. 경로를 잊으므로 뒤의 {@link #discard}가 같은 이미지를 다시 지우지 않는다.
      */
     void deleteUploadedBatch() {
+        deleteLocal();
         if (uploadedPaths.isEmpty() || uploadedBatchId == null) return;
         String batchId = uploadedBatchId;
         uploadedPaths = Collections.emptyList();
@@ -175,7 +220,31 @@ final class TimetableImageUploader {
         }
     }
 
+    private List<String> saveLocal(String batchId, List<byte[]> jpegs) {
+        try {
+            List<String> saved = localCopy.save(batchId, jpegs);
+            return saved == null || saved.size() != jpegs.size()
+                    ? Collections.emptyList() : Collections.unmodifiableList(new ArrayList<>(saved));
+        } catch (RuntimeException e) {
+            return Collections.emptyList();
+        }
+    }
+
+    /** 기기 안 사본을 지우고 경로를 잊는다. 두 번 불러도 안전하다. */
+    private void deleteLocal() {
+        if (localBatchId == null) return;
+        String batchId = localBatchId;
+        localPaths = Collections.emptyList();
+        localBatchId = null;
+        try {
+            localCopy.delete(batchId);
+        } catch (RuntimeException ignored) {
+            // 캐시 파일은 다음 새 업로드 화면 시작 때 RecognitionImageCache.clearAll 이 정리한다.
+        }
+    }
+
     private void cancelAndDeleteUploaded() {
+        deleteLocal();
         if (upload != null) {
             upload.cancel();
             upload = null;

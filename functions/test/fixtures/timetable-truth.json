@@ -1,0 +1,125 @@
+{
+  "description": "BT-048 시간표 인식 정답표. 실제 에브리타임 이미지 7장(이미지 파일은 repo 에 넣지 않음)의 수업 72개. 수업명·장소는 이미지별 가명(C1, P1 …)이고 요일·시각만 실제 정답이다.",
+  "timeRule": "dayOfWeek 1(월)~7(일), 자정 기준 분, [startMinute, endMinute)",
+  "fields": {
+    "name": "이미지 안에서 같은 수업이면 같은 가명",
+    "place": "이미지 안에서 같은 장소면 같은 가명, 장소가 없으면 null",
+    "endApprox": "true 면 이미지 블록 끝이 정시·30분 경계가 아니라 근사값(약 18:50 → 1130)",
+    "truncated": "원본 이미지에서 글자가 잘린 필드"
+  },
+  "images": [
+    {
+      "image": "IMG_3466",
+      "note": "7열(월~일), 수·토 비어 있음",
+      "courses": [
+        { "name": "C1", "dayOfWeek": 1, "startMinute": 540, "endMinute": 720, "place": "P1" },
+        { "name": "C2", "dayOfWeek": 2, "startMinute": 720, "endMinute": 810, "place": "P2" },
+        { "name": "C2", "dayOfWeek": 4, "startMinute": 720, "endMinute": 810, "place": "P2" },
+        { "name": "C3", "dayOfWeek": 2, "startMinute": 810, "endMinute": 900, "place": "P3" },
+        { "name": "C3", "dayOfWeek": 4, "startMinute": 810, "endMinute": 900, "place": "P3" },
+        { "name": "C4", "dayOfWeek": 2, "startMinute": 900, "endMinute": 990, "place": "P4", "truncated": ["place"] },
+        { "name": "C4", "dayOfWeek": 4, "startMinute": 900, "endMinute": 990, "place": "P4", "truncated": ["place"] },
+        { "name": "C5", "dayOfWeek": 2, "startMinute": 990, "endMinute": 1080, "place": "P5" },
+        { "name": "C5", "dayOfWeek": 4, "startMinute": 990, "endMinute": 1080, "place": "P5" },
+        { "name": "C6", "dayOfWeek": 5, "startMinute": 660, "endMinute": 780, "place": "P6" },
+        { "name": "C7", "dayOfWeek": 5, "startMinute": 840, "endMinute": 900, "place": "P4", "truncated": ["place"] },
+        { "name": "C8", "dayOfWeek": 7, "startMinute": 540, "endMinute": 600, "place": "P7", "truncated": ["name"] }
+      ]
+    },
+    {
+      "image": "IMG_3461",
+      "note": "금요일 수업 없음",
+      "courses": [
+        { "name": "C1", "dayOfWeek": 1, "startMinute": 810, "endMinute": 900, "place": "P1" },
+        { "name": "C1", "dayOfWeek": 3, "startMinute": 810, "endMinute": 900, "place": "P1" },
+        { "name": "C2", "dayOfWeek": 1, "startMinute": 900, "endMinute": 990, "place": "P2" },
+        { "name": "C2", "dayOfWeek": 3, "startMinute": 900, "endMinute": 990, "place": "P2" },
+        { "name": "C3", "dayOfWeek": 1, "startMinute": 990, "endMinute": 1080, "place": "P3" },
+        { "name": "C3", "dayOfWeek": 3, "startMinute": 990, "endMinute": 1080, "place": "P3" },
+        { "name": "C4", "dayOfWeek": 2, "startMinute": 810, "endMinute": 900, "place": "P4" },
+        { "name": "C4", "dayOfWeek": 4, "startMinute": 810, "endMinute": 900, "place": "P4" },
+        { "name": "C5", "dayOfWeek": 2, "startMinute": 900, "endMinute": 990, "place": "P5" },
+        { "name": "C5", "dayOfWeek": 4, "startMinute": 900, "endMinute": 990, "place": "P5" },
+        { "name": "C6", "dayOfWeek": 2, "startMinute": 990, "endMinute": 1080, "place": "P1" },
+        { "name": "C6", "dayOfWeek": 4, "startMinute": 990, "endMinute": 1080, "place": "P1" }
+      ]
+    },
+    {
+      "image": "IMG_3464",
+      "note": "시간축 9~12, 1~6(12시간제 정시 숫자만). 수업 블록 다수가 30분 위치에서 시작·종료",
+      "courses": [
+        { "name": "C1", "dayOfWeek": 1, "startMinute": 810, "endMinute": 900, "place": "P1" },
+        { "name": "C1", "dayOfWeek": 3, "startMinute": 810, "endMinute": 900, "place": "P1" },
+        { "name": "C2", "dayOfWeek": 1, "startMinute": 900, "endMinute": 990, "place": "P1" },
+        { "name": "C2", "dayOfWeek": 3, "startMinute": 900, "endMinute": 990, "place": "P1" },
+        { "name": "C3", "dayOfWeek": 2, "startMinute": 540, "endMinute": 630, "place": "P2" },
+        { "name": "C3", "dayOfWeek": 4, "startMinute": 540, "endMinute": 630, "place": "P2" },
+        { "name": "C4", "dayOfWeek": 2, "startMinute": 630, "endMinute": 720, "place": "P3" },
+        { "name": "C4", "dayOfWeek": 4, "startMinute": 630, "endMinute": 720, "place": "P3" },
+        { "name": "C5", "dayOfWeek": 2, "startMinute": 810, "endMinute": 900, "place": "P4" },
+        { "name": "C5", "dayOfWeek": 4, "startMinute": 810, "endMinute": 900, "place": "P4" },
+        { "name": "C6", "dayOfWeek": 2, "startMinute": 1020, "endMinute": 1130, "place": "P5", "endApprox": true },
+        { "name": "C7", "dayOfWeek": 3, "startMinute": 1020, "endMinute": 1130, "place": "P6", "endApprox": true },
+        { "name": "C8", "dayOfWeek": 5, "startMinute": 840, "endMinute": 960, "place": "P7" }
+      ]
+    },
+    {
+      "image": "IMG_3465",
+      "courses": [
+        { "name": "C1", "dayOfWeek": 1, "startMinute": 630, "endMinute": 720, "place": "P1" },
+        { "name": "C1", "dayOfWeek": 3, "startMinute": 630, "endMinute": 720, "place": "P1" },
+        { "name": "C2", "dayOfWeek": 1, "startMinute": 810, "endMinute": 900, "place": "P2" },
+        { "name": "C2", "dayOfWeek": 3, "startMinute": 810, "endMinute": 900, "place": "P2" },
+        { "name": "C3", "dayOfWeek": 1, "startMinute": 900, "endMinute": 990, "place": "P3" },
+        { "name": "C3", "dayOfWeek": 3, "startMinute": 900, "endMinute": 990, "place": "P3" },
+        { "name": "C4", "dayOfWeek": 2, "startMinute": 630, "endMinute": 720, "place": "P4" },
+        { "name": "C4", "dayOfWeek": 4, "startMinute": 630, "endMinute": 720, "place": "P4" },
+        { "name": "C5", "dayOfWeek": 2, "startMinute": 780, "endMinute": 900, "place": "P5" },
+        { "name": "C6", "dayOfWeek": 3, "startMinute": 990, "endMinute": 1080, "place": "P6" },
+        { "name": "C6", "dayOfWeek": 5, "startMinute": 630, "endMinute": 720, "place": "P6" },
+        { "name": "C7", "dayOfWeek": 5, "startMinute": 750, "endMinute": 870, "place": "P7" }
+      ]
+    },
+    {
+      "image": "IMG_3467",
+      "note": "금요일 수업 없음",
+      "courses": [
+        { "name": "C1", "dayOfWeek": 1, "startMinute": 540, "endMinute": 630, "place": "P1" },
+        { "name": "C1", "dayOfWeek": 3, "startMinute": 540, "endMinute": 630, "place": "P1" },
+        { "name": "C2", "dayOfWeek": 1, "startMinute": 660, "endMinute": 780, "place": "P2" },
+        { "name": "C2", "dayOfWeek": 3, "startMinute": 660, "endMinute": 780, "place": "P2" },
+        { "name": "C3", "dayOfWeek": 1, "startMinute": 900, "endMinute": 990, "place": "P3" },
+        { "name": "C3", "dayOfWeek": 3, "startMinute": 900, "endMinute": 990, "place": "P3" },
+        { "name": "C4", "dayOfWeek": 2, "startMinute": 900, "endMinute": 1020, "place": "P4" },
+        { "name": "C4", "dayOfWeek": 4, "startMinute": 540, "endMinute": 660, "place": "P4" }
+      ]
+    },
+    {
+      "image": "IMG_3448",
+      "note": "건물·호실 표시 없음",
+      "courses": [
+        { "name": "C1", "dayOfWeek": 1, "startMinute": 540, "endMinute": 720, "place": null },
+        { "name": "C1", "dayOfWeek": 2, "startMinute": 540, "endMinute": 720, "place": null },
+        { "name": "C1", "dayOfWeek": 3, "startMinute": 540, "endMinute": 720, "place": null },
+        { "name": "C1", "dayOfWeek": 4, "startMinute": 540, "endMinute": 720, "place": null },
+        { "name": "C1", "dayOfWeek": 5, "startMinute": 540, "endMinute": 720, "place": null },
+        { "name": "C2", "dayOfWeek": 1, "startMinute": 720, "endMinute": 900, "place": null },
+        { "name": "C2", "dayOfWeek": 2, "startMinute": 720, "endMinute": 900, "place": null },
+        { "name": "C2", "dayOfWeek": 3, "startMinute": 720, "endMinute": 900, "place": null },
+        { "name": "C2", "dayOfWeek": 4, "startMinute": 720, "endMinute": 900, "place": null },
+        { "name": "C2", "dayOfWeek": 5, "startMinute": 720, "endMinute": 900, "place": null }
+      ]
+    },
+    {
+      "image": "IMG_3463",
+      "note": "장소는 건물 없이 호실 숫자만",
+      "courses": [
+        { "name": "C1", "dayOfWeek": 1, "startMinute": 720, "endMinute": 900, "place": "P1" },
+        { "name": "C1", "dayOfWeek": 2, "startMinute": 720, "endMinute": 900, "place": "P1" },
+        { "name": "C1", "dayOfWeek": 3, "startMinute": 720, "endMinute": 900, "place": "P1" },
+        { "name": "C1", "dayOfWeek": 4, "startMinute": 720, "endMinute": 900, "place": "P1" },
+        { "name": "C1", "dayOfWeek": 5, "startMinute": 720, "endMinute": 900, "place": "P1" }
+      ]
+    }
+  ]
+}

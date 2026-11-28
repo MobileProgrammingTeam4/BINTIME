@@ -71,8 +71,12 @@ public class TimetableUploadActivity extends AppCompatActivity {
         super.onCreate(state);
         setContentView(R.layout.activity_timetable_upload);
         upload = new ViewModelProvider(this).get(TimetableUploadViewModel.class);
+        RecognitionImageCache originals = new RecognitionImageCache(
+                new java.io.File(getCacheDir(), RecognitionImageCache.DIRECTORY));
+        // [BT-048] 새로 연 화면이면 지난 실행에서 지우지 못한 원본 사본을 정리한다(복원·회전 때는 두어 검수 화면이 쓴다).
+        if (state == null) thumbnails.execute(originals::clearAll);
         upload.attach(TimetableImageRepositories.get(this), TimetableRecognitionRepositories.get(this),
-                getApplicationContext().getContentResolver());
+                getApplicationContext().getContentResolver(), originals);
         if (state != null) {
             // 회전이면 ViewModel에 선택이 남아 있다. 프로세스가 종료됐다가 돌아온 경우에만 다시 검사한다.
             upload.restoreIfEmpty(state.getParcelableArrayList(STATE_IMAGES));
@@ -186,7 +190,7 @@ public class TimetableUploadActivity extends AppCompatActivity {
         RecognitionResult result = upload.takeRecognition();
         if (result == null) return;
         review.launch(TimetableReviewActivity.forRecognition(this, RecognitionDrafts.toDraft(result),
-                result.droppedCount, result.warnings));
+                result.droppedCount, result.warnings, upload.localImagePaths()));
     }
 
     private void showImages(List<Uri> selection) {

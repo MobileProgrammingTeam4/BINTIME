@@ -106,7 +106,7 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)("BT-017 → BT-019 실제 
   });
   it("합친 Rules에서 프로필·시간표·공강·설정 권한을 보존하고 서버 전용 경로를 차단한다", async () => {
     const client = env.authenticatedContext("sender", { email: "test@school.ac.kr", email_verified: true }).firestore();
-    const peer = env.authenticatedContext("receiver").firestore();
+    const peer = env.authenticatedContext("receiver", { email: "peer@school.ac.kr", email_verified: true }).firestore();
     const profile = { uid: "sender", nickname: "test", department: "software" };
     await assertSucceeds(setDoc(doc(client, "users/sender"), { ...profile, email: "test@school.ac.kr", profileCompleted: true }));
     await assertSucceeds(setDoc(doc(client, "publicProfiles/sender"), profile));
