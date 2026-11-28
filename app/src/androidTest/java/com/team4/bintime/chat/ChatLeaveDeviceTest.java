@@ -55,7 +55,8 @@ public class ChatLeaveDeviceTest {
         try (ActivityScenario<ChatRoomActivity> scenario = ActivityScenario.launch(ChatRoomActivity.intent(context, "match-jimin"))) {
             showWindow(scenario);
             scenario.onActivity(activity -> invoke(activity, "confirmLeaveRoom"));
-            idle(); screenshot("02-active-leave-blocked");
+            waitUntil(scenario, "나가기 불가 안내", activity -> activity.getSupportFragmentManager().findFragmentByTag("chat.leaveBlocked") != null);
+            screenshot("02-active-leave-blocked");
             scenario.onActivity(activity -> {
                 DialogFragment notice = (DialogFragment) activity.getSupportFragmentManager().findFragmentByTag("chat.leaveBlocked");
                 assertNotNull(notice);
@@ -69,28 +70,30 @@ public class ChatLeaveDeviceTest {
 
     @Test public void endedRoom_leave_hidesFromMyList() throws Exception {
         try (ActivityScenario<MainActivity> main = ActivityScenario.launch(MainActivity.class)) {
-            main.moveToState(Lifecycle.State.RESUMED); idle();
+            main.moveToState(Lifecycle.State.RESUMED); waitForState(main, Lifecycle.State.RESUMED);
             main.onActivity(activity -> activity.selectTab(R.id.nav_chat));
-            idle(); screenshot("03-list-before-leave");
-            main.onActivity(activity -> assertTrue(listTexts(activity).contains("서연")));
+            waitUntil(main, "채팅 목록에 서연 방 표시", activity -> listTexts(activity).contains("서연"));
+            screenshot("03-list-before-leave");
         }
         try (ActivityScenario<ChatRoomActivity> scenario = ActivityScenario.launch(ChatRoomActivity.intent(context, "match-seoyeon"))) {
             showWindow(scenario);
             scenario.onActivity(activity -> invoke(activity, "confirmLeaveRoom"));
-            idle(); screenshot("04-ended-leave-confirm");
+            waitUntil(scenario, "나가기 확인 창", activity -> activity.getSupportFragmentManager().findFragmentByTag("chat.leaveRoom") != null);
+            screenshot("04-ended-leave-confirm");
             scenario.onActivity(activity -> {
                 DialogFragment confirm = (DialogFragment) activity.getSupportFragmentManager().findFragmentByTag("chat.leaveRoom");
                 assertNotNull(confirm);
                 confirm.requireDialog().findViewById(R.id.dialogPositive).performClick();
             });
-            idle();
-            assertEquals(Lifecycle.State.DESTROYED, scenario.getState());
+            waitForState(scenario, Lifecycle.State.DESTROYED);
         }
         try (ActivityScenario<MainActivity> main = ActivityScenario.launch(MainActivity.class)) {
-            main.moveToState(Lifecycle.State.RESUMED); idle();
+            main.moveToState(Lifecycle.State.RESUMED); waitForState(main, Lifecycle.State.RESUMED);
             main.onActivity(activity -> activity.selectTab(R.id.nav_chat));
-            idle(); screenshot("05-list-after-leave");
+            // 목록이 그려진 뒤에 서연 방이 없는지 본다(빈 목록을 '없음'으로 착각하지 않게 다른 방이 보일 때까지 기다린다).
+            waitUntil(main, "채팅 목록 표시", activity -> listTexts(activity).contains("김지민"));
             main.onActivity(activity -> assertFalse(listTexts(activity).contains("서연")));
+            screenshot("05-list-after-leave");
         }
     }
 
@@ -128,12 +131,39 @@ public class ChatLeaveDeviceTest {
     private static void showWindow(ActivityScenario<ChatRoomActivity> scenario) throws Exception {
         scenario.moveToState(Lifecycle.State.CREATED);
         scenario.moveToState(Lifecycle.State.RESUMED);
-        idle();
+        waitForState(scenario, Lifecycle.State.RESUMED);
     }
 
-    private static void idle() throws Exception {
+    /** 메인 스레드 작업이 끝날 때까지만 기다린다. 결과 확인은 {@link #waitUntil} 로 한다. */
+    private static void idle() {
         InstrumentationRegistry.getInstrumentation().waitForIdleSync();
-        Thread.sleep(900);
+    }
+
+    private static final long WAIT_TIMEOUT_MILLIS = 5_000, WAIT_STEP_MILLIS = 100;
+
+    /** 고정 대기 대신 조건이 맞을 때까지 100ms 마다 최대 5초 확인한다. 끝내 안 맞으면 무엇을 기다렸는지 알리며 실패한다. */
+    private static <A extends android.app.Activity> void waitUntil(ActivityScenario<A> scenario, String what,
+                                                                    java.util.function.Predicate<A> condition) throws Exception {
+        long deadline = android.os.SystemClock.uptimeMillis() + WAIT_TIMEOUT_MILLIS;
+        while (true) {
+            idle();
+            boolean[] met = {false};
+            scenario.onActivity(activity -> met[0] = condition.test(activity));
+            if (met[0]) return;
+            if (android.os.SystemClock.uptimeMillis() > deadline) throw new AssertionError("5초 안에 확인되지 않음: " + what);
+            Thread.sleep(WAIT_STEP_MILLIS);
+        }
+    }
+
+    private static void waitForState(ActivityScenario<?> scenario, Lifecycle.State state) throws Exception {
+        long deadline = android.os.SystemClock.uptimeMillis() + WAIT_TIMEOUT_MILLIS;
+        while (scenario.getState() != state) {
+            if (android.os.SystemClock.uptimeMillis() > deadline) {
+                throw new AssertionError("5초 안에 " + state + " 가 되지 않음(현재 " + scenario.getState() + ")");
+            }
+            idle();
+            Thread.sleep(WAIT_STEP_MILLIS);
+        }
     }
 
     private void screenshot(String name) throws Exception {
