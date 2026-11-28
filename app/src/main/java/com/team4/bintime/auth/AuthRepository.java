@@ -66,6 +66,21 @@ public interface AuthRepository {
     /** 로그아웃 */
     void signOut();
 
+    /** BT-045 탈퇴 실패 문구. */
+    String MSG_DELETE_FAILED = "탈퇴를 마치지 못했어요. 잠시 후 다시 시도해 주세요.";
+    String MSG_DELETE_NETWORK = "네트워크 연결을 확인해 주세요.";
+    /** 방금 수락한 매칭의 채팅방을 준비하는 중이라 잠시 뒤 다시 시도해야 하는 경우(서버 CHAT_LINK_BUSY). */
+    String MSG_DELETE_BUSY = "채팅방을 정리하는 중이에요. 1~2분 뒤 다시 시도해 주세요.";
+
+    /**
+     * BT-045 회원 탈퇴. 서버(deleteAccount)가 개인 데이터 삭제·대기 요청/진행 매칭 정리·채팅방 나가기 후 계정을 지운다.
+     * 성공해도 기기 로그인은 그대로이므로 호출한 쪽에서 {@link SessionGuard#signOutByUser} 로 정리한다.
+     * 실패하면 다시 호출하면 된다(서버가 남은 단계부터 이어서 한다). 콜백은 정확히 한 번, 메인 스레드로 온다.
+     */
+    default void deleteAccount(Callback<Void> callback) {
+        callback.onError(MSG_DELETE_FAILED);
+    }
+
     /** BT-030 세션 확인 결과. */
     enum SessionState {
         /** 로그인이 유효하다. */

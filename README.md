@@ -166,6 +166,7 @@ userChatRooms/{uid}/{chatRoomId}: {..., chatReady, archived, hidden, linkedAt}
 - `aiUsage/{uid}_{YYYY-MM-DD}`(BT-024)는 Gemini 게이트웨이의 사용자별 하루 호출 수입니다. 날짜는 `Asia/Seoul` 기준이며 **서버(Cloud Functions)만 쓰고 앱은 읽기·쓰기 모두 금지**합니다. 자세한 계약은 [`docs/BT-024.md`](./docs/BT-024.md)를 참고합니다.
 - RTDB 채팅(`chatRooms`, `userChatRooms`)의 접근 규칙은 `database.rules.json`(BT-021)입니다. 메시지는 방 멤버만 읽고 새로 쓸 수 있으며(`senderId === auth.uid`, 서버 시각, 본문 1~1000자, 수정·삭제 금지), 멤버·목록·나가기 상태는 서버만 씁니다. 자세한 계약과 에뮬레이터 사용법은 [`docs/BT-021.md`](./docs/BT-021.md)를 참고합니다.
 - `control`은 서버 전용 읽기·쓰기이며 Rules가 `writable/archived`로 전송을 판정합니다. 앱은 본인의 `userChatRooms.chatReady/archived`와 현재 참여자용 `chatRoomLinks`를 표시 상태로 사용합니다. 매칭이 ENDED여도 보관되지 않은 준비된 방은 계속 전송할 수 있습니다.
+- 회원 탈퇴(BT-045)는 `deleteAccount()` Callable이 처리합니다. 내 프로필·시간표·공강·설정·사진 등 개인 데이터를 삭제하고 대기 요청·진행 매칭을 정리한 뒤 채팅방에서 나가며, 마지막에 Auth 계정을 지웁니다. 상대에게 남는 요청·매칭 기록과 메시지는 UID만 남겨 보존합니다. 같은 학교 이메일로 다시 가입하면 새 계정입니다. 상세는 [`docs/BT-045.md`](./docs/BT-045.md)를 따릅니다.
 
 더 구체적인 역할별 데이터·상태 변경 경계 및 AI 에이전트 작업 규칙은 [`AGENTS.md`](./AGENTS.md)를 참고하세요.
 

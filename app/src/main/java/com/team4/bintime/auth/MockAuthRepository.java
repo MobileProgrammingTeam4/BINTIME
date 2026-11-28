@@ -146,6 +146,17 @@ public class MockAuthRepository implements AuthRepository {
         pendingLink = null;
     }
 
+    /** BT-045 Mock 탈퇴: 이 계정의 이메일을 가입 목록에서 빼서 같은 이메일로 새로 가입할 수 있게 한다. */
+    @Override
+    public void deleteAccount(Callback<Void> callback) {
+        if (currentUid == null) {
+            callback.onError("로그인이 필요해요.");
+            return;
+        }
+        registeredEmails.removeIf(email -> currentUid.equals("mock_uid_" + Integer.toHexString(email.hashCode())));
+        callback.onSuccess(null);
+    }
+
     public String getPendingEmail() {
         return pendingEmail;
     }

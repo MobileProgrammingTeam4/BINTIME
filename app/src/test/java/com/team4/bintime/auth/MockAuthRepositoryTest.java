@@ -160,6 +160,26 @@ public class MockAuthRepositoryTest {
         assertNull(repository.getCurrentUid());
     }
 
+    /** BT-045: 탈퇴하면 같은 이메일로 다시 가입할 수 있다(검증된 이메일당 한 계정, 새 UID). */
+    @Test
+    public void deleteAccount_freesEmailAndRequiresSignIn() {
+        Recorder<Void> notSignedIn = new Recorder<>();
+        repository.deleteAccount(notSignedIn);
+        assertFalse(notSignedIn.success);
+        assertNotNull(notSignedIn.errorMessage);
+
+        String email = "new.user@kookmin.ac.kr";
+        assertTrue(verify(email, sendLink(email)).success);
+        assertTrue(repository.isRegisteredEmail(email));
+        assertTrue(repository.isRegisteredEmail(EMAIL)); // 다른 계정은 그대로
+
+        Recorder<Void> deleted = new Recorder<>();
+        repository.deleteAccount(deleted);
+        assertTrue(deleted.success);
+        assertFalse(repository.isRegisteredEmail(email));
+        assertTrue(repository.isRegisteredEmail(EMAIL));
+    }
+
     @Test
     public void verify_fails_whenLinkWasNeverSent() {
         assertFailure(verify(EMAIL, MockAuthRepository.LINK_PREFIX + "anything"),
