@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { type Firestore, FieldValue, Timestamp } from "firebase-admin/firestore";
 import { evaluateMatch } from "../ai/internal";
 import { type EvaluateMatchInput, type EvaluateMatchOutput, SYSTEM_INSTRUCTION } from "../ai/tasks/evaluateMatch";
-import { stripContacts } from "../ai/tasks/generateProfile";
+import { stripContacts } from "../ai/contactPolicy";
 import type { AiResponse } from "../ai/types";
 import { type Candidate, PURPOSE_ALL, type Slot } from "./eligibility";
 

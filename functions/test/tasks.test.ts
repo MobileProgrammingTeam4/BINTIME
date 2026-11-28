@@ -247,7 +247,9 @@ describe("generateProfile", () => {
     expect(ok.data.bio).toBe("같이 공부해요");
     expect(retried.client.calls).toHaveLength(2);
 
-    for (const bio of ["010-1234-5678 로 연락해요", "인스타 https://x.com/me", "카톡 01012345678"]) {
+    // 공통 contactPolicy 로 바꾸면서 점 구분 전화번호·http 없는 오픈채팅/SNS 링크도 막는다.
+    for (const bio of ["010-1234-5678 로 연락해요", "인스타 https://x.com/me", "카톡 01012345678",
+      "010.1234.5678 로 연락해요", "오픈채팅 open.kakao.com/o/abc 로 와요", "텔레그램 t.me/abc"]) {
       const deps = live(JSON.stringify({ bio, suggestedTags: [] }), [{ text: JSON.stringify({ bio, suggestedTags: [] }) }]);
       await expectReason(runAiTask(generateProfileTask, profileInput, ctx(me), deps), "AI_INVALID_OUTPUT");
     }
@@ -267,6 +269,19 @@ describe("generateProfile", () => {
     expect(stripContacts("010-1234-5678")).toBeUndefined();
     expect(stripContacts(undefined)).toBeUndefined();
     expect(stripContacts("2학년 C++ 프로그래밍 2")).toBe("2학년 C++ 프로그래밍 2");
+  });
+
+  it("stripContacts: 공통 contactPolicy 패턴을 쓴다(점 구분 번호·http 없는 링크 제거, 단어 중간은 유지)", () => {
+    expect(stripContacts("카페 좋아해요 010.1234.5678 open.kakao.com/o/abc")).toBe("카페 좋아해요");
+    expect(stripContacts("t.me/abc")).toBeUndefined();
+    expect(stripContacts("chat.me 같은 말이나 at.meeting 은 그대로")).toBe("chat.me 같은 말이나 at.meeting 은 그대로");
+  });
+
+  it("live: 연락처가 아닌 낱말(chat.me 등)이 든 소개는 그대로 통과한다", async () => {
+    const deps = live('{"bio":"chat.me 처럼 편하게 이야기해요","suggestedTags":[]}');
+    const ok = await runAiTask(generateProfileTask, profileInput, ctx(me), deps);
+    expect(ok.data.bio).toBe("chat.me 처럼 편하게 이야기해요");
+    expect(deps.client.calls).toHaveLength(1);
   });
 
   it("하루 5회까지, 6번째는 QUOTA_EXCEEDED", async () => {

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { containsContact, stripContacts as stripContactText } from "../contactPolicy";
 import { AiError } from "../errors";
 import type { AiTask } from "../types";
 import { text } from "./shared";
@@ -58,17 +59,15 @@ export function normalizeTags(tags: readonly string[]): string[] {
   return result;
 }
 
-/** 자기소개에 연락처가 들어가면 안 된다(개인정보 노출). 이메일·전화번호·URL 형태를 막는다. */
-const CONTACT_SOURCE = String.raw`[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}|(?:\d[\s-]?){9,}|https?:\/\/\S*|www\.\S*`;
-const CONTACT_PATTERN = new RegExp(CONTACT_SOURCE, "i");
-
 /**
  * 작성 중인 소개에서 연락처 형태를 지우고 공백을 정리한다. 비면 undefined.
  * 연락처를 Gemini 에 보내지 않고, 모델이 그대로 살려 출력 검사에 계속 걸리는 일(횟수만 소모)을 막는다.
+ * 자기소개에 연락처가 들어가면 안 된다(개인정보 노출). 패턴은 게이트웨이 공통 contactPolicy(BT-041)를 쓴다:
+ * 이메일·전화번호(공백·하이픈·점 구분)·링크·http 없이 쓰는 오픈채팅/SNS 링크.
  */
 export function stripContacts(draft: string | undefined): string | undefined {
   if (!draft) return undefined;
-  const cleaned = draft.replace(new RegExp(CONTACT_SOURCE, "gi"), " ").replace(/\s+/g, " ").trim();
+  const cleaned = stripContactText(draft);
   return cleaned.length > 0 ? cleaned : undefined;
 }
 
@@ -97,7 +96,7 @@ export const generateProfileTask: AiTask<GenerateProfileInput, GenerateProfileOu
   dailyLimit: DAILY_LIMIT,
   minIntervalMs: MIN_INTERVAL_MS,
   verify: (out) => {
-    if (CONTACT_PATTERN.test(out.bio)) {
+    if (containsContact(out.bio)) {
       // 일시적인 형식 오류로 보고 공통 처리에서 1회 재시도한다.
       throw new AiError("AI_INVALID_OUTPUT", "bio contains contact-like text", { transient: true });
     }
