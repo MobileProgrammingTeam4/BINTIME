@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { ModelClient, ModelRequest } from "./gemini";
+import type { GeminiMediaResolution, GeminiThinkingLevel, ModelClient, ModelRequest } from "./gemini";
 import type { UsageStore } from "./usage";
 import type { MatchAccess } from "./access";
 import type { ChatContextAccess } from "./chatContext";
@@ -23,8 +23,10 @@ export interface AiContext {
 
 export interface AiDeps {
   mode: AiMode;
-  /** live 모드에서 쓸 모델 ID. 비어 있으면 AI_UNAVAILABLE */
+  /** live 모드에서 쓸 기본 모델 ID(GEMINI_MODEL). 작업이 geminiOptions.modelEnv 를 두지 않았거나 그 값이 비어 있으면 이 값. 비어 있으면 AI_UNAVAILABLE */
   model: string;
+  /** 작업별 모델 환경 변수(geminiOptions.modelEnv) 읽기. 기본은 process.env. */
+  taskModel?: (envName: string) => string | undefined;
   /** live 모드에서만 호출한다. 키가 없으면 AI_UNAVAILABLE 을 던진다. */
   modelClient: () => ModelClient;
   usage: UsageStore;
@@ -81,6 +83,8 @@ export interface AiTask<I, O> {
    * 뺀 제약은 서버가 output 스키마와 verify 로 그대로 검사한다(어긋나면 AI_INVALID_OUTPUT).
    */
   geminiSchema?: GeminiSchemaMode;
+  /** 작업별 Gemini 설정(BT-048). 없으면 기본 모델·모델 기본 해상도·기본 thinking 으로 보낸다. */
+  geminiOptions?: GeminiOptions;
   /** 키 없이 계약대로 응답하는 Mock. 결과도 output 스키마·verify 를 통과해야 한다. */
   mock: (input: I, ctx: AiContext) => O;
   /** live 프롬프트. 없으면 AI_NOT_IMPLEMENTED(담당 이슈에서 추가). */
@@ -93,6 +97,14 @@ export interface AiTask<I, O> {
   fromCache?: (input: I, ctx: AiContext, deps: AiDeps) => Promise<O | null>;
   /** live Gemini 결과가 검증을 통과한 뒤 저장한다. 실패해도 응답은 그대로 돌려준다(로그만 남김). */
   saveCache?: (output: O, input: I, ctx: AiContext, deps: AiDeps) => Promise<void>;
+}
+
+/** 작업별 Gemini 설정. 모델 ID 는 코드에 두지 않고 서버 설정(환경 변수)으로 지정한다(AGENTS §6). */
+export interface GeminiOptions {
+  /** 이 작업만 쓸 모델 ID 를 담은 환경 변수 이름(예: GEMINI_MODEL_ANALYZE_TIMETABLE). 비어 있으면 GEMINI_MODEL */
+  modelEnv?: string;
+  mediaResolution?: GeminiMediaResolution;
+  thinkingLevel?: GeminiThinkingLevel;
 }
 
 export interface AiResponse<O> {

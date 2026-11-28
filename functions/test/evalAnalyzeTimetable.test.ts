@@ -184,7 +184,7 @@ describe("callOnce(가짜 ai)", () => {
     ({ model: "m", thinkingConfig: undefined, resolutionOption: {}, ...extra });
   const course = { name: "가", dayOfWeek: 1, startMinute: 540, endMinute: 630, building: null, room: null, confidence: 0.9, sourceImageIndex: 0 };
 
-  it("앱과 같은 요청(PROMPT·temperature 0·8192·typesOnly 스키마·이미지 part)을 보내고 응답을 스키마·verify 로 검사한다", async () => {
+  it("앱과 같은 요청(PROMPT·temperature 0·16384·typesOnly 스키마·이미지 part)을 보내고 응답을 스키마·verify 로 검사한다", async () => {
     const ai = fakeAi(JSON.stringify({ courses: [course], warnings: [] }));
     const rec = await callOnce({ ai, task: analyzeTimetableTask, toGeminiSchema, options: options(), bytes: jpeg, secret: "k" });
     expect(rec.error).toBeUndefined();
@@ -194,7 +194,7 @@ describe("callOnce(가짜 ai)", () => {
     expect(req.model).toBe("m");
     expect(req.config.systemInstruction).toBe(PROMPT);
     expect(req.config.temperature).toBe(0);
-    expect(req.config.maxOutputTokens).toBe(8192);
+    expect(req.config.maxOutputTokens).toBe(16_384);
     expect(req.config.responseJsonSchema).toEqual(toGeminiSchema(analyzeTimetableTask.output, "typesOnly"));
     expect(req.config.thinkingConfig).toBeUndefined();
     expect(req.config.mediaResolution).toBeUndefined();
