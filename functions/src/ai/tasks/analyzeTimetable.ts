@@ -157,7 +157,7 @@ export const analyzeTimetableTask: AiTask<AnalyzeTimetableInput, AnalyzeTimetabl
   name: "analyzeTimetable",
   input,
   output,
-  // BT-048(#146): gemini-3.8-flash + ULTRA_HIGH(thinking 기본) 은 5장 한 호출에 47~62초가 걸렸다.
+  // BT-048(#146): gemini-3.8-flash + ULTRA_HIGH(thinking 기본) 은 5장 한 호출에 43~71초가 걸렸다.
   // #143 부터 timeoutMs 는 재시도까지 포함한 전체 시간이고 마감 504 는 재시도하지 않으므로 최악값도 100초다.
   // 함수 제한 120초(index.ts)에서 이미지 읽기·횟수 차감·검증 여유 약 20초, 앱 Callable 제한 130초(docs/BT-048.md).
   timeoutMs: 100_000,
