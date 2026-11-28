@@ -42,7 +42,7 @@ public class RequestFlowDeviceTest {
 
     @Before public void useMockOnly() {
         context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        for (FirebaseApp app : new ArrayList<>(FirebaseApp.getApps(context))) app.delete();
+        // Mock 모드는 BinTimeTestRunner 가 앱 시작 전에 고른다(FirebaseApp 을 만들지 않음). delete() 로 지우지 않는다.
         assertFalse(AuthRepositories.isFirebaseEnabled(context));
         previousSuppression = context.getSharedPreferences("mockNotificationSettings", Context.MODE_PRIVATE)
                 .getString("suppressedDate", "");

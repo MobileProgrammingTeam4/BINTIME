@@ -9,11 +9,12 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.FirebaseApp;
-import com.google.firebase.FirebaseOptions;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreSettings;
 import com.google.firebase.functions.FirebaseFunctions;
+import com.team4.bintime.BinTimeTestRunner;
+import com.team4.bintime.FirebaseEmulatorTest;
 import com.team4.bintime.MainActivity;
 import com.team4.bintime.R;
 import org.junit.Before;
@@ -25,24 +26,25 @@ import java.io.FileOutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 import static org.junit.Assert.*;
 
 /** Test process only: synthetic demo project, local Auth/Firestore, no production or actual FCM calls. */
+@FirebaseEmulatorTest
 @RunWith(AndroidJUnit4.class)
 public class NotificationInboxDeviceTest {
-    private static final String PROJECT = "demo-bintime";
+    private static final String PROJECT = BinTimeTestRunner.EMULATOR_PROJECT;
     Context context;
     String uid;
     FirebaseFirestore db;
     @Before public void localOnly() throws Exception {
         context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        for (FirebaseApp app : new ArrayList<>(FirebaseApp.getApps(context))) app.delete();
-        // Syntactically valid placeholder required by the SDK, not a Google-issued credential.
-        String emulatorPlaceholder = "AIza" + new String(new char[35]).replace('\0', '0');
-        FirebaseApp.initializeApp(context, new FirebaseOptions.Builder().setProjectId(PROJECT)
-                .setApiKey(emulatorPlaceholder).setApplicationId("1:123456789:android:abcdef1234567890").build());
+        // 기본 앱은 BinTimeTestRunner 가 앱 시작 전에 demo-bintime 설정으로 만든다(delete()·재초기화 없음).
+        BinTimeTestRunner.requireEmulatorMode();
+        assertEquals(PROJECT, FirebaseApp.getInstance().getOptions().getProjectId());
+        // 오케스트레이터가 테스트마다 앱 데이터를 지우므로(clearPackageData) 알림 권한도 초기화된다. 화면을 가리지 않게 먼저 허용한다.
+        if (android.os.Build.VERSION.SDK_INT >= 33) InstrumentationRegistry.getInstrumentation().getUiAutomation()
+                .grantRuntimePermission(context.getPackageName(), android.Manifest.permission.POST_NOTIFICATIONS);
         FirebaseAuth auth = FirebaseAuth.getInstance(); auth.useEmulator("10.0.2.2", 9099);
         uid = Tasks.await(auth.signInAnonymously(), 25, TimeUnit.SECONDS).getUser().getUid();
         db = FirebaseFirestore.getInstance();

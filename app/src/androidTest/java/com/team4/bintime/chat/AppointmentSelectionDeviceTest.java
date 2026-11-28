@@ -22,7 +22,6 @@ import java.io.FileOutputStream;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import static org.junit.Assert.*;
@@ -34,7 +33,7 @@ public class AppointmentSelectionDeviceTest {
     private List<MatchAppointment> appointments;
     @Before public void mockOnly() {
         context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        for (FirebaseApp app : new ArrayList<>(FirebaseApp.getApps(context))) app.delete();
+        // Mock 모드는 BinTimeTestRunner 가 앱 시작 전에 고른다(FirebaseApp 을 만들지 않음). delete() 로 지우지 않는다.
         assertFalse(AuthRepositories.isFirebaseEnabled(context));
         ZonedDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Seoul"));
         int minute = now.getHour() * 60 + now.getMinute(); String today = now.toLocalDate().toString();

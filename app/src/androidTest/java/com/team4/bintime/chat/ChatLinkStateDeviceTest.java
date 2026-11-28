@@ -28,12 +28,11 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 /**
- * BT-034 준비 안 된 방의 재시도 화면. Mock 전용(FirebaseApp 제거)이라 운영 호출이 없다.
+ * BT-034 준비 안 된 방의 재시도 화면. Mock 전용(FirebaseApp 없음, BinTimeTestRunner)이라 운영 호출이 없다.
  * 실제 ensureMatchChat 실패 코드 처리는 ChatLinkRetryTest(JVM)가 검증한다.
  */
 @RunWith(AndroidJUnit4.class)
@@ -45,7 +44,7 @@ public class ChatLinkStateDeviceTest {
     @Before
     public void mockOnly() {
         context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        for (FirebaseApp app : new ArrayList<>(FirebaseApp.getApps(context))) app.delete();
+        // Mock 모드는 BinTimeTestRunner 가 앱 시작 전에 고른다(FirebaseApp 을 만들지 않음). delete() 로 지우지 않는다.
         assertFalse(AuthRepositories.isFirebaseEnabled(context));
         ZonedDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Seoul"));
         int minute = now.getHour() * 60 + now.getMinute();
