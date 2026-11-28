@@ -492,15 +492,32 @@ public class ChatRoomActivity extends AppCompatActivity {
     }
 
     private void confirmLeaveRoom() {
-        if (room.status == ChatRoom.Status.ACTIVE) {
-            // 진행 중 매칭은 나갈 수 없다. 매칭 종료를 먼저 해야 한다.
-            ChatNoticeDialog.show(getSupportFragmentManager(), TAG_LEAVE_BLOCKED,
-                    getString(R.string.chat_leave_blocked_title), getString(R.string.chat_leave_blocked_message),
-                    getString(R.string.chat_close));
+        if (hasActiveAppointment()) {
+            showLeaveBlocked();
             return;
         }
         ConfirmDialog.show(getSupportFragmentManager(), KEY_LEAVE_ROOM, getString(R.string.chat_leave_title),
                 getString(R.string.chat_leave_message), getString(R.string.chat_leave_confirm));
+    }
+
+    /** 서버(BT-043)와 같은 기준: 방 상태뿐 아니라 연결된 약속 중 하나라도 ACTIVE 면 나갈 수 없다. */
+    private boolean hasActiveAppointment() {
+        return room.status == ChatRoom.Status.ACTIVE
+                || room.appointments.stream().anyMatch(a -> a.status == MatchAppointment.Status.ACTIVE);
+    }
+
+    /**
+     * 진행 중 매칭은 나갈 수 없다는 안내(BT-010 다이얼로그 재사용). 종료 시각이 모두 지났는데 서버 자동 종료가
+     * 아직 반영되지 않은 경우(BT-038 1분 주기)는 매칭 종료 대신 잠시 기다리라고 안내한다.
+     */
+    private void showLeaveBlocked() {
+        long now = repository.nowMillis();
+        boolean waitingAutoEnd = !room.appointments.isEmpty() && room.appointments.stream()
+                .filter(a -> a.status == MatchAppointment.Status.ACTIVE).allMatch(a -> a.endAtMillis() <= now);
+        ChatNoticeDialog.show(getSupportFragmentManager(), TAG_LEAVE_BLOCKED,
+                getString(R.string.chat_leave_blocked_title),
+                getString(waitingAutoEnd ? R.string.chat_leave_ending_message : R.string.chat_leave_blocked_message),
+                getString(R.string.chat_close));
     }
 
     private void endMatch(String selectedId) {
@@ -525,21 +542,44 @@ public class ChatRoomActivity extends AppCompatActivity {
     }
 
     private void leaveRoom() {
-        if (actionInProgress || room == null || room.status != ChatRoom.Status.ENDED) return;
+        if (actionInProgress || room == null) return;
+        if (hasActiveAppointment()) {
+            showLeaveBlocked();
+            return;
+        }
         actionInProgress = true;
         leaving = true;
-        repository.leaveRoom(matchId, new ChatRepository.ActionCallback() {
+        repository.leaveRoom(matchId, new ChatRepository.LeaveCallback() {
             @Override
             public void onSuccess() {
+                if (isFinishing() || isDestroyed()) return;
                 Toast.makeText(ChatRoomActivity.this, R.string.chat_leave_done, Toast.LENGTH_SHORT).show();
                 finish();
             }
 
             @Override
-            public void onError() {
+            public void onError(ChatLeaveFailure failure) {
+                if (isFinishing() || isDestroyed()) return;
                 actionInProgress = false;
                 leaving = false;
-                Toast.makeText(ChatRoomActivity.this, R.string.chat_leave_failed, Toast.LENGTH_SHORT).show();
+                switch (failure) {
+                    case ACTIVE_MATCH:
+                        // 화면이 아직 받지 못한 다른 약속이 진행 중이거나 자동 종료 반영 전이다.
+                        showLeaveBlocked();
+                        return;
+                    case SIGNED_OUT:
+                        if (SessionGuard.redirectIfSignedOut(ChatRoomActivity.this)) return;
+                        Toast.makeText(ChatRoomActivity.this, R.string.chat_login_required, Toast.LENGTH_SHORT).show();
+                        return;
+                    case RETRY_LATER:
+                        Toast.makeText(ChatRoomActivity.this, R.string.chat_leave_retry, Toast.LENGTH_SHORT).show();
+                        return;
+                    case PERMISSION:
+                        Toast.makeText(ChatRoomActivity.this, R.string.chat_leave_denied, Toast.LENGTH_SHORT).show();
+                        return;
+                    default:
+                        Toast.makeText(ChatRoomActivity.this, R.string.chat_leave_failed, Toast.LENGTH_SHORT).show();
+                }
             }
         });
     }

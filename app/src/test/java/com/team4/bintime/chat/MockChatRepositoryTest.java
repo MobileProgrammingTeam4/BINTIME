@@ -238,8 +238,9 @@ public class MockChatRepositoryTest {
         assertEquals(4, freshRooms().size());
     }
 
-    private static final class ActionResult implements ChatRepository.ActionCallback {
+    private static final class ActionResult implements ChatRepository.ActionCallback, ChatRepository.LeaveCallback {
         int successes, errors;
+        ChatLeaveFailure lastFailure;
 
         @Override
         public void onSuccess() {
@@ -248,6 +249,12 @@ public class MockChatRepositoryTest {
 
         @Override
         public void onError() {
+            errors++;
+        }
+
+        @Override
+        public void onError(ChatLeaveFailure failure) {
+            lastFailure = failure;
             errors++;
         }
     }
@@ -295,6 +302,20 @@ public class MockChatRepositoryTest {
         assertEquals(Boolean.FALSE, after.appointments.get(1).reviewEligible);
         assertEquals(600, after.appointments.get(1).startMinute);
         repository.leaveRoom("match-jimin", result); assertEquals(1, result.errors);
+        assertEquals(ChatLeaveFailure.ACTIVE_MATCH, result.lastFailure);
+    }
+
+    /** 서버(BT-043)와 같이 종료된 약속이 있어도 연결된 약속 중 하나라도 ACTIVE 면 나갈 수 없다. */
+    @Test public void leaveRoom_rejectsWhenAnyAppointmentIsActive() {
+        com.team4.bintime.request.MatchAppointment ended = new com.team4.bintime.request.MatchAppointment("one", "match-seoyeon", "2026-10-06", 840, 930,
+                "스터디", com.team4.bintime.request.MatchAppointment.Status.ENDED, true, false);
+        com.team4.bintime.request.MatchAppointment active = new com.team4.bintime.request.MatchAppointment("two", "match-seoyeon", "2026-10-09", 600, 690,
+                "대화", com.team4.bintime.request.MatchAppointment.Status.ACTIVE, null, false);
+        repository.setAppointmentsForDemo("match-seoyeon", java.util.Arrays.asList(ended, active), false);
+        ActionResult result = new ActionResult();
+        repository.leaveRoom("match-seoyeon", result);
+        assertEquals(ChatLeaveFailure.ACTIVE_MATCH, result.lastFailure);
+        assertEquals(0, result.successes);
     }
 
     @Test public void archivedConversationKeepsRecordsAndRejectsSending() {
@@ -313,6 +334,7 @@ public class MockChatRepositoryTest {
         ActionResult result = new ActionResult();
         repository.leaveRoom("match-jimin", result);
         assertEquals(1, result.errors);
+        assertEquals(ChatLeaveFailure.ACTIVE_MATCH, result.lastFailure);
         assertEquals(4, liveRooms.last.size());
     }
 
