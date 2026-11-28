@@ -62,7 +62,7 @@ export async function runAiTask<I, O>(
       task: task.name,
       data,
       meta: {
-        model: deps.mode === "mock" ? "mock" : deps.model,
+        model: deps.mode === "mock" ? "mock" : modelFor(task, deps),
         requestId: ctx.requestId,
         latencyMs: Date.now() - startedAt,
         mock: deps.mode === "mock",
@@ -82,7 +82,7 @@ export async function runAiTask<I, O>(
       uid: ctx.uid,
       requestId: ctx.requestId,
       mode: deps.mode,
-      model: deps.mode === "mock" ? "mock" : deps.model,
+      model: deps.mode === "mock" ? "mock" : modelFor(task, deps),
       outcome,
       // 실패 원인 진단용. Gemini HTTP 상태 코드만 남기고 오류 본문은 남기지 않는다.
       upstreamStatus,
@@ -94,6 +94,13 @@ export async function runAiTask<I, O>(
       totalTokens: stats.usage?.totalTokens,
     });
   }
+}
+
+/** 작업이 쓸 모델 ID. 작업별 환경 변수가 비어 있으면 기본 모델(GEMINI_MODEL). */
+export function modelFor<I, O>(task: AiTask<I, O>, deps: AiDeps): string {
+  const env = task.geminiOptions?.modelEnv;
+  const own = env ? (deps.taskModel ?? ((name: string) => process.env[name]))(env)?.trim() : undefined;
+  return own || deps.model;
 }
 
 function parseInput<I, O>(task: AiTask<I, O>, rawInput: unknown): I {
@@ -121,7 +128,9 @@ interface CallStats {
 
 async function callModel<I, O>(task: AiTask<I, O>, input: I, ctx: AiContext, deps: AiDeps, stats: CallStats): Promise<O> {
   if (!task.buildRequest) throw new AiError("AI_NOT_IMPLEMENTED", `${task.name} has no live prompt yet`);
-  if (!deps.model) throw new AiError("AI_UNAVAILABLE", "GEMINI_MODEL is not set");
+  const model = modelFor(task, deps);
+  if (!model) throw new AiError("AI_UNAVAILABLE", "GEMINI_MODEL is not set");
+  const { mediaResolution, thinkingLevel } = task.geminiOptions ?? {};
 
   const request = await task.buildRequest(input, ctx, deps);
   const client = deps.modelClient();
@@ -135,7 +144,7 @@ async function callModel<I, O>(task: AiTask<I, O>, input: I, ctx: AiContext, dep
     stats.attempts = attempt;
     const timeoutMs = attempt === 1 ? task.timeoutMs : Math.max(1, deadline - clock());
     try {
-      const result = await client.generate({ ...request, model: deps.model, jsonSchema, timeoutMs });
+      const result = await client.generate({ ...request, model, mediaResolution, thinkingLevel, jsonSchema, timeoutMs });
       stats.usage = result.usage;
       let json: unknown;
       try {

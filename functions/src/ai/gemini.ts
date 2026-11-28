@@ -1,4 +1,4 @@
-import { ApiError, GoogleGenAI, type ContentListUnion } from "@google/genai";
+import { ApiError, GoogleGenAI, type ContentListUnion, type GenerateContentParameters, type PartMediaResolutionLevel, type ThinkingLevel } from "@google/genai";
 import { AiError } from "./errors";
 
 /** 작업이 만드는 프롬프트. 개인정보는 필요한 최소값만 담는다. */
@@ -9,8 +9,16 @@ export interface ModelRequest {
   maxOutputTokens?: number;
 }
 
+/** 이미지 part 해상도. ULTRA_HIGH 는 config 단위(mediaResolution)에 없어서 part 단위로만 보낸다. */
+export type GeminiMediaResolution = "LOW" | "MEDIUM" | "HIGH" | "ULTRA_HIGH";
+export type GeminiThinkingLevel = "MINIMAL" | "LOW" | "MEDIUM" | "HIGH";
+
 export interface ModelCall extends ModelRequest {
   model: string;
+  /** 있으면 contents 의 모든 이미지(inlineData) part 에 붙인다. 없으면 보내지 않는다(모델 기본값). */
+  mediaResolution?: GeminiMediaResolution;
+  /** 있으면 thinkingConfig.thinkingLevel 로 보낸다. 없으면 보내지 않는다(모델 기본값). */
+  thinkingLevel?: GeminiThinkingLevel;
   /** 응답 JSON 스키마(output zod 스키마에서 생성) */
   jsonSchema: unknown;
   /** 이번 시도에 쓸 시간. SDK 가 Google 쪽 마감으로도 보낸다. 게이트웨이가 남은 전체 시간으로 정한다. */
@@ -48,19 +56,7 @@ export class GenAiModelClient implements ModelClient {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), call.timeoutMs);
     try {
-      const response = await this.ai.models.generateContent({
-        model: call.model,
-        contents: call.contents,
-        config: {
-          systemInstruction: call.systemInstruction,
-          temperature: call.temperature,
-          maxOutputTokens: call.maxOutputTokens,
-          responseMimeType: "application/json",
-          responseJsonSchema: call.jsonSchema,
-          abortSignal: controller.signal,
-          httpOptions: { timeout: call.timeoutMs },
-        },
-      });
+      const response = await this.ai.models.generateContent(generateParams(call, controller.signal));
       const finishReason = response.candidates?.[0]?.finishReason;
       if (response.promptFeedback?.blockReason || (finishReason && BLOCKED_FINISH_REASONS.has(finishReason))) {
         throw new AiError("AI_BLOCKED", `blocked: ${response.promptFeedback?.blockReason ?? finishReason}`);
@@ -80,6 +76,38 @@ export class GenAiModelClient implements ModelClient {
       clearTimeout(timer);
     }
   }
+}
+
+/**
+ * SDK 요청을 만든다. 작업별 옵션(mediaResolution·thinkingLevel)이 없으면 옵션 도입 전과 같은 요청이다.
+ * 작업이 만든 contents 는 바꾸지 않고 복사본에 해상도를 붙인다.
+ */
+export function generateParams(call: ModelCall, abortSignal?: AbortSignal): GenerateContentParameters {
+  const params: GenerateContentParameters = {
+    model: call.model,
+    contents: call.mediaResolution ? withPartResolution(call.contents, call.mediaResolution) : call.contents,
+    config: {
+      systemInstruction: call.systemInstruction,
+      temperature: call.temperature,
+      maxOutputTokens: call.maxOutputTokens,
+      responseMimeType: "application/json",
+      responseJsonSchema: call.jsonSchema,
+      abortSignal,
+      httpOptions: { timeout: call.timeoutMs },
+    },
+  };
+  if (call.thinkingLevel) params.config!.thinkingConfig = { thinkingLevel: call.thinkingLevel as ThinkingLevel };
+  return params;
+}
+
+function withPartResolution(contents: ContentListUnion, resolution: GeminiMediaResolution): ContentListUnion {
+  const level = `MEDIA_RESOLUTION_${resolution}` as PartMediaResolutionLevel;
+  const list = Array.isArray(contents) ? contents : [contents];
+  const mapped = list.map((content) => {
+    if (typeof content !== "object" || content === null || !("parts" in content) || !Array.isArray(content.parts)) return content;
+    return { ...content, parts: content.parts.map((part) => (part.inlineData ? { ...part, mediaResolution: { level } } : part)) };
+  });
+  return (Array.isArray(contents) ? mapped : mapped[0]) as ContentListUnion;
 }
 
 /** Google 이 마감 초과로 돌려준 504(status DEADLINE_EXCEEDED)인지. 오류 본문의 상태 값만 본다. */
