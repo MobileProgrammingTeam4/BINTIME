@@ -32,7 +32,7 @@ import java.util.UUID;
 
 import static org.junit.Assert.*;
 
-/** Pixel 10 실제 View 경합 회귀. FirebaseApp 제거 후 로컬 지연 저장소만 사용한다. */
+/** Pixel 10 실제 View 경합 회귀. Mock 모드(FirebaseApp 없음, BinTimeTestRunner)에서 로컬 지연 저장소만 사용한다. */
 @RunWith(AndroidJUnit4.class)
 public class RequestButtonDeviceTest {
     private ActivityScenario<ProfileDetailActivity> scenario;
@@ -42,7 +42,7 @@ public class RequestButtonDeviceTest {
 
     @Before public void launchWithoutFirebase() {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        for (FirebaseApp app : new ArrayList<>(FirebaseApp.getApps(context))) app.delete();
+        // Mock 모드는 BinTimeTestRunner 가 앱 시작 전에 고른다(FirebaseApp 을 만들지 않음). delete() 로 지우지 않는다.
         assertFalse(AuthRepositories.isFirebaseEnabled(context));
         MockAuthRepository auth = MockAuthRepository.shared();
         auth.sendSignInLink("request.qa@kookmin.ac.kr", null);

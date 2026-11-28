@@ -27,10 +27,16 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1-week1"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // 기기 테스트: 앱 시작 전에 Mock/로컬 에뮬레이터 모드를 고르는 runner(androidTest/BinTimeTestRunner).
+        // 오케스트레이터로 테스트마다 새 프로세스를 띄우고 앱 데이터를 지운다. FirebaseApp.delete() 로 모드를 바꾸지 않는다.
+        testInstrumentationRunner = "com.team4.bintime.BinTimeTestRunner"
+        testInstrumentationRunnerArguments["clearPackageData"] = "true"
         // 이메일 링크가 돌아오는 Firebase Hosting 기본 도메인 (App Link intent-filter host)
         manifestPlaceholders["authLinkHost"] =
             if (firebaseProjectId != null) "$firebaseProjectId.firebaseapp.com" else "auth.invalid"
+    }
+    testOptions {
+        execution = "ANDROIDX_TEST_ORCHESTRATOR"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -57,4 +63,7 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.junit)
+    // 테스트 전용(앱 APK 에 포함되지 않음): 기기 테스트를 테스트마다 별도 프로세스로 실행
+    androidTestUtil(libs.androidx.test.orchestrator)
+    androidTestUtil(libs.androidx.test.services)
 }

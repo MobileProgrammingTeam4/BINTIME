@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:networkSecurityConfig="@xml/emulator_network_security" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application android:networkSecurityConfig="@xml/emulator_network_security">
+        <!-- debug 만: 기본 FirebaseApp 은 BinTimeApplication(FirebaseStartup)이 만든다. 기기 테스트 runner 가
+             앱 시작 전에 Mock(앱 없음)·로컬 에뮬레이터(demo 프로젝트)를 고르게 하기 위해서다. release 는 provider 를 그대로 쓴다. -->
+        <provider
+            android:name="com.google.firebase.provider.FirebaseInitProvider"
+            android:authorities="${applicationId}.firebaseinitprovider"
+            tools:node="remove" />
+    </application>
 </manifest>

@@ -26,6 +26,7 @@ import static org.junit.Assert.*;
 import static com.team4.bintime.notification.NotificationInboxDeviceTest.text;
 
 /** Local Functions RPC + real owner listeners on a visible Pixel. Does not call production. */
+@com.team4.bintime.FirebaseEmulatorTest
 @RunWith(AndroidJUnit4.class)
 public class NotificationSettingsDeviceTest {
     @Test public void saveRestoreSuppressPopupAndRejectThenSwitchAccount() throws Exception {

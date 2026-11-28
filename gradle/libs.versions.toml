@@ -7,6 +7,9 @@ firebaseBom = "35.1.0"
 googleServices = "4.5.0"
 androidxTestRunner = "1.7.0"
 androidxTestJunit = "1.3.0"
+# 기기 테스트 전용: 테스트마다 앱 프로세스를 새로 띄운다(androidTestUtil, 앱 APK 에는 들어가지 않음)
+androidxTestOrchestrator = "1.6.1"
+androidxTestServices = "1.6.0"
 [libraries]
 appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
@@ -23,6 +26,8 @@ firebase-appcheck-debug = { group = "com.google.firebase", name = "firebase-appc
 firebase-appcheck-playintegrity = { group = "com.google.firebase", name = "firebase-appcheck-playintegrity" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
 androidx-test-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestJunit" }
+androidx-test-orchestrator = { group = "androidx.test", name = "orchestrator", version.ref = "androidxTestOrchestrator" }
+androidx-test-services = { group = "androidx.test.services", name = "test-services", version.ref = "androidxTestServices" }
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
