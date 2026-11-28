@@ -26,6 +26,8 @@ import { createEndMatchCallable, createMatchEndSchedule } from "./requests/endCa
 export const endMatch = createEndMatchCallable();
 export const maintainMatches = createMatchEndSchedule();
 
+import { createGetMatchReviewCallable, createSubmitReviewCallable } from "./reviews/callable";
+
 /** D · BT-019 요청 생성. */
 export const createMatchRequest = createRequestCallable();
 /** D · BT-020. 발신자 본인의 PENDING 요청만 취소한다. */
@@ -54,6 +56,10 @@ export const suggestChatReplies = createAiCallable(suggestChatRepliesTask);
 
 /** A · BT-017 매칭 후보 검색 */
 export const searchMatches = createSearchCallable();
+
+/** E · BT-044 매칭 후기 작성·조회. reviews 는 앱 직접 접근 거부(Rules 규칙 없음), 공개 조건은 서버가 검사한다. */
+export const submitReview = createSubmitReviewCallable();
+export const getMatchReview = createGetMatchReviewCallable();
 
 /** E · BT-022 새 메시지 → 두 멤버 userChatRooms 의 마지막 메시지·상대 안읽음 수 갱신(RTDB 트리거, asia-southeast1). */
 export const chatOnMessageCreated = createMessageTrigger();

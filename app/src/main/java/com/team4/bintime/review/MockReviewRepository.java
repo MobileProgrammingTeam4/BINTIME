@@ -15,7 +15,7 @@ import java.util.Set;
 import java.util.function.LongSupplier;
 
 /**
- * BT-010 UI 시연 전용. 메모리 데이터만 바꾸며 실제 권한·Firestore·공개 조건 검사를 대신하지 않는다.
+ * BT-010·BT-044 UI 시연 전용(Firebase 미설정). 메모리 데이터만 바꾸며 실제 권한·Firestore·공개 조건 검사를 대신하지 않는다.
  * 시드: 지은 방은 양쪽 모두 작성, 서연 방은 상대만 작성(내가 쓰면 바로 공개), 그 밖의 방은 상대 미작성.
  */
 public final class MockReviewRepository implements ReviewRepository {
@@ -52,38 +52,41 @@ public final class MockReviewRepository implements ReviewRepository {
     }
 
     @Override
-    public void loadMyReviewStatus(String matchId, StatusCallback callback) {
-        callback.onResult(written.containsKey(matchId));
-    }
-
-    @Override
-    public void loadReceivedReview(String matchId, ReceivedCallback callback) {
+    public void loadMatchReview(String matchId, MatchReviewCallback callback) {
         scheduler.schedule(() -> {
             if (matchId == null) {
-                callback.onError();
-            } else if (!written.containsKey(matchId)) {
-                callback.onResult(Visibility.LOCKED, null);
-            } else if (!received.containsKey(matchId)) {
-                callback.onResult(Visibility.NOT_YET, null);
-            } else {
-                callback.onResult(Visibility.VISIBLE, received.get(matchId));
+                callback.onError(ReviewFailure.GENERIC);
+                return;
             }
+            Review mine = written.get(matchId);
+            Visibility visibility = mine == null ? Visibility.LOCKED
+                    : received.containsKey(matchId) ? Visibility.VISIBLE : Visibility.NOT_YET;
+            callback.onResult(new MatchReview(matchId, partnerOf(matchId), mine == null, null, -1, -1,
+                    mine, visibility, received.get(matchId)));
         }, LOAD_DELAY_MILLIS);
     }
 
     @Override
-    public void submitReview(String matchId, String targetUid, Satisfaction satisfaction,
-                             Set<ReviewKeyword> keywords, @Nullable String comment, SubmitCallback callback) {
+    public void submitReview(String matchId, Satisfaction satisfaction, Set<ReviewKeyword> keywords,
+                             @Nullable String comment, SubmitCallback callback) {
         String text = comment == null ? "" : comment.trim();
-        if (matchId == null || targetUid == null || satisfaction == null
-                || text.length() > COMMENT_MAX_LENGTH || written.containsKey(matchId)) {
-            callback.onError();
+        if (matchId == null || satisfaction == null || text.length() > COMMENT_MAX_LENGTH) {
+            callback.onError(ReviewFailure.GENERIC);
             return;
         }
-        written.put(matchId, review(matchId, MY_UID, targetUid, satisfaction,
+        if (written.containsKey(matchId)) {
+            callback.onError(ReviewFailure.ALREADY_REVIEWED);
+            return;
+        }
+        written.put(matchId, review(matchId, MY_UID, partnerOf(matchId), satisfaction,
                 keywords == null ? EnumSet.noneOf(ReviewKeyword.class) : keywords,
                 text.isEmpty() ? null : text));
         callback.onSuccess();
+    }
+
+    /** 시연 매칭 ID(match-지은 → mock-지은)의 상대 UID */
+    static String partnerOf(String matchId) {
+        return matchId.startsWith("match-") ? "mock-" + matchId.substring("match-".length()) : "mock-partner";
     }
 
     private Review review(String matchId, String author, String target, Satisfaction satisfaction,

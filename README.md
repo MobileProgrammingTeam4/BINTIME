@@ -136,7 +136,7 @@ matchSettings/{uid}
 matchRequests/{requestId}
 matches/{matchId}
 notifications/{uid}/items/{notificationId}
-reviews/{reviewId}
+reviews/{matchId}_{authorUid}   # BT-044 서버 전용(규칙 없음 = 앱 접근 거부), docs/BT-044.md
 reports/{reportId}
 aiUsage/{uid}_{YYYY-MM-DD}
 placeRecommendations/{matchId}   # BT-042 서버 전용 장소 추천 저장(docs/BT-042.md)
@@ -163,6 +163,7 @@ userChatRooms/{uid}/{chatRoomId}: {..., chatReady, archived, hidden, linkedAt}
 - 둘 다 나간 방은 사용자 목록과 대화 접근을 차단한 채 서버에만 보관합니다. 보관 기간·최종 삭제 시점은 신고 담당·SM의 후속 합의 대상이며 자동 삭제하지 않습니다. 한 명만 나간 방은 남은 사람에게 이전 대화로 표시합니다.
 - `matches/{matchId}`가 **매칭의 기준 데이터**입니다. 채팅 생성은 별도 RTDB 작업이므로 재시도·부분 실패를 고려해 연결 상태를 관리합니다.
 - 개인 시간표 원본을 상대방에게 통째로 반환하지 않습니다. 검색 결과에는 필요한 겹침 시간 및 공개 가능한 프로필 정보만 담습니다.
+- 후기(BT-044)는 개별 `matchId`·작성자당 1건이며 `submitReview`·`getMatchReview` Callable로만 쓰고 읽습니다. 서버가 참여자·ENDED·`reviewEligible === true`·상대 미탈퇴를 확인하고, 상대 후기는 내 후기를 쓴 뒤에만 돌려줍니다. 상세는 [`docs/BT-044.md`](./docs/BT-044.md)를 따릅니다.
 - `aiUsage/{uid}_{YYYY-MM-DD}`(BT-024)는 Gemini 게이트웨이의 사용자별 하루 호출 수입니다. 날짜는 `Asia/Seoul` 기준이며 **서버(Cloud Functions)만 쓰고 앱은 읽기·쓰기 모두 금지**합니다. 자세한 계약은 [`docs/BT-024.md`](./docs/BT-024.md)를 참고합니다.
 - RTDB 채팅(`chatRooms`, `userChatRooms`)의 접근 규칙은 `database.rules.json`(BT-021)입니다. 메시지는 방 멤버만 읽고 새로 쓸 수 있으며(`senderId === auth.uid`, 서버 시각, 본문 1~1000자, 수정·삭제 금지), 멤버·목록·나가기 상태는 서버만 씁니다. 자세한 계약과 에뮬레이터 사용법은 [`docs/BT-021.md`](./docs/BT-021.md)를 참고합니다.
 - `control`은 서버 전용 읽기·쓰기이며 Rules가 `writable/archived`로 전송을 판정합니다. 앱은 본인의 `userChatRooms.chatReady/archived`와 현재 참여자용 `chatRoomLinks`를 표시 상태로 사용합니다. 매칭이 ENDED여도 보관되지 않은 준비된 방은 계속 전송할 수 있습니다.

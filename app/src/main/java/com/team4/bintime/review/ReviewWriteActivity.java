@@ -25,7 +25,7 @@ import java.util.EnumSet;
 
 /**
  * 매칭 후기 남기기 (Figma 116:3395). 만족도는 필수, 키워드(복수)와 한 줄 후기는 선택이다.
- * 종료된 매칭의 채팅 배너에서만 들어온다. 작성 권한·중복은 서버(BT-044)도 다시 검사한다.
+ * 채팅방 후기 버튼과 ReviewEntry(완료된 매칭·알림)에서 들어온다. 작성 자격·중복은 서버(submitReview)가 검사한다.
  */
 public class ReviewWriteActivity extends AppCompatActivity {
 
@@ -41,7 +41,7 @@ public class ReviewWriteActivity extends AppCompatActivity {
                 .putExtra(EXTRA_PARTNER, partner.toBundle());
     }
 
-    private final ReviewRepository repository = MockReviewRepository.shared();
+    private ReviewRepository repository;
 
     private String matchId;
     private PartnerSummary partner;
@@ -62,6 +62,7 @@ public class ReviewWriteActivity extends AppCompatActivity {
             finish();
             return;
         }
+        repository = ReviewRepositories.get(this);
         setContentView(R.layout.activity_review_write);
         restore(savedInstanceState);
 
@@ -147,7 +148,7 @@ public class ReviewWriteActivity extends AppCompatActivity {
         if (satisfaction == null || submitting || done) return;
         submitting = true;
         updateSubmit();
-        repository.submitReview(matchId, partner.uid, satisfaction, keywords, comment.getText().toString(),
+        repository.submitReview(matchId, satisfaction, keywords, comment.getText().toString(),
                 new ReviewRepository.SubmitCallback() {
                     @Override
                     public void onSuccess() {
@@ -158,14 +159,35 @@ public class ReviewWriteActivity extends AppCompatActivity {
                     }
 
                     @Override
-                    public void onError() {
+                    public void onError(ReviewFailure failure) {
                         if (isDestroyed()) return;
                         submitting = false;
-                        updateSubmit();
-                        Toast.makeText(ReviewWriteActivity.this, R.string.review_submit_failed,
-                                Toast.LENGTH_SHORT).show();
+                        handleFailure(failure);
                     }
                 });
+    }
+
+    /** 이미 썼으면 조회 화면으로, 대상이 아니면 닫고, 일시 오류면 입력을 그대로 두고 다시 시도하게 한다. */
+    private void handleFailure(ReviewFailure failure) {
+        switch (failure) {
+            case ALREADY_REVIEWED:
+                Toast.makeText(this, R.string.review_already_written, Toast.LENGTH_SHORT).show();
+                startActivity(ReviewDetailActivity.intent(this, matchId, partner));
+                finish();
+                return;
+            case NOT_ELIGIBLE:
+            case PERMISSION:
+                Toast.makeText(this, R.string.review_not_eligible, Toast.LENGTH_SHORT).show();
+                finish();
+                return;
+            case PARTNER_DELETED:
+                Toast.makeText(this, R.string.review_partner_deleted, Toast.LENGTH_SHORT).show();
+                finish();
+                return;
+            default:
+                updateSubmit();
+                Toast.makeText(this, R.string.review_submit_failed, Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void showDone() {

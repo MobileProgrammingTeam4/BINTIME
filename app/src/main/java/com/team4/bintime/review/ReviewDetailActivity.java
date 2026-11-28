@@ -31,7 +31,7 @@ public class ReviewDetailActivity extends AppCompatActivity {
                 .putExtra(EXTRA_PARTNER, partner.toBundle());
     }
 
-    private final ReviewRepository repository = MockReviewRepository.shared();
+    private ReviewRepository repository;
 
     private String matchId;
     private PartnerSummary partner;
@@ -48,6 +48,7 @@ public class ReviewDetailActivity extends AppCompatActivity {
             finish();
             return;
         }
+        repository = ReviewRepositories.get(this);
         setContentView(R.layout.activity_review_detail);
         findViewById(R.id.reviewDetailBack).setOnClickListener(v -> finish());
         content = findViewById(R.id.reviewDetailContent);
@@ -58,13 +59,16 @@ public class ReviewDetailActivity extends AppCompatActivity {
     private void load() {
         content.setVisibility(View.GONE);
         state.showLoading();
-        repository.loadReceivedReview(matchId, new ReviewRepository.ReceivedCallback() {
+        repository.loadMatchReview(matchId, new ReviewRepository.MatchReviewCallback() {
             @Override
-            public void onResult(ReviewRepository.Visibility visibility, @Nullable Review review) {
+            public void onResult(MatchReview result) {
                 if (isDestroyed()) return;
-                if (visibility == ReviewRepository.Visibility.VISIBLE && review != null) {
-                    bind(review);
-                } else if (visibility == ReviewRepository.Visibility.LOCKED) {
+                if (result.visibility == ReviewRepository.Visibility.VISIBLE && result.received != null) {
+                    bind(result.received);
+                } else if (result.visibility == ReviewRepository.Visibility.LOCKED && !result.canWrite) {
+                    // 내 후기도 없고 쓸 수도 없는 약속(진행 중·시작 전 종료·탈퇴 종료·상대 탈퇴): 작성 버튼 없이 안내만.
+                    state.showEmpty(getString(R.string.review_not_target_title), getString(R.string.review_not_target_message));
+                } else if (result.visibility == ReviewRepository.Visibility.LOCKED) {
                     state.showEmpty(getString(R.string.review_locked_title),
                                     getString(R.string.review_locked_message, partner.name))
                             .primary(getString(R.string.review_submit), v -> {
@@ -78,7 +82,7 @@ public class ReviewDetailActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onError() {
+            public void onError(ReviewFailure failure) {
                 if (isDestroyed()) return;
                 state.showError(getString(R.string.review_load_error))
                         .primary(getString(R.string.review_retry), v -> load());

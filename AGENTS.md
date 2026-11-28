@@ -141,7 +141,7 @@ matchSettings/{uid}
 matchRequests/{requestId}
 matches/{matchId}
 notifications/{uid}/items/{notificationId}
-reviews/{reviewId}
+reviews/{matchId}_{authorUid}   # BT-044 서버 전용(규칙 없음 = 앱 접근 거부), docs/BT-044.md
 reports/{reportId}
 aiUsage/{uid}_{YYYY-MM-DD}
 matchScores/{searcherUid}_{candidateUid}
@@ -172,7 +172,8 @@ userChatRooms/{uid}/{chatRoomId}
 | `matches` | `participantUids`, `requestId`, `status`, `meetingDate`, `startMinute`, `endMinute`, `chatReady` 등 **확정 스냅샷** |
 | `chatRooms` | 실제 방 키는 `chatRoomId`, 개별 약속 `matchId`와 구분. Rules는 `database.rules.json`: 멤버만 메시지 읽기·새 쓰기(`senderId === auth.uid`, 서버 시각, 본문 1~1000자), `members` 쓰기와 `control {chatReady,writable,archived}` 읽기·쓰기는 서버 전용. Rules는 control을 내부 참조하며 앱은 직접 읽지 않음. `writable=false` 또는 `archived=true`면 전송 거부. 계약은 `docs/BT-021.md`·`docs/BT-034.md` |
 | `userChatRooms` | `userChatRooms/{uid}/{chatRoomId}`의 본인 목록/안읽음·방 단위 `chatReady/archived/hidden/status`·`linkedAt`(항목을 처음 만든 서버 시각, 메시지 없는 방의 정렬 기준). 앱은 본인 읽기 및 `unreadCount=0`만 쓰기 가능. 나머지는 서버 전용이며 표시 상태는 이 값과 참여자용 `chatRoomLinks`를 사용 |
-| `reviews` / `reports` | 참여·공개/작성 권한, 개인정보 최소 수집 |
+| `reviews` | BT-044: `reviews/{matchId}_{authorUid}` = `matchId`·`authorUid`·`targetUid`·`satisfaction`(BAD/GOOD/GREAT)·`keywords`(enum 이름)·`comment`(100자, 없으면 null)·`createdAt`. 매칭·작성자당 1건, 수정·삭제 없음. **서버 전용**(Rules 규칙 없음): `submitReview({matchId, satisfaction, keywords, comment})`가 참여자·ENDED·`reviewEligible === true`·상대 `accountDeletions` 없음을 확인하고, `getMatchReview({matchId})`는 내 후기는 항상, 상대 후기는 내 후기가 있을 때만 돌려줌. 계약은 `docs/BT-044.md` |
+| `reports` | 참여·작성 권한, 개인정보 최소 수집 |
 | `aiUsage` | BT-024 Gemini 게이트웨이의 사용자별 하루 호출 수(`uid`, `date`, `counts.{task}`, `lastCalledAtMs.{task}`, `total`, `updatedAt`). 날짜는 `Asia/Seoul`. **서버 전용**: Admin SDK만 쓰고 Rules는 앱 읽기·쓰기 모두 거부. 계약은 `docs/BT-024.md` |
 | `matchScores` | BT-028 AI 점수 캐시(`searcherUid`, `candidateUid`, `inputHash`, `score`, `reasons`, `suggestedActivity`, `expiresAt`, `updatedAt`). **서버 전용**: Rules에 규칙이 없어 앱 읽기·쓰기 모두 거부. 계약은 `docs/BT-028.md` |
 

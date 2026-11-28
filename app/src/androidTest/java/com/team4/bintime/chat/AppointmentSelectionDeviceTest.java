@@ -161,10 +161,10 @@ public class AppointmentSelectionDeviceTest {
         assertTrue("지연 구간에도 입력은 그대로", activity.findViewById(R.id.chatInput).isEnabled());
     }
     private static void writeReview(String id) {
-        com.team4.bintime.review.MockReviewRepository.shared().submitReview(id, "u1", com.team4.bintime.review.Satisfaction.GREAT,
+        com.team4.bintime.review.MockReviewRepository.shared().submitReview(id, com.team4.bintime.review.Satisfaction.GREAT,
                 java.util.Collections.emptySet(), null, new com.team4.bintime.review.ReviewRepository.SubmitCallback() {
                     @Override public void onSuccess() {}
-                    @Override public void onError() { fail("로컬 후기 작성 실패"); }
+                    @Override public void onError(com.team4.bintime.review.ReviewFailure failure) { fail("로컬 후기 작성 실패"); }
                 });
     }
     private static void showWindow(ActivityScenario<ChatRoomActivity> scenario) throws Exception {
