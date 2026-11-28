@@ -16,9 +16,9 @@ export const AI_SCORE_LIMIT = 5;
 export const SCORE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 /**
  * 프롬프트(SYSTEM_INSTRUCTION)와 모델(GEMINI_MODEL)은 해시에 들어가 바뀌면 자동으로 다시 평가된다.
- * 그 밖의 규칙(출력 검사 verify 등)을 바꾸면 이 값을 올린다. 2: 건물명 출력 검사 추가(#102).
+ * 그 밖의 규칙(출력 검사 verify 등)을 바꾸면 이 값을 올린다. 2: 건물명 출력 검사 추가(#102). 3: 근거 없는 이유 제거(BT-049).
  */
-export const SCORE_CACHE_VERSION = 2;
+export const SCORE_CACHE_VERSION = 3;
 /** searchMatches 30초 제한 안에서 검색 결과를 꼭 돌려주기 위한 점수 마감. 늦은 후보는 점수 없이 보낸다. */
 export const SCORE_DEADLINE_MS = 15_000;
 
@@ -68,6 +68,9 @@ const validCache = (c: CachedScore | null, hash: string, now: number): c is Cach
   !!c && c.inputHash === hash && c.expiresAt > now && Number.isInteger(c.score) && c.score >= 0 && c.score <= 100;
 
 export type Evaluator = (uid: string, input: EvaluateMatchInput) => Promise<AiResponse<EvaluateMatchOutput>>;
+
+/** 진행 중인 평가. 키에 검색자 UID 가 들어가 사용자끼리 섞이지 않고, 끝나면 바로 지운다(인스턴스 안에서만 합쳐진다). */
+const inflight = new Map<string, Promise<EvaluateMatchOutput>>();
 
 const clip = (s: unknown, max: number) => (typeof s === "string" ? s.trim().slice(0, max) : "");
 
@@ -159,14 +162,24 @@ export async function addScores(
       if (validCache(hit, hash, now)) {
         return { ...c, score: hit.score, reasons: hit.reasons, suggestedActivity: hit.suggestedActivity };
       }
-      const res = await evaluate(uid, input);
-      const out = res.data;
-      // Mock 점수는 저장하지 않는다(live 로 바꾼 뒤 가짜 점수가 남지 않게). 저장 실패는 점수 표시를 막지 않는다.
-      if (!res.meta.mock) {
-        await data
-          .saveCache(uid, c.candidateId, { inputHash: hash, ...out, expiresAt: now + SCORE_CACHE_TTL_MS })
-          .catch(() => undefined);
+      // BT-049: 같은 사람·후보·입력 평가가 동시에 오면(연속 검색) Gemini 호출·한도 차감·저장을 한 번만 한다.
+      const key = `${uid}_${c.candidateId}_${hash}`;
+      let shared = inflight.get(key);
+      if (!shared) {
+        shared = evaluate(uid, input)
+          .then(async (res) => {
+            // Mock 점수는 저장하지 않는다(live 로 바꾼 뒤 가짜 점수가 남지 않게). 저장 실패는 점수 표시를 막지 않는다.
+            if (!res.meta.mock) {
+              await data
+                .saveCache(uid, c.candidateId, { inputHash: hash, ...res.data, expiresAt: now + SCORE_CACHE_TTL_MS })
+                .catch(() => undefined);
+            }
+            return res.data;
+          })
+          .finally(() => inflight.delete(key));
+        inflight.set(key, shared);
       }
+      const out = await shared;
       return { ...c, score: out.score, reasons: out.reasons, suggestedActivity: out.suggestedActivity };
     } catch {
       return c; // AI·읽기 실패는 점수 없이 보여준다
