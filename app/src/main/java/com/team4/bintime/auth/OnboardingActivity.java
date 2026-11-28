@@ -13,6 +13,7 @@ import com.team4.bintime.R;
 import com.team4.bintime.profile.ProfileRepositories;
 import com.team4.bintime.profile.ProfileRepository;
 import com.team4.bintime.timetable.TimetableSelectModeActivity;
+import com.team4.bintime.timetable.TimetableOriginals;
 
 /**
  * 앱 최초 진입 온보딩 화면 (Figma 41:9992).
@@ -100,6 +101,8 @@ public class OnboardingActivity extends AppCompatActivity {
     /** 로그인 전 온보딩 상태로 되돌린다. expired 면 "다시 로그인" 안내를 띄운다. */
     private void showSignedOut(boolean expired) {
         if (expired) Toast.makeText(this, R.string.session_expired, Toast.LENGTH_SHORT).show();
+        // 앱 시작 때 만료·정지로 확인되면 이전 계정의 시간표 원본 사본도 지운다(#142 리뷰 C).
+        TimetableOriginals.clearInBackground(this);
         retryMode = false;
         btnStart.setText(R.string.onboarding_start_button);
         btnStart.setEnabled(true);
