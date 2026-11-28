@@ -8,6 +8,11 @@ export const SEOUL_TIME_ZONE = "Asia/Seoul";
 /** live 모드에서 일시적 오류(429·5xx·형식 오류)일 때 최대 시도 횟수(첫 시도 포함) */
 export const MAX_ATTEMPTS = 2;
 export const RETRY_DELAY_MS = 500;
+/**
+ * 재시도 조건(BT-048, #48): 대기(RETRY_DELAY_MS) 뒤 남은 시간이 작업 제한 시간(timeoutMs)의 이 비율 이상일 때만 다시 시도한다.
+ * timeoutMs 는 재시도까지 포함한 전체 시간이라, 남은 시간이 적으면 다시 보내도 시간 초과로 끝나기 쉽다.
+ */
+export const MIN_RETRY_BUDGET_RATIO = 0.5;
 
 /**
  * AI_MODE 가 명시되면 그 값을 쓴다. 없으면 에뮬레이터는 mock, 배포 환경은 live.

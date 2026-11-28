@@ -202,10 +202,11 @@ describe("analyzeTimetable live: 요청 본문", () => {
     expect(call.systemInstruction).toContain("비례로 읽는다");
     expect(call.systemInstruction).toContain("0.9 이상");
     expect(call.temperature).toBe(0);
-    expect(call.maxOutputTokens).toBe(8192);
-    // BT-048: 모델 호출 제한 55초. 마감 504 를 한 번 재시도해도(2회 + 0.5초) 함수 제한 120초 안에 들어가야 한다.
-    expect(call.timeoutMs).toBe(55_000);
-    expect(call.timeoutMs * 2 + 500).toBeLessThan(120_000);
+    expect(call.maxOutputTokens).toBe(16_384);
+    // BT-048(#146): 모델 호출 제한 100초. #143 부터 timeoutMs 는 재시도까지 포함한 전체 시간이라(마감 504 는 재시도 안 함)
+    // 재시도 대기(0.5초)를 더해도 함수 제한 120초 안에 이미지 읽기·검증 여유가 남아야 한다.
+    expect(call.timeoutMs).toBe(100_000);
+    expect(call.timeoutMs + 500).toBeLessThan(120_000);
     const contents = call.contents as Array<{ role: string; parts: Array<Record<string, any>> }>;
     expect(contents).toHaveLength(1);
     expect(contents[0].role).toBe("user");

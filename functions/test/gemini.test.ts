@@ -26,6 +26,21 @@ describe("Gemini 오류 분류", () => {
     expect(toHttpsError(error, "r").details).toMatchObject({ reason, retryable });
   });
 
+  it("Google 마감 초과 504(DEADLINE_EXCEEDED)는 AI_TIMEOUT 이고 게이트웨이가 재시도하지 않는다(#48)", () => {
+    const deadline = new ApiError({ status: 504,
+      message: '{"error":{"code":504,"message":"Deadline expired before operation could complete.","status":"DEADLINE_EXCEEDED"}}' });
+    const error = classify(deadline, false);
+    expect(error).toMatchObject({ reason: "AI_TIMEOUT", transient: false, retryable: true, upstreamStatus: 504 });
+    expect(toHttpsError(error, "r").details).toMatchObject({ reason: "AI_TIMEOUT", retryable: true });
+  });
+
+  it("마감 표시가 없는 504 는 다른 5xx 처럼 재시도 대상", () => {
+    const gateway = new ApiError({ status: 504, message: '{"error":{"code":504,"status":"UNAVAILABLE"}}' });
+    expect(classify(gateway, false)).toMatchObject({ reason: "AI_UNAVAILABLE", transient: true, upstreamStatus: 504 });
+    // 504 가 아닌 상태에 DEADLINE_EXCEEDED 글자가 있어도 마감 초과로 보지 않는다
+    expect(classify(new ApiError({ status: 503, message: "DEADLINE_EXCEEDED" }), false)).toMatchObject({ reason: "AI_UNAVAILABLE", transient: true });
+  });
+
   it("앱으로 가는 details 에는 상태 코드가 없다", () => {
     expect(toHttpsError(classify(api(402), false), "r").details).not.toHaveProperty("upstreamStatus");
   });
