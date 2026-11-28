@@ -21,17 +21,24 @@ import com.team4.bintime.request.MockRequestRepository;
 import com.team4.bintime.request.RequestTabsController;
 
 public class MatchRequestDialog extends DialogFragment {
+    private FirebaseRequestPopupController firebase;
+    private static final java.util.Set<FragmentManager> LAUNCHING = java.util.Collections.newSetFromMap(new java.util.WeakHashMap<>());
     public static final String RESULT = "receivedRequestResult";
     public static void showRequest(FragmentManager fm, String id) {
-        if (fm.isStateSaved() || fm.findFragmentByTag(RESULT) != null) return;
+        if (fm.isStateSaved() || fm.findFragmentByTag(RESULT) != null || !LAUNCHING.add(fm)) return;
         MatchRequestDialog dialog = new MatchRequestDialog();
         Bundle args = new Bundle(); args.putString("id", id); dialog.setArguments(args);
-        dialog.show(fm, RESULT);
+        try { dialog.show(fm.beginTransaction().runOnCommit(() -> LAUNCHING.remove(fm)), RESULT); }
+        catch (RuntimeException error) { LAUNCHING.remove(fm); throw error; }
     }
     @NonNull @Override public Dialog onCreateDialog(Bundle saved) {
         Dialog dialog = new Dialog(requireContext());
         View root = getLayoutInflater().inflate(R.layout.dialog_match_request, null);
         dialog.setContentView(root);
+        if (com.team4.bintime.auth.AuthRepositories.isFirebaseEnabled(requireContext())) {
+            firebase = new FirebaseRequestPopupController(this, root, requireArguments().getString("id"));
+            return dialog;
+        }
         MockRequestRepository.Item item = ((MainActivity) requireActivity()).requests().find(requireArguments().getString("id"));
         MatchCandidate profile = item == null ? null : MockMatchRepository.find(item.profileUid);
         root.findViewById(R.id.popupClose).setOnClickListener(v -> dismiss());
@@ -72,10 +79,12 @@ public class MatchRequestDialog extends DialogFragment {
     }
     @Override public void onStart() {
         super.onStart();
+        if (firebase != null) firebase.start();
         if (requireDialog().getWindow()==null) return;
         requireDialog().getWindow().setBackgroundDrawableResource(android.R.color.transparent);
         requireDialog().getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
         requireDialog().getWindow().setDimAmount(.7f);
         requireDialog().getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);
     }
+    @Override public void onStop() { if (firebase != null) firebase.close(); super.onStop(); }
 }

@@ -1,11 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
+        android:name=".common.BinTimeApplication"
         android:allowBackup="true"
         android:label="BIN TIME"
         android:supportsRtl="true"
         android:theme="@style/Theme.BinTime">
+        <service android:name=".notification.BinTimeMessagingService" android:exported="false">
+            <intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT" /></intent-filter>
+        </service>
 
         <!-- 최초 가입: 온보딩 → 학교 이메일 인증 → 시간표 등록 → 프로필 생성 → 메인 -->
         <activity

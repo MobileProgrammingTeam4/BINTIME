@@ -26,6 +26,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
 public class NotificationListFragment extends Fragment {
+    private FirebaseNotificationListController firebase;
     private final MockNotificationRepository events = new MockNotificationRepository();
     private ActivityResultLauncher<Intent> accepted;
     private boolean demoEmpty;
@@ -51,6 +52,10 @@ public class NotificationListFragment extends Fragment {
     }
     @Override public void onViewCreated(@NonNull View root, Bundle state) {
         root.findViewById(R.id.notificationBack).setOnClickListener(v->getParentFragmentManager().popBackStack());
+        if (com.team4.bintime.auth.AuthRepositories.isFirebaseEnabled(requireContext())) {
+            firebase = new FirebaseNotificationListController(this);
+            return;
+        }
         root.findViewById(R.id.notificationDate).setOnLongClickListener(v -> {
             demoEmpty = !demoEmpty; render();
             Toast.makeText(requireContext(), "시연: 알림 빈 목록 전환", Toast.LENGTH_SHORT).show();
@@ -59,9 +64,12 @@ public class NotificationListFragment extends Fragment {
         render();
     }
     @Override public void onSaveInstanceState(@NonNull Bundle out) { out.putBoolean("demoEmpty", demoEmpty); super.onSaveInstanceState(out); }
-    @Override public void onResume() { super.onResume(); render(); }
+    @Override public void onResume() { super.onResume(); if (firebase != null) firebase.start(); else render(); }
+    @Override public void onPause() { if (firebase != null) firebase.stop(); super.onPause(); }
+    @Override public void onDestroyView() { if (firebase != null) firebase.stop(); firebase = null; super.onDestroyView(); }
     private void render() {
         if(getView()==null) return;
+        if(com.team4.bintime.auth.AuthRepositories.isFirebaseEnabled(requireContext())) return;
         View root=requireView();
         ((TextView)root.findViewById(R.id.notificationDate)).setText(LocalDate.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("오늘 · M월 d일 (E)",Locale.KOREAN)));
         LinearLayout rows=root.findViewById(R.id.notificationRows); rows.removeAllViews();

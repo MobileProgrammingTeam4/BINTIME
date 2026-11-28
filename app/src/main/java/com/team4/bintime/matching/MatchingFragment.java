@@ -34,6 +34,7 @@ import com.team4.bintime.request.RequestTabsController;
 import com.team4.bintime.request.MatchAcceptedActivity;
 import com.team4.bintime.notification.MatchRequestDialog;
 import com.team4.bintime.notification.NotificationPreferences;
+import com.team4.bintime.notification.RequestPopupCoordinator;
 
 import java.util.Collections;
 import java.util.List;
@@ -57,6 +58,7 @@ public class MatchingFragment extends Fragment {
     private RequestTabsController requestTabs;
     private View requestContent;
     private int selectedTab;
+    private RequestPopupCoordinator popupCoordinator;
     private StateView stateView;
     private TextView[] tabs;
     private MaterialSwitch switchMatching;
@@ -68,6 +70,7 @@ public class MatchingFragment extends Fragment {
     private String searchError;
     /** 늦게 도착한 이전 검색 응답을 버리기 위한 순번 */
     private int searchSeq;
+    @Nullable private String inFlightKey;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -117,6 +120,10 @@ public class MatchingFragment extends Fragment {
         if (getView() != null) {
             reload(); // 시간표에서 공강을 바꾸고 돌아와도 서버 기준으로 다시 검색
             if (requestTabs != null) requestTabs.render();
+            if (!requestRepository.isMock()) {
+                if (popupCoordinator == null) popupCoordinator = new RequestPopupCoordinator(this, requestRepository);
+                popupCoordinator.start();
+            }
             getView().post(() -> {
                 if (!isResumed() || isHidden() || getView() == null || getChildFragmentManager().isStateSaved()) return;
                 NotificationPreferences prefs = new NotificationPreferences(requireContext());
@@ -165,6 +172,8 @@ public class MatchingFragment extends Fragment {
         });
         v.findViewById(R.id.btnChangeSlot).setOnClickListener(b -> goTimetable());
         switchMatching.setOnCheckedChangeListener((b, checked) -> {
+            // render()가 저장된 값에 맞춰 스위치를 바꿀 때는 다시 검색하지 않는다(앱 시작 시 검색 2회 방지, BT-049).
+            if (checked == ((MainActivity) requireActivity()).isMatchingOn()) return;
             ((MainActivity) requireActivity()).setMatchingOn(checked);
             reload();
         });
@@ -191,13 +200,21 @@ public class MatchingFragment extends Fragment {
         if (!find) requestTabs.show(MockRequestRepository.Tab.values()[selectedTab - 1]);
     }
 
+    /** Notification entry point; null opens matching search, otherwise the existing request tab. */
+    public void openRequestTab(RequestRepository.Tab tab) {
+        selectedTab = tab == null ? 0 : tab.ordinal() + 1;
+        if (tabs != null && getView() != null) selectTopTab(tabs[selectedTab]);
+    }
+
     @Override public void onHiddenChanged(boolean hidden) {
         super.onHiddenChanged(hidden);
+        if (popupCoordinator != null) { if (hidden) popupCoordinator.close(); else popupCoordinator.start(); }
         if (!hidden && getView() != null) {
             reload();
             if (requestTabs != null) requestTabs.render();
         }
     }
+    @Override public void onPause() { if (popupCoordinator != null) popupCoordinator.close(); super.onPause(); }
 
     @Override
     public void onDestroyView() {
@@ -219,20 +236,28 @@ public class MatchingFragment extends Fragment {
     /** 스위치·필터를 저장하고 다시 검색한다. 결과가 오면 render(). */
     private void reload() {
         boolean matchingOn = ((MainActivity) requireActivity()).isMatchingOn();
+        // 같은 조건 검색이 이미 진행 중이면 그 결과를 기다린다(필터 복귀·화면 복귀가 겹쳐 AI 평가가 두 번 되는 것 방지, BT-049).
+        String key = matchingOn + "|" + filter.minOverlapMinutes + "|" + filter.purpose + "|" + filter.tags;
+        if (key.equals(inFlightKey)) return;
+        inFlightKey = key;
         int seq = ++searchSeq;
         result = null;
         searchError = null;
         render();
         searchRepository.search(matchingOn, filter.copy(), new MatchSearchRepository.Callback() {
             @Override public void onResult(MatchSearchRepository.Result r) {
-                if (seq != searchSeq || getView() == null) return;
+                if (seq != searchSeq) return;
+                inFlightKey = null; // 화면이 사라진 뒤 도착해도 풀어 둬야 다음 검색이 막히지 않는다
+                if (getView() == null) return;
                 result = r;
                 MatchSearchRepositories.remember(r.candidates);
                 render();
             }
 
             @Override public void onError(String message) {
-                if (seq != searchSeq || getView() == null) return;
+                if (seq != searchSeq) return;
+                inFlightKey = null;
+                if (getView() == null) return;
                 searchError = message;
                 render();
             }
