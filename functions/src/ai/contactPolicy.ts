@@ -1,8 +1,8 @@
 /**
  * AI 입력·출력의 연락처 처리(BT-041). 공통 게이트웨이(E) 소유.
- * 기본 패턴은 generateProfile(B, BT-029)의 CONTACT_SOURCE 와 같다. 채팅에서 흔한 점 구분 전화번호(010.1234.5678)와
- * http·www 없는 메신저·SNS 링크를 더 막는다.
- * generateProfile 을 이 파일로 옮기는 것은 B 와 합의한 뒤 별도로 한다(그 전까지 두 곳에 같은 기본 패턴이 있다).
+ * 쓰는 곳: 채팅 답장 추천(suggestChatReplies, E), 자기소개 초안(generateProfile, B·BT-029),
+ * 매칭 평가 입력의 자기소개(matching/score.ts, A·BT-027).
+ * 패턴을 바꾸면 세 곳의 입력·출력 검사가 함께 바뀐다(매칭 평가는 입력 해시가 바뀐 사용자만 다시 평가된다).
  */
 const CONTACT_SOURCE = [
   // 이메일

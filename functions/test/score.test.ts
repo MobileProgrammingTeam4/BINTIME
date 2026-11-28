@@ -57,6 +57,9 @@ describe("toSide", () => {
     expect(toSide({ department: "경영학과", grade: "3", bio: "카페 좋아해요 010-1234-5678 a.b@kookmin.ac.kr https://x.io/y" })?.bio)
       .toBe("카페 좋아해요");
     expect(toSide({ department: "경영학과", grade: "3", bio: "01012345678" })).toEqual({ department: "경영학과", grade: 3, tags: [] });
+    // 공통 contactPolicy: 점 구분 번호·http 없는 오픈채팅 링크도 지운다
+    expect(toSide({ department: "경영학과", grade: "3", bio: "스터디 해요 010.1234.5678 open.kakao.com/o/x" })?.bio)
+      .toBe("스터디 해요");
   });
   it("학과나 학년이 없으면 null", () => {
     expect(toSide({ department: "경영학과", grade: "" })).toBeNull();
