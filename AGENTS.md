@@ -174,6 +174,7 @@ userChatRooms/{uid}/{chatRoomId}
 | `userChatRooms` | `userChatRooms/{uid}/{chatRoomId}`의 본인 목록/안읽음·방 단위 `chatReady/archived/hidden/status`·`linkedAt`(항목을 처음 만든 서버 시각, 메시지 없는 방의 정렬 기준)·`blockedByMe/sendDisabled`(BT-046 차단 표시). 앱은 본인 읽기 및 `unreadCount=0`만 쓰기 가능. 나머지는 서버 전용이며 표시 상태는 이 값과 참여자용 `chatRoomLinks`를 사용 |
 | 차단 계약 | `users/{uid}/blockedUsers/{blockedUid}` `{blockedUid, createdAt}`은 본인 읽기만, 쓰기는 `blockUser`/`unblockUser({targetUid})` Callable 전용. 차단 시 두 사람 사이 PENDING을 `CANCELED`(보낸 것)/`REJECTED`(받은 것)로 정리하고 사유도 일반 처리와 같게 씀(`MANUAL_CANCEL`/`RECIPIENT_REJECTED`/`EXPIRED`, 차단 사실 비공개, 재신청 제한 없음). 기존 채팅은 기록 유지·새 메시지만 거부: 서버 전용 `chatRooms/{roomId}/blocks/{blockerUid}`가 있으면 Rules가 전송 거부. 계약은 `docs/BT-046.md` |
 | `reviews` / `reports` | 참여·공개/작성 권한, 개인정보 최소 수집 |
+| 신고 계약 | `submitReport({targetUid, matchId|null, reasons, detail, alsoBlock})`만 저장. `reports/{reportId}`(신고자·대상 UID·matchId·사유·직접 입력 ≤500자·status·createdAt)는 일반 사용자 읽기·쓰기 모두 거부. 같은 신고자·대상·매칭당 1건(`ALREADY_REPORTED`). matchId가 있으면 두 사람이 참여자여야 함. 함께 차단은 BT-046 차단 서비스. 계약은 `docs/BT-051.md` |
 | `aiUsage` | BT-024 Gemini 게이트웨이의 사용자별 하루 호출 수(`uid`, `date`, `counts.{task}`, `lastCalledAtMs.{task}`, `total`, `updatedAt`). 날짜는 `Asia/Seoul`. **서버 전용**: Admin SDK만 쓰고 Rules는 앱 읽기·쓰기 모두 거부. 계약은 `docs/BT-024.md` |
 | `matchScores` | BT-028 AI 점수 캐시(`searcherUid`, `candidateUid`, `inputHash`, `score`, `reasons`, `suggestedActivity`, `expiresAt`, `updatedAt`). **서버 전용**: Rules에 규칙이 없어 앱 읽기·쓰기 모두 거부. 계약은 `docs/BT-028.md` |
 
