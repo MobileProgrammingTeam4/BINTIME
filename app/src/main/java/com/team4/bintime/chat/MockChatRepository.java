@@ -68,6 +68,11 @@ public final class MockChatRepository implements ChatRepository {
         ChatRoom room = rooms.get(roomId);
         if (room != null) { rooms.put(roomId, room.withAppointments(appointments, archived).withChatReady(ready)); notifyRoomChanged(roomId); }
     }
+    /** BT-046 차단된 방 표시의 Mock 검증 주입점. 실제 전송 차단은 서버 Rules 가 한다. */
+    public void setBlockStateForDemo(String roomId, ChatRoom.BlockState state) {
+        ChatRoom room = rooms.get(roomId);
+        if (room != null) { rooms.put(roomId, room.withBlockState(state)); notifyRoomChanged(roomId); }
+    }
 
     private static final class Subscription<T> {
         final String matchId;

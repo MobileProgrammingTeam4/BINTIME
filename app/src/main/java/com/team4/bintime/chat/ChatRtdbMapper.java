@@ -57,7 +57,10 @@ final class ChatRtdbMapper {
                 status,
                 Boolean.TRUE.equals(hidden), Boolean.TRUE.equals(map.get("archived")),
                 map.containsKey("chatReady") ? Boolean.TRUE.equals(map.get("chatReady")) : null,
-                linkedAt == null ? 0L : linkedAt);
+                linkedAt == null ? 0L : linkedAt,
+                Boolean.TRUE.equals(map.get(ChatRtdbPaths.BLOCKED_BY_ME)) ? ChatRoom.BlockState.BY_ME
+                        : Boolean.TRUE.equals(map.get(ChatRtdbPaths.SEND_DISABLED)) ? ChatRoom.BlockState.BY_PARTNER
+                        : ChatRoom.BlockState.NONE);
     }
 
     /**
@@ -101,7 +104,8 @@ final class ChatRtdbMapper {
                 samePartner && partner.hasPhoto,
                 entry.lastMessage, entry.lastMessageAt, entry.unreadCount,
                 null /* recommendedPlace: BT-042 */).withAppointments(match == null ? Collections.emptyList() : match.appointments, entry.archived)
-                .withPartnerPhoto(samePartner ? partner.photoPath : null);
+                .withPartnerPhoto(samePartner ? partner.photoPath : null)
+                .withBlockState(entry.blockState);
     }
 
     @Nullable

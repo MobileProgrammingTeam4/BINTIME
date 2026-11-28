@@ -16,7 +16,7 @@ if (googleServicesFile.exists()) {
     apply(plugin = "com.google.gms.google-services")
 }
 
-android {
+android { 
     namespace = "com.team4.bintime"
     compileSdk {
         version = release(37)

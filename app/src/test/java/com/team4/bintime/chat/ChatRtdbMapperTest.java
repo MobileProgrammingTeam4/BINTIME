@@ -203,6 +203,28 @@ public class ChatRtdbMapperTest {
         assertEquals(OTHER, parsed.otherUid);
     }
 
+    // ---- BT-046 차단 표시 ----
+
+    @Test public void blockFlagsMapToRoomBlockStateAndSurviveRoomAssembly() {
+        MatchInfo match = new MatchInfo(MATCH, Arrays.asList(ME, OTHER), ChatRoom.Status.ACTIVE, "2026-11-17", 600, 690, true);
+        Map<String, Object> node = roomNode(OTHER, "ACTIVE");
+        assertEquals(ChatRoom.BlockState.NONE, ChatRtdbMapper.userChatRoom(MATCH, node).blockState);
+        assertFalse(ChatRtdbMapper.room(ME, ChatRtdbMapper.userChatRoom(MATCH, node), match, null, "상대").blocked());
+
+        node.put("sendDisabled", true);
+        ChatRoom partner = ChatRtdbMapper.room(ME, ChatRtdbMapper.userChatRoom(MATCH, node), match, null, "상대");
+        assertEquals(ChatRoom.BlockState.BY_PARTNER, partner.blockState);
+        // 차단은 전송만 막는다. 방 준비·상태·기록 표시용 값은 그대로다.
+        assertTrue(partner.chatReady);
+        assertEquals(ChatRoom.Status.ACTIVE, partner.status);
+        assertEquals(ChatRoom.BlockState.BY_PARTNER, partner.withUnread(3).withChatReady(true).blockState);
+
+        node.put("blockedByMe", true); // 서로 차단: 내가 풀 수 있는 쪽을 보여 준다
+        assertEquals(ChatRoom.BlockState.BY_ME, ChatRtdbMapper.userChatRoom(MATCH, node).blockState);
+        node.put("blockedByMe", "true"); // 형식이 틀리면 내 차단으로 보지 않는다
+        assertEquals(ChatRoom.BlockState.BY_PARTNER, ChatRtdbMapper.userChatRoom(MATCH, node).blockState);
+    }
+
     // ---- ChatRoom 조립 ----
 
     @Test public void roomLevelNotReadyOverridesPreviouslyReadyMatchAndRecovers() {

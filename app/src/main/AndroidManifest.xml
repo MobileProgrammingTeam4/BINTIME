@@ -63,6 +63,7 @@
         <activity android:name=".matching.ProfileDetailActivity" />
         <activity android:name=".request.MatchAcceptedActivity" android:exported="false" />
         <activity android:name=".notification.NotificationSettingsActivity" android:exported="false" />
+        <activity android:name=".profile.BlockedUsersActivity" android:exported="false" />
         <activity
             android:name=".chat.ChatRoomActivity"
             android:exported="false"

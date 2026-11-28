@@ -45,20 +45,28 @@ public final class ChatRoom {
     /** 추천 장소가 없으면 null. BT-009 에서는 AI 결과가 아니라 Mock 문구다. */
     public final String recommendedPlace;
 
+    /**
+     * BT-046 차단 상태. 서버(blockUser)가 userChatRooms 에 쓴 blockedByMe·sendDisabled 로 정한다.
+     * NONE 이 아니면 서버 Rules 가 이 방의 새 메시지를 거부하므로 입력창을 막는다. 기록은 그대로 읽는다.
+     */
+    public enum BlockState { NONE, BY_ME, BY_PARTNER }
+    public final BlockState blockState;
+
     ChatRoom(String matchId, List<String> participantUids, Status status, String meetingDate,
              int startMinute, int endMinute, boolean chatReady, String otherUid, String otherName,
              String otherInfo, boolean otherHasPhoto, String lastMessage, long lastMessageAt,
              int unreadCount, String recommendedPlace) {
         this(matchId, participantUids, status, meetingDate, startMinute, endMinute, chatReady, otherUid, otherName,
-                otherInfo, otherHasPhoto, lastMessage, lastMessageAt, unreadCount, recommendedPlace, Collections.emptyList(), false, null);
+                otherInfo, otherHasPhoto, lastMessage, lastMessageAt, unreadCount, recommendedPlace, Collections.emptyList(), false, null, BlockState.NONE);
     }
 
     private ChatRoom(String matchId, List<String> participantUids, Status status, String meetingDate,
              int startMinute, int endMinute, boolean chatReady, String otherUid, String otherName,
              String otherInfo, boolean otherHasPhoto, String lastMessage, long lastMessageAt,
              int unreadCount, String recommendedPlace, List<MatchAppointment> appointments, boolean archived,
-             String otherPhotoPath) {
+             String otherPhotoPath, BlockState blockState) {
         this.matchId = matchId;
+        this.blockState = blockState == null ? BlockState.NONE : blockState;
         this.participantUids = participantUids;
         this.status = status;
         this.meetingDate = meetingDate;
@@ -78,10 +86,22 @@ public final class ChatRoom {
         this.otherPhotoPath = otherPhotoPath;
     }
 
+    /** BT-046 차단 상태만 바꾼다. */
+    ChatRoom withBlockState(BlockState state) {
+        return new ChatRoom(matchId, participantUids, status, meetingDate, startMinute, endMinute,
+                chatReady, otherUid, otherName, otherInfo, otherHasPhoto, lastMessage, lastMessageAt, unreadCount,
+                recommendedPlace, appointments, archived, otherPhotoPath, state);
+    }
+
+    /** 차단으로 새 메시지를 보낼 수 없는 방인지(BT-046). */
+    public boolean blocked() {
+        return blockState != BlockState.NONE;
+    }
+
     ChatRoom withLastMessage(String message, long at, int unread) {
         return new ChatRoom(matchId, participantUids, status, meetingDate, startMinute, endMinute,
                 chatReady, otherUid, otherName, otherInfo, otherHasPhoto, message, at, unread,
-                recommendedPlace, appointments, archived, otherPhotoPath);
+                recommendedPlace, appointments, archived, otherPhotoPath, blockState);
     }
 
     ChatRoom withUnread(int unread) {
@@ -92,27 +112,27 @@ public final class ChatRoom {
     ChatRoom withStatus(Status newStatus) {
         return new ChatRoom(matchId, participantUids, newStatus, meetingDate, startMinute, endMinute,
                 chatReady, otherUid, otherName, otherInfo, otherHasPhoto, lastMessage, lastMessageAt,
-                unreadCount, recommendedPlace, appointments, archived, otherPhotoPath);
+                unreadCount, recommendedPlace, appointments, archived, otherPhotoPath, blockState);
     }
 
     ChatRoom withAppointments(List<MatchAppointment> items, boolean archived) {
         Status aggregate = items.isEmpty() ? status : items.stream().anyMatch(a -> a.status == MatchAppointment.Status.ACTIVE) ? Status.ACTIVE : Status.ENDED;
         return new ChatRoom(matchId, participantUids, archived ? Status.ENDED : aggregate, meetingDate, startMinute, endMinute,
                 chatReady && !archived, otherUid, otherName, otherInfo, otherHasPhoto, lastMessage, lastMessageAt,
-                unreadCount, recommendedPlace, items, archived, otherPhotoPath);
+                unreadCount, recommendedPlace, items, archived, otherPhotoPath, blockState);
     }
     ChatRoom withChatReady(boolean ready) {
         return new ChatRoom(matchId, participantUids, status, meetingDate, startMinute, endMinute,
                 ready && !archived, otherUid, otherName, otherInfo, otherHasPhoto, lastMessage, lastMessageAt,
-                unreadCount, recommendedPlace, appointments, archived, otherPhotoPath);
+                unreadCount, recommendedPlace, appointments, archived, otherPhotoPath, blockState);
     }
     /** 상대 공개 프로필 사진 경로만 바꾼다(BT-034). */
     ChatRoom withPartnerPhoto(String path) {
         return new ChatRoom(matchId, participantUids, status, meetingDate, startMinute, endMinute, chatReady,
-                otherUid, otherName, otherInfo, otherHasPhoto, lastMessage, lastMessageAt, unreadCount, recommendedPlace, appointments, archived, path);
+                otherUid, otherName, otherInfo, otherHasPhoto, lastMessage, lastMessageAt, unreadCount, recommendedPlace, appointments, archived, path, blockState);
     }
     ChatRoom withDisplayAppointment(MatchAppointment item) {
         return new ChatRoom(matchId, participantUids, status, item.meetingDate, item.startMinute, item.endMinute, chatReady,
-                otherUid, otherName, otherInfo, otherHasPhoto, lastMessage, lastMessageAt, unreadCount, recommendedPlace, appointments, archived, otherPhotoPath);
+                otherUid, otherName, otherInfo, otherHasPhoto, lastMessage, lastMessageAt, unreadCount, recommendedPlace, appointments, archived, otherPhotoPath, blockState);
     }
 }

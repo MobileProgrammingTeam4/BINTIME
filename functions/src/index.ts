@@ -15,6 +15,7 @@ import { createSearchCallable } from "./matching/callable";
 import { createMessageTrigger } from "./chat/trigger";
 import { createRequestMaintenanceSchedule } from "./requests/scheduled";
 import { createChatLinkCallable, createChatLinkTrigger } from "./chat/linkCallable";
+import { createBlockCallable, createUnblockCallable } from "./safety/callable";
 export { notificationOnRequestCreated, notificationOnMatchChanged, notificationOnReviewCreated,
   notificationOnMessageCreated, notificationOnPushQueued, notificationOnAvailabilityChanged,
   notificationOnTimetableChanged, notificationOnSettingsChanged, notificationOnUserChanged, maintainNotifications,
@@ -51,6 +52,10 @@ export const generateProfile = createAiCallable(generateProfileTask);
 export const recommendPlace = createAiCallable(recommendPlaceTask);
 /** E · BT-041 */
 export const suggestChatReplies = createAiCallable(suggestChatRepliesTask);
+
+/** B · BT-046 차단·해제. 대기 요청 정리와 채팅 전송 차단 표시를 서버가 함께 한다. */
+export const blockUser = createBlockCallable();
+export const unblockUser = createUnblockCallable();
 
 /** A · BT-017 매칭 후보 검색 */
 export const searchMatches = createSearchCallable();

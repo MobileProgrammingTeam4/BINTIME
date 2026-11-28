@@ -330,9 +330,10 @@ public class ChatRoomActivity extends AppCompatActivity {
     private void bindRoom() {
         ((TextView) findViewById(R.id.chatRoomTitle)).setText(room.otherName);
         boolean active = room.status == ChatRoom.Status.ACTIVE;
-        ChatComposer.bind(findViewById(R.id.chatComposer), room.archived, room.chatReady, sending);
+        ChatComposer.bind(findViewById(R.id.chatComposer), room.archived, room.chatReady, sending, room.blockState);
         setAiButtonEnabled(replyRequest == null);
-        findViewById(R.id.chatAiRow).setVisibility(room.archived ? View.GONE : View.VISIBLE);
+        // BT-046 차단된 방은 보낼 수 없으므로 AI 답장 줄도 숨긴다.
+        findViewById(R.id.chatAiRow).setVisibility(room.archived || room.blocked() ? View.GONE : View.VISIBLE);
         // 매칭 스냅샷(matches/{matchId})을 아직 못 받으면 확정 시간이 없다(BT-034 연결 전·문서 생성 전). 시간 카드를 숨긴다.
         // 종료 시각이 지났는데 서버가 아직 ACTIVE 로 둔 구간도 카드를 유지한다(ChatAppointmentDisplay, BT-035).
         boolean hasMatchTime = room.meetingDate != null && (room.appointments.isEmpty() || ChatAppointmentDisplay.pick(room.appointments, repository.nowMillis()) != null);
@@ -553,7 +554,7 @@ public class ChatRoomActivity extends AppCompatActivity {
 
     /** 버튼을 눌렀을 때만 요청한다. 요청 중에는 버튼을 잠가 중복 호출을 막는다. */
     private void requestReplies() {
-        if (replyRequest != null || aiReplyUnavailable || room == null || room.archived || !room.chatReady) return;
+        if (replyRequest != null || aiReplyUnavailable || room == null || room.archived || !room.chatReady || room.blocked()) return;
         // 서버는 이 약속의 chatRoomId 로 실제 방을 찾는다(재사용 방은 방 키와 약속 ID 가 다르다, BT-034).
         String target = ReplySuggestionRepositories.targetMatchId(room.appointments, matchId, repository.nowMillis());
         setAiButtonEnabled(false);
@@ -594,7 +595,7 @@ public class ChatRoomActivity extends AppCompatActivity {
 
     private void setAiButtonEnabled(boolean enabled) {
         aiButton.setVisibility(aiReplyUnavailable ? View.GONE : View.VISIBLE);
-        enabled = enabled && !aiReplyUnavailable && room != null && !room.archived && room.chatReady;
+        enabled = enabled && !aiReplyUnavailable && room != null && !room.archived && room.chatReady && !room.blocked();
         aiButton.setEnabled(enabled);
         aiButton.setAlpha(enabled ? 1f : 0.4f);
     }
@@ -620,7 +621,7 @@ public class ChatRoomActivity extends AppCompatActivity {
 
     /** 칩 문구를 입력창에만 넣는다. 전송은 사용자가 직접 한다(자동 전송 금지). */
     private void fillInput(String reply) {
-        if (room == null || room.archived || !room.chatReady) return;
+        if (room == null || room.archived || !room.chatReady || room.blocked()) return;
         input.setText(reply);
         input.setSelection(input.length());
         input.requestFocus();
@@ -630,7 +631,7 @@ public class ChatRoomActivity extends AppCompatActivity {
 
     /** 응답이 올 때까지 전송 버튼을 잠가 중복 전송을 막는다. */
     private void send() {
-        if (sending || room == null || room.archived || !room.chatReady) return;
+        if (sending || room == null || room.archived || !room.chatReady || room.blocked()) return;
         String text = input.getText().toString();
         if (text.trim().isEmpty()) return;
         setSending(true);
@@ -655,7 +656,8 @@ public class ChatRoomActivity extends AppCompatActivity {
 
     private void setSending(boolean value) {
         sending = value;
-        ChatComposer.bind(findViewById(R.id.chatComposer), room != null && room.archived, room != null && room.chatReady, value);
+        ChatComposer.bind(findViewById(R.id.chatComposer), room != null && room.archived, room != null && room.chatReady, value,
+                room != null ? room.blockState : ChatRoom.BlockState.NONE);
     }
 
     private boolean isResumedNow() {

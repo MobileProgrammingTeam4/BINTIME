@@ -44,6 +44,13 @@ service cloud.firestore {
       allow create, update: if isOwner(uid) && validProfile()
           && request.resource.data.email == request.auth.token.email;
       allow delete: if false; // 회원 탈퇴는 후속 이슈에서 서버로 처리
+
+      // B · BT-046 차단 목록: 본인만 읽는다. 다른 사용자는 읽을 수 없다(차단 사실 비공개).
+      // 차단·해제는 대기 요청 정리·채팅 전송 차단과 함께 해야 하므로 서버(blockUser/unblockUser)만 쓴다.
+      match /blockedUsers/{blockedUid} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
     }
 
     // 공개 프로필: 인증된 학교 계정만 읽고(#135), 본인만 쓴다. 이메일 등 개인정보 필드는 금지.
