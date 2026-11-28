@@ -3,6 +3,7 @@
  * BT-024: Gemini 공통 게이트웨이. 앱은 아래 Callable 만 호출하고 Gemini 를 직접 부르지 않는다.
  * 리전: asia-northeast3 (앱은 FirebaseFunctions.getInstance("asia-northeast3") 사용)
  */
+import "./security/appCheck";
 import { createAiCallable } from "./ai/callable";
 import { aiPingTask } from "./ai/tasks/aiPing";
 import { analyzeTimetableTask } from "./ai/tasks/analyzeTimetable";
@@ -16,6 +17,16 @@ import { createRequestMaintenanceSchedule } from "./requests/scheduled";
 import { createChatLinkCallable, createChatLinkTrigger } from "./chat/linkCallable";
 import { createBlockCallable, createUnblockCallable } from "./safety/callable";
 import { createReportCallable } from "./safety/reportCallable";
+export { notificationOnRequestCreated, notificationOnMatchChanged, notificationOnReviewCreated,
+  notificationOnMessageCreated, notificationOnPushQueued, notificationOnAvailabilityChanged,
+  notificationOnTimetableChanged, notificationOnSettingsChanged, notificationOnUserChanged, maintainNotifications,
+  registerNotificationDevice, updateNotificationSettings, requestPopupPolicy } from "./notification/functions";
+
+import { createEndMatchCallable, createMatchEndSchedule } from "./requests/endCallable";
+
+/** D · BT-038. Only participants end a match; server time drives automatic ending. */
+export const endMatch = createEndMatchCallable();
+export const maintainMatches = createMatchEndSchedule();
 
 /** D · BT-019 요청 생성. */
 export const createMatchRequest = createRequestCallable();

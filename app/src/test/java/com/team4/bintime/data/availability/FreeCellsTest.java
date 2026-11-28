@@ -1,6 +1,8 @@
 package com.team4.bintime.data.availability;
 
+import com.team4.bintime.data.model.Course;
 import com.team4.bintime.data.model.TimeSlot;
+import com.team4.bintime.data.repository.FreeSlotValidator;
 
 import org.junit.Test;
 
@@ -183,5 +185,53 @@ public class FreeCellsTest {
         cleared[TUE - 1] |= 1L << 21;    // 다시 선택
         assertArrayEquals(first, cleared);
         assertEquals(Collections.singletonList(slot(TUE, 600, 720)), FreeCells.matchable(cleared));
+    }
+
+    // ── [BT-047] 수업 변경 시 선택 원본 정리 ─────────────────────────────
+
+    private static final int WED = 3;
+
+    @Test
+    public void keepSelectable_multiSlotAndOverlappingCourses_clearEverySlot() {
+        long[] m = FreeCells.fromSlots(Arrays.asList(
+                slot(MON, 540, 900), slot(TUE, 600, 660), slot(WED, 540, 720)));
+        List<TimeSlot> courseSlots = Arrays.asList(
+                slot(MON, 600, 690), slot(MON, 630, 720), // 서로 겹치는 두 시간대 → 10:00~12:00
+                slot(MON, 780, 840),                      // 같은 요일 두 번째 수업
+                slot(WED, 600, 660));                     // 다른 요일
+        long[] kept = FreeCells.keepSelectable(m, courseSlots);
+        assertEquals(Arrays.asList(
+                slot(MON, 540, 600), slot(MON, 720, 780), slot(MON, 840, 900),
+                slot(TUE, 600, 660),                      // 수업 없는 요일은 그대로
+                slot(WED, 540, 600), slot(WED, 660, 720)), FreeCells.toSlots(kept));
+        assertFalse(FreeCells.isSelectable(m, courseSlots));
+        assertTrue(FreeCells.isSelectable(kept, courseSlots));
+    }
+
+    @Test
+    public void keepSelectable_nullCoursesAndSlotsAreSkipped() {
+        long[] m = FreeCells.fromSlots(Arrays.asList(slot(MON, 540, 720), slot(TUE, 540, 720)));
+        List<TimeSlot> withNullSlot = new ArrayList<>(Arrays.asList(null, slot(MON, 600, 660)));
+        List<Course> courses = Arrays.asList(
+                null,
+                new Course("e", "빈 수업", null, null, null, null),
+                new Course("n", "null 칸", null, null, null, withNullSlot),
+                new Course("t", "화요일", null, null, null,
+                        new ArrayList<>(Collections.singletonList(slot(TUE, 630, 690)))));
+        List<TimeSlot> courseSlots = FreeSlotValidator.courseSlots(courses);
+        assertEquals(Arrays.asList(slot(MON, 600, 660), slot(TUE, 630, 690)), courseSlots);
+
+        long[] kept = FreeCells.keepSelectable(m, courseSlots);
+        assertEquals(Arrays.asList(slot(MON, 540, 600), slot(MON, 660, 720),
+                slot(TUE, 540, 630), slot(TUE, 690, 720)), FreeCells.toSlots(kept));
+        // 목록 안의 null 칸을 직접 넘겨도 건너뛴다
+        assertArrayEquals(kept, FreeCells.keepSelectable(m, withNullSlotPlus(slot(TUE, 630, 690))));
+        // 수업 목록이 null이면 선택은 그대로, 선택이 null이면 빈 선택
+        assertArrayEquals(m, FreeCells.keepSelectable(m, null));
+        assertArrayEquals(FreeCells.empty(), FreeCells.keepSelectable(null, courseSlots));
+    }
+
+    private static List<TimeSlot> withNullSlotPlus(TimeSlot extra) {
+        return new ArrayList<>(Arrays.asList(null, slot(MON, 600, 660), extra));
     }
 }

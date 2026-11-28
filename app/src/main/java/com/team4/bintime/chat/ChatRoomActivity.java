@@ -39,6 +39,7 @@ import com.team4.bintime.request.MatchAppointment;
 import com.team4.bintime.request.MatchAppointmentPolicy;
 import com.team4.bintime.request.MatchSelectionSheet;
 import com.team4.bintime.auth.AuthRepositories;
+import com.team4.bintime.auth.SessionGuard;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -65,9 +66,12 @@ public class ChatRoomActivity extends AppCompatActivity {
         return new Intent(context, ChatRoomActivity.class).putExtra(EXTRA_MATCH_ID, matchId);
     }
 
-    /** Firebase 가 설정되면 RTDB, 아니면 Mock (ChatRepositories). AI 답장·후기는 아직 Mock 이다(BT-041·BT-044). */
+    /** Firebase 가 설정되면 RTDB, 아니면 Mock (ChatRepositories). 후기는 아직 Mock 이다(BT-044). */
     private ChatRepository repository;
-    private final ReplySuggestionRepository replyRepository = MockReplySuggestionRepository.shared();
+    /** Firebase 가 설정되면 suggestChatReplies(Gemini, BT-041), 아니면 Mock (ReplySuggestionRepositories). */
+    private ReplySuggestionRepository replyRepository;
+    /** 키·모델 설정 문제나 미구현이면 이 화면에서 반짝이 버튼을 숨긴다(BT-024 오류 표). */
+    private boolean aiReplyUnavailable;
     private final ReviewRepository reviewRepository = MockReviewRepository.shared();
 
     private String matchId;
@@ -88,6 +92,11 @@ public class ChatRoomActivity extends AppCompatActivity {
     private ChatLinkRetry linkRetry;
     @Nullable private ChatLinkFailure linkFailure;
     private boolean linkUnavailable;
+    /** BT-042 추천 장소(Firebase 모드). Mock 모드는 null 이고 room.recommendedPlace 시안 문구를 쓴다. */
+    @Nullable private PlaceRecommendationRepository placeRepository;
+    @Nullable private PlaceRecommendationRepository.Request placeRequest;
+    /** 마지막으로 요청한 약속 ID와 받은 표시 문구(실패·없음이면 null). 1초마다 다시 그려도 같은 약속은 한 번만 요청한다. */
+    @Nullable private String placeMatchId, placeText;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -98,6 +107,8 @@ public class ChatRoomActivity extends AppCompatActivity {
             return;
         }
         repository = ChatRepositories.get(this);
+        replyRepository = ReplySuggestionRepositories.get(this);
+        placeRepository = PlaceRecommendations.get(this);
         String myUid = repository.currentUid();
         if (myUid == null || myUid.trim().isEmpty()) {
             // 로그인 전이면 내 메시지를 구분할 수 없다. 구독을 시작하지 않고 닫는다.
@@ -190,6 +201,7 @@ public class ChatRoomActivity extends AppCompatActivity {
         if (roomRegistration != null) roomRegistration.remove();
         if (messageRegistration != null) messageRegistration.remove();
         if (replyRequest != null) replyRequest.cancel();
+        if (placeRequest != null) placeRequest.cancel();
         if (linkRetry != null) linkRetry.cancel(); // 늦게 온 준비 결과로 닫힌 화면을 바꾸지 않는다
         ticker.removeCallbacks(tick);
         super.onDestroy();
@@ -342,12 +354,39 @@ public class ChatRoomActivity extends AppCompatActivity {
         ((TextView) findViewById(R.id.chatMatchTime)).setText(additional > 0 ? getString(R.string.appointment_additional, time, additional) : time);
         ((TextView) findViewById(R.id.chatMatchRemaining)).setText(appointment != null && appointment.startAtMillis() > now
                 ? getString(R.string.appointment_upcoming) : getString(R.string.chat_remaining, ChatTimeFormatter.remaining(display, now)));
-        boolean hasPlace = room.recommendedPlace != null;
+        String place = placeRepository == null ? room.recommendedPlace : placeFor(now);
+        boolean hasPlace = place != null;
         findViewById(R.id.chatPlaceRow).setVisibility(hasPlace ? View.VISIBLE : View.GONE);
         if (hasPlace) {
-            ((TextView) findViewById(R.id.chatPlace)).setText(getString(R.string.chat_recommended_place,
-                    room.recommendedPlace));
+            ((TextView) findViewById(R.id.chatPlace)).setText(getString(R.string.chat_recommended_place, place));
         }
+    }
+
+    /**
+     * BT-042: 상단 카드 약속의 추천 장소. 처음 보이는 약속이면 서버에 한 번 요청하고, 받기 전·실패하면 null(장소 줄 숨김).
+     * 대표 약속이 바뀌면(다음 약속) 새로 요청한다. 서버가 약속별로 저장하므로 다시 열어도 횟수를 쓰지 않는다.
+     */
+    @Nullable
+    private String placeFor(long now) {
+        String target = PlaceRecommendations.targetMatchId(room.appointments, matchId, now);
+        if (target == null) return null;
+        if (target.equals(placeMatchId)) return placeText;
+        if (placeRequest != null) placeRequest.cancel();
+        placeMatchId = target;
+        placeText = null;
+        placeRequest = placeRepository.recommend(target, new PlaceRecommendationRepository.Callback() {
+            @Override public void onSuccess(List<String> names) {
+                if (isFinishing() || isDestroyed() || !target.equals(placeMatchId)) return;
+                placeRequest = null;
+                placeText = PlaceRecommendations.join(names);
+                if (room != null) bindRoom();
+            }
+            @Override public void onError() {
+                if (isFinishing() || isDestroyed() || !target.equals(placeMatchId)) return;
+                placeRequest = null; // 같은 약속은 다시 요청하지 않는다. 화면을 다시 열면 재시도한다.
+            }
+        });
+        return placeText;
     }
 
     // ---- 후기 ----
@@ -473,11 +512,13 @@ public class ChatRoomActivity extends AppCompatActivity {
             @Override
             public void onSuccess() {
                 // 화면 전환은 observeRoom 이 ENDED 를 전달하며 처리한다.
+                if (isFinishing() || isDestroyed()) return;
                 actionInProgress = false;
             }
 
             @Override
             public void onError() {
+                if (isFinishing() || isDestroyed()) return;
                 actionInProgress = false;
                 Toast.makeText(ChatRoomActivity.this, R.string.chat_end_failed, Toast.LENGTH_SHORT).show();
             }
@@ -513,28 +554,48 @@ public class ChatRoomActivity extends AppCompatActivity {
 
     /** 버튼을 눌렀을 때만 요청한다. 요청 중에는 버튼을 잠가 중복 호출을 막는다. */
     private void requestReplies() {
-        if (replyRequest != null || room == null || room.archived || !room.chatReady || room.blocked()) return;
+        if (replyRequest != null || aiReplyUnavailable || room == null || room.archived || !room.chatReady || room.blocked()) return;
+        // 서버는 이 약속의 chatRoomId 로 실제 방을 찾는다(재사용 방은 방 키와 약속 ID 가 다르다, BT-034).
+        String target = ReplySuggestionRepositories.targetMatchId(room.appointments, matchId, repository.nowMillis());
         setAiButtonEnabled(false);
-        replyRequest = replyRepository.requestReplies(matchId, new ReplySuggestionRepository.Callback() {
+        replyRequest = replyRepository.requestReplies(target, new ReplySuggestionRepository.Callback() {
             @Override
             public void onSuccess(List<String> result) {
+                if (isFinishing() || isDestroyed()) return;
                 replyRequest = null;
                 setAiButtonEnabled(true);
                 showReplies(new ArrayList<>(result));
             }
 
             @Override
-            public void onError() {
+            public void onError(ReplySuggestionFailure failure) {
+                if (isFinishing() || isDestroyed()) return;
                 replyRequest = null;
-                setAiButtonEnabled(true);
                 hideReplies();
-                Toast.makeText(ChatRoomActivity.this, R.string.chat_ai_reply_failed, Toast.LENGTH_SHORT).show();
+                if (failure == ReplySuggestionFailure.UNAVAILABLE) aiReplyUnavailable = true;
+                setAiButtonEnabled(true);
+                if (failure == ReplySuggestionFailure.SIGNED_OUT && SessionGuard.redirectIfSignedOut(ChatRoomActivity.this)) return;
+                Toast.makeText(ChatRoomActivity.this, replyFailureMessage(failure), Toast.LENGTH_SHORT).show();
             }
         });
     }
 
+    /** 실패마다 안내만 바꾼다. 재시도는 반짝이 버튼을 다시 누르는 것으로 하고, 자동으로 다시 부르지 않는다. */
+    private static int replyFailureMessage(ReplySuggestionFailure failure) {
+        switch (failure) {
+            case RETRY: return R.string.chat_ai_reply_retry;
+            case QUOTA: return R.string.chat_ai_reply_quota;
+            case PERMISSION: return R.string.chat_ai_reply_denied;
+            case BLOCKED: return R.string.chat_ai_reply_blocked;
+            case UNAVAILABLE: return R.string.chat_ai_reply_unavailable;
+            case SIGNED_OUT: return R.string.chat_login_required;
+            default: return R.string.chat_ai_reply_failed;
+        }
+    }
+
     private void setAiButtonEnabled(boolean enabled) {
-        enabled = enabled && room != null && !room.archived && room.chatReady && !room.blocked();
+        aiButton.setVisibility(aiReplyUnavailable ? View.GONE : View.VISIBLE);
+        enabled = enabled && !aiReplyUnavailable && room != null && !room.archived && room.chatReady && !room.blocked();
         aiButton.setEnabled(enabled);
         aiButton.setAlpha(enabled ? 1f : 0.4f);
     }

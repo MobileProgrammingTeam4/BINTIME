@@ -105,6 +105,11 @@ overlapMinutes = max(0, min(endA, endB) - max(startA, startB))
 
 **공통 데이터 계약과 시간 규칙은 [`docs/BT-012.md`](./docs/BT-012.md)를 먼저 확인합니다.** 필드 이름·UID·요청/매칭 식별자·분 단위 시간·Repository 연동을 변경할 때 이 문서의 팀 결정과 후속 확정 항목을 따릅니다.
 
+알림·기기 토큰·공강 시작 이벤트의 데이터·권한 계약은 [`docs/BT-039.md`](./docs/BT-039.md)를 따릅니다.
+계정별 알림 선호와 서버 날짜 기반 요청 팝업 계약은 [`docs/BT-040.md`](./docs/BT-040.md)를 따릅니다.
+
+매칭 종료·후기 자격·채팅방 상태 및 담당자 간 연결 계약은 [`docs/BT-038.md`](./docs/BT-038.md)를 따릅니다.
+
 | 구성 | 용도 | 핵심 원칙 |
 |---|---|---|
 | **Android Java/XML** | 화면·상호작용·상태 표시 | Activity/Fragment에서 서버 상태 변경 로직 분리 |
@@ -134,6 +139,7 @@ notifications/{uid}/items/{notificationId}
 reviews/{reviewId}
 reports/{reportId}
 aiUsage/{uid}_{YYYY-MM-DD}
+placeRecommendations/{matchId}   # BT-042 서버 전용 장소 추천 저장(docs/BT-042.md)
 
 Realtime Database
 chatRooms/{chatRoomId}/members/{uid}
@@ -148,8 +154,9 @@ userChatRooms/{uid}/{chatRoomId}: {..., chatReady, archived, hidden, linkedAt, b
 - 공강 계산의 입력 버전(`timetables.revision`)과 파생 결과(`availability.sourceRevision`)를 비교해 오래된 공강으로 매칭하지 않습니다.
 - `timetables/{uid}.freeCells`는 월~일 7개의 48비트 정수로 선택 원본을 보존합니다. 수업 변경은 `revision`을 증가시키고 공강 선택만 변경할 때는 유지합니다. `semester`는 없거나 null일 수 있습니다. `availability.slots`는 연속 칸을 병합한 60분 이상 구간이며, 서버는 원본 선택·수업·revision과 일치하는지 다시 검증합니다.
 - 매칭 검색은 `searchMatches()` Callable이 저장된 `matchSettings/{uid}`로 판정합니다. 지금 겹치는 공강, 없으면 가장 가까운 미래 공강 **하나**를 기준으로 양측 ON·검색자가 고른 최소 겹침·목적·차단을 확인하고, 상대 UID(`candidateId`)와 겹침 시간·목적만 돌려줍니다. 이름·사진은 앱이 `publicProfiles`에서 읽습니다. 상세 계약은 [`docs/BT-017.md`](./docs/BT-017.md)를 따릅니다.
-- AI 매칭률(BT-027)은 검색 서버가 조건을 통과한 상위 5명에게만 Gemini 점수·추천 이유를 붙이고, 실패하면 점수 없이 결과를 돌려줍니다. 앱은 Gemini를 직접 부르지 않습니다. 상세는 [`docs/BT-027.md`](./docs/BT-027.md)를 따릅니다.
+- AI 매칭률(BT-027)은 검색 서버가 조건을 통과한 상위 5명에게만 Gemini 점수·추천 이유를 붙이고, 실패하면 점수 없이 결과를 돌려줍니다. 자기소개의 연락처(이메일·전화번호·링크)는 지우고 보냅니다. 앱은 Gemini를 직접 부르지 않습니다. 상세는 [`docs/BT-027.md`](./docs/BT-027.md)를 따릅니다.
 - AI 추천순(BT-028)은 점수가 붙은 후보를 점수 높은 순으로 앞에 두고, 같은 입력이면 24시간 동안 서버 전용 `matchScores` 캐시를 써서 Gemini를 다시 부르지 않습니다. 상세는 [`docs/BT-028.md`](./docs/BT-028.md)를 따릅니다.
+- AI 평가 품질·비용(BT-049)은 점수 기준·예시를 프롬프트에 고정하고, 입력에 근거가 없는 추천 이유는 서버가 빼며, 같은 평가가 동시에 오거나 앱이 같은 조건으로 검색을 겹쳐 부르면 Gemini를 한 번만 부릅니다. 상세는 [`docs/BT-049.md`](./docs/BT-049.md)를 따릅니다.
 - 요청 생성 입력은 `{candidateId, clientRequestId}`이며 `candidateId`는 상대 UID, `clientRequestId`는 재시도 동안 유지하는 UUID입니다. 서버는 검색자가 선택한 최소 겹침, 프로필 완료·공개 프로필 존재, 차단·확정 매칭 충돌을 확인한 뒤 시간·목적 스냅샷을 정합니다. 상세 계약은 [`docs/BT-019.md`](./docs/BT-019.md)를 따릅니다.
 - 요청 정책은 보낸 대기 3개·받은 대기 5개, 직접 취소 후 모든 상대에 신규 신청 60초 제한, 역방향 대기 요청 차단입니다. 기존 초과 요청은 보존합니다. 실제 수락·거절은 `respondToMatchRequest({requestId, action})`로 처리하며 수락과 확정 매칭 생성을 같은 트랜잭션으로 보호합니다. 상세는 [`docs/BT-031.md`](./docs/BT-031.md)를 따릅니다.
 - 수락 시 양측의 겹치는 대기 요청을 정리하고 종료 시각이 지난 요청은 만료 취소합니다. 자동 정리의 서버 전용 작업·5분 예약 코드·운영 활성화 조건은 [`docs/BT-032.md`](./docs/BT-032.md)를 따릅니다.
@@ -241,6 +248,7 @@ npm run build
 - 팀 정책상 `google-services.json`은 각자 Firebase Console에서 받아 로컬에 두고 Git에서 제외합니다.
 - `firebase.json`, Firestore/RTDB/Storage Rules, 인덱스 설정 파일은 팀 검토 후 버전 관리합니다.
 - **Gemini는 Cloud Functions에서 호출**하고 키는 Firebase Secrets 등 서버 비밀 저장소로 관리합니다.
+- Android App Check는 debug에서 Debug provider, release에서 Play Integrity를 사용합니다. Callable은 공통 `APP_CHECK_ENFORCED` 설정을 따르며, 앱 등록·모니터링 후 승인된 배포에서만 강제합니다. [보안 설정 안내](./docs/SECURITY-135.md)에 콘솔 설정과 로컬 시크릿 검사 명령을 정리했습니다.
 - 운영 환경 배포·유료 기능 활성화·비용 설정 변경은 프로젝트 소유자 승인 없이 진행하지 않습니다.
 
 ## 8. 협업 규칙 — 커밋 · 브랜치 · PR · Issues

@@ -59,8 +59,11 @@
 ### 요청·채팅·종료
 
 - 요청 상태: `PENDING`, `ACCEPTED`, `REJECTED`, `CANCELED`.
+- BT-039 알림·기기 토큰·공강 시작 이벤트는 `docs/BT-039.md`를 따른다. 토큰/전송 작업은 서버 전용이고 앱 알림의 생성·수신자 변경은 허용하지 않는다.
+- BT-040 설정 저장·서버 한국 날짜 팝업 정책은 `docs/BT-040.md`를 따른다. 계정 간 설정을 공유하지 않으며 UID·숨김 날짜를 요청 본문에서 신뢰하지 않는다.
 - BT-032 상충/만료 정리는 `docs/BT-032.md`를 따른다. `matchCleanupJobs`는 서버 전용이며 자동 정리는 직접 취소 cooldown을 변경하지 않는다. 5분 주기 예약 코드와 실제 운영 활성화를 구분한다.
 - 매칭 상태: `ACTIVE`, `ENDED`.
+- BT-038 종료·후기 자격·방 상태 복구 및 BT-043/044 인수인계는 `docs/BT-038.md`를 따른다. `roomStateJobs`는 서버 전용이며 종료는 채팅 쓰기 권한을 변경하지 않는다.
 - BT-033부터 개별 matchId와 실제 chatRoomId를 구분합니다. 서버 전용 chatPairs/chatLinkJobs, 현재 참여자 읽기 전용 chatRoomLinks 및 방의 archived/writable 계약은 `docs/BT-034.md`를 따릅니다. 여러 약속의 대표·종료/후기 선택과 비활성 MessageComposer는 `docs/BT-035.md`의 제공 컴포넌트를 재사용합니다.
 - 둘 다 나간 방은 목록 hidden·멤버 제거로 양측 접근을 차단하고 서버에만 보관한다. 보관 기간·최종 삭제는 신고 담당·SM 후속 합의 전 자동 실행하지 않는다. 한 명 이탈 방의 남은 사람 읽기 권한은 유지한다.
 - 서버가 요청 수락/거절/취소를 검증하고 **동시 수락과 상충 요청**을 트랜잭션/멱등 처리로 보호합니다.
@@ -142,6 +145,7 @@ reviews/{reviewId}
 reports/{reportId}
 aiUsage/{uid}_{YYYY-MM-DD}
 matchScores/{searcherUid}_{candidateUid}
+placeRecommendations/{matchId}   # BT-042 서버 전용(규칙 없음 = 앱 접근 거부), docs/BT-042.md
 
 Realtime Database
 chatRooms/{chatRoomId}/members/{uid}
@@ -158,8 +162,9 @@ userChatRooms/{uid}/{chatRoomId}
 | `availability` | 선택 원본을 병합한 60분 이상 슬롯과 `sourceRevision`. 검색(`searchMatches`)은 revision 일치·30분 경계·병합 후 60분 이상만 확인하고, 요청 생성(`createMatchRequest`)이 원본·수업 비겹침·revision을 다시 검증 |
 | `matchSettings` | `isMatching`, `minOverlapMinutes`(60·90·120·150·180), `purposes`(빈 목록 = 전체, 최대 5), `preferredTags`(`#` 없이, 최대 20), `updatedAt`(서버 시간). 본인만 읽기·쓰기, 다른 사용자는 검색 서버만 읽음. 계약은 `docs/BT-017.md` |
 | 매칭 검색 계약 | `searchMatches()`(입력 없음): 토큰 UID·학교 이메일 확인 → 지금/가장 가까운 내 공강 하나 기준으로 양측 ON·검색자 최소 겹침·목적 AND·양방향 차단을 판정. 결과 `MATCHING_OFF`/`NO_FREE_SLOT`/`OK{reference, candidates}`, 후보는 `candidateId`(= 상대 UID)와 겹침·목적만 반환. availability는 revision 일치·30분 경계·병합 후 60분 이상만 사용. 계약은 `docs/BT-017.md` |
-| AI 매칭률 계약 | BT-027: `searchMatches`가 필수 조건 통과 후보 중 겹침 상위 5명에게만 서버 내부 `evaluateMatch`를 호출해 `score`(0~100)·`reasons`·`suggestedActivity`를 선택 필드로 붙임. 입력은 공개 프로필 요약·수업 건물(호실 제외)·공통 과목·겹침·목적(이름·UID·시간표 원본 금지), 이유 문장에 건물 이름 금지(서버 `verify`가 건물명 문장 제거)·수업 이름은 공통 과목만. 점수 붙이기는 15초 마감, 늦은 후보는 점수 없음. 앱은 점수 없음을 `NO_SCORE`(-1)로 두고 0점과 구분. AI 실패 후보는 필드 없음, 검색은 계속. 정렬·캐시는 BT-028. 계약은 `docs/BT-027.md` |
+| AI 매칭률 계약 | BT-027: `searchMatches`가 필수 조건 통과 후보 중 겹침 상위 5명에게만 서버 내부 `evaluateMatch`를 호출해 `score`(0~100)·`reasons`·`suggestedActivity`를 선택 필드로 붙임. 입력은 공개 프로필 요약(자기소개는 연락처 제거)·수업 건물(호실 제외)·공통 과목·겹침·목적(이름·UID·시간표 원본 금지), 이유 문장에 건물 이름 금지(서버 `verify`가 건물명 문장 제거)·수업 이름은 공통 과목만. 점수 붙이기는 15초 마감, 늦은 후보는 점수 없음. 앱은 점수 없음을 `NO_SCORE`(-1)로 두고 0점과 구분. AI 실패 후보는 필드 없음, 검색은 계속. 정렬·캐시는 BT-028. 계약은 `docs/BT-027.md` |
 | AI 추천순·점수 캐시 | BT-028: 점수가 붙은 상위 5명은 점수 높은 순, 동점·점수 없음은 겹침 순 유지, 6번째부터는 겹침 순. 같은 AI 입력(목적·30분 단위 겹침·양쪽 프로필·수업 건물·공통 과목)·프롬프트·모델·캐시 버전의 해시가 같으면 24시간 동안 `matchScores` 캐시를 쓰고, 입력이 바뀌거나 만료되면 다시 평가. Mock 점수는 저장 안 함. 계약은 `docs/BT-028.md` |
+| AI 평가 품질·비용 | BT-049: 프롬프트에 채점표(50에서 시작)와 예시 2개 고정. 서버 `verify`가 건물명 문장에 더해 근거 없는 이유(공통 수업 없는데 함께 듣는다, 겹침과 다른 시간, 입력에 없는 인용)를 빼고, 다 빠지면 그 후보는 점수 없음. 같은 검색자·후보·입력의 동시 평가는 한 번만 호출(인스턴스 안). 앱은 스위치 초기화로 검색하지 않고 같은 조건 검색이 진행 중이면 다시 부르지 않음. 캐시 버전 3. 계약은 `docs/BT-049.md` |
 | `matchRequests` | `fromUid`, `toUid`, `status`, `meetingDate`, `startMinute`, `endMinute`, `overlapMinutes` 등 **시간 스냅샷** |
 | 요청 생성 계약 | `createMatchRequest({candidateId, clientRequestId})`: 상대 UID와 재시도 UUID만 입력. 검색자가 선택한 최소 겹침, 프로필·차단·시간표·확정 매칭 충돌을 같은 서버 트랜잭션에서 검증. 같은 방향 PENDING 중복은 서버 전용 `matchRequestGuards`로 막음. 계약은 `docs/BT-019.md` |
 | 요청 목록·취소 계약 | UID별 발신/수신 Firestore 리스너, `cancelMatchRequest(requestId)`, 두 복합 인덱스와 검증 범위는 `docs/BT-020.md`를 따릅니다. |
@@ -206,6 +211,7 @@ MatchStatus: ACTIVE | ENDED
 | E | AI 공통 게이트웨이, 채팅 이벤트, 답장/장소/후기 | 채팅 참여자 확인, AI 출력 형식/실패 처리, 장소 검증 |
 
 - Gemini 호출 전에 **입력 최소화·개인정보 제거·인증/권한 검사**. 출력은 스키마 검사하고 비용/지연/실패/시간초과를 제어합니다.
+- App Check·키 제한·공개 전 시크릿 검사는 [`docs/SECURITY-135.md`](./docs/SECURITY-135.md)를 따릅니다. `functions/src/index.ts`는 `security/appCheck`를 첫 import로 유지하며, 개별 Callable에서 공통 `APP_CHECK_ENFORCED` 정책을 덮어쓰지 않습니다. 앱 등록·모니터링과 운영 강제 배포는 별도 단계입니다. debug 토큰을 커밋·공유 로그·화면 증거에 넣지 않습니다.
 - Gemini 매칭 점수는 추천 정렬용. **필수 매칭 조건 검사 전 또는 대신 호출하지 않습니다.** AI 불가 시에도 P0 기본 흐름에 대해 실패 정책을 명확히 처리합니다.
 - AI 답장 3개는 **UI 제안**이며 사용자가 직접 선택·수정·전송합니다. 타인의 메시지나 개인 시간표 전체를 필요 이상으로 모델에 전송하지 않습니다.
 - 장소는 신뢰 가능한 **사전 검증된 캠퍼스 장소 데이터**만 후보로 제공하고 모델이 결과의 존재 여부를 결정하지 않게 합니다.
