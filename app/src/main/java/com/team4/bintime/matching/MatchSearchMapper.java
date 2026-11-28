@@ -92,7 +92,15 @@ final class MatchSearchMapper {
                 tags, reasons, profile.getBio());
         c.dayLabel = dayLabel((String) raw.get("meetingDate"), dayOfWeek, today);
         c.photoPath = profile.getPhotoPath();
+        c.aiPlace = placeLabel(raw.get("placeName"), raw.get("placeCount"));
         return c;
+    }
+
+    /** BT-042 검색 결과 추천 장소(서버 규칙 기반 미리보기): "공차 (북악관 1층) 외 4곳". 이름이 없으면 null(상세 화면에서 줄 숨김). */
+    static String placeLabel(Object name, Object count) {
+        if (!(name instanceof String) || ((String) name).isEmpty()) return null;
+        int n = num(count);
+        return n > 1 ? name + " 외 " + (n - 1) + "곳" : (String) name;
     }
 
     /** "3학년" → 3, 숫자가 없으면 0 */

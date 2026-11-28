@@ -29,7 +29,7 @@ public class MatchCandidate {
     public String photoPath;
 
     // 프로필 상세 화면 전용 (없으면 해당 영역을 빈 상태로 표시)
-    public String aiPlace;               // AI 추천 장소 — 3주차 Gemini 장소 추천으로 대체
+    public String aiPlace;               // 추천 장소 줄. 실데이터는 BT-042 검색 미리보기(placeName·placeCount), 없으면 null
     public int rematchRate;              // 재만남 희망률(%)
     public List<Review> reviews = java.util.Collections.emptyList();
 

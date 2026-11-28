@@ -11,6 +11,8 @@ import {
 } from "../src/matching/eligibility";
 import { createSearchCallable } from "../src/matching/callable";
 import { type MatchStore, resolveCandidate, searchMatches } from "../src/matching/search";
+import { withPlacePreview } from "../src/matching/places";
+import { candidatePlaces, displayName, VERIFIED_CAMPUS_PLACES } from "../src/ai/campusPlaces";
 
 // 2026-11-16(월) 14:10 KST
 const MON_1410 = new Date("2026-11-16T05:10:00Z");
@@ -164,6 +166,32 @@ describe("searchMatches Callable", () => {
       async (_uid, candidates) => candidates.map((c) => ({ ...c, score: 70 })));
     const res = await scored.run({ data: {}, auth: { uid: "me", token: school }, rawRequest: {} } as never);
     expect(res).toMatchObject({ status: "OK", candidates: [{ candidateId: "you", score: 70 }] });
+  });
+  it("OK 결과 후보에 기준 공강 요일·겹친 시간으로 추천 장소를 붙인다(BT-042)", async () => {
+    const two = new MemoryStore({ me: { settings: on(), slots: [s(1, 840, 960)] }, you: { settings: on(), slots: [s(1, 840, 960)] } });
+    const fn2 = createSearchCallable(() => two, () => MON_1410, () => [".ac.kr"], async (_uid, candidates) => candidates);
+    const res = await fn2.run({ data: {}, auth: { uid: "me", token: school }, rawRequest: {} } as never);
+    const open = candidatePlaces("전체", 1, 850, 960);
+    expect(open.length).toBeGreaterThan(1);
+    expect(res).toMatchObject({ status: "OK", candidates: [{ candidateId: "you", placeName: displayName(open[0]), placeCount: open.length }] });
+  });
+});
+
+describe("withPlacePreview (BT-042 검색 추천 장소)", () => {
+  const c = { candidateId: "you", purpose: "밥", meetingDate: "2026-11-20", startMinute: 720, endMinute: 780, overlapMinutes: 60 };
+  it("목적에 맞고 그 시간에 여는 검증 목록 장소만 센다", () => {
+    const out = withPlacePreview(c, 5);
+    const names = VERIFIED_CAMPUS_PLACES.filter((p) => p.purposes.includes("밥")).map(displayName);
+    expect(names).toContain(out.placeName);
+    expect(out.placeCount).toBe(candidatePlaces("밥", 5, 720, 780).length);
+  });
+  it("금요일 저녁은 석식을 안 하는 교직원식당을 빼고 센다", () => {
+    const evening = { ...c, startMinute: 1020, endMinute: 1110 };
+    expect(withPlacePreview(evening, 5).placeCount).toBe(withPlacePreview(evening, 4).placeCount! - 1);
+  });
+  it("여는 곳이 없으면 필드를 붙이지 않는다", () => {
+    const late = withPlacePreview({ ...c, startMinute: 1320, endMinute: 1400 }, 1);
+    expect(late).toEqual({ ...c, startMinute: 1320, endMinute: 1400 });
   });
 });
 

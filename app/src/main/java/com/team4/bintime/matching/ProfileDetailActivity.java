@@ -22,7 +22,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-/** 매칭 상대 프로필 상세 (BT-011): 요약 · AI 추천 장소 · 자기소개 · 선호태그 · 받은 후기 · [매칭 신청]. */
+/** 매칭 상대 프로필 상세 (BT-011): 요약 · 추천 장소 · 자기소개 · 선호태그 · 받은 후기 · [매칭 신청]. */
 public class ProfileDetailActivity extends AppCompatActivity {
 
     private static final String EXTRA_UID = "uid";

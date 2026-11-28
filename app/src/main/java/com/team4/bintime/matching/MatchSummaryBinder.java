@@ -28,7 +28,7 @@ public final class MatchSummaryBinder {
     private MatchSummaryBinder() {
     }
 
-    /** view_match_summary.xml 채우기. showPlace=true 면 AI 추천 장소 줄도 표시(상세 화면). */
+    /** view_match_summary.xml 채우기. showPlace=true 면 추천 장소 줄도 표시(상세 화면). */
     public static void bind(View summary, MatchCandidate c, boolean showPlace) {
         bindAvatar(summary.findViewById(R.id.avatar), c.photoPath);
         text(summary, R.id.name, c.name);
@@ -43,7 +43,7 @@ public final class MatchSummaryBinder {
         TextView place = summary.findViewById(R.id.aiPlace);
         boolean hasPlace = showPlace && c.aiPlace != null;
         place.setVisibility(hasPlace ? View.VISIBLE : View.GONE);
-        if (hasPlace) place.setText("AI 추천 장소: " + c.aiPlace);
+        if (hasPlace) place.setText("추천 장소: " + c.aiPlace); // BT-042: 검색 단계는 AI 가 아닌 검증 목록 규칙이라 "AI" 를 붙이지 않는다
     }
 
     /** [매칭 신청] 버튼: 이미 신청했으면 '신청 완료'로 잠그고, 아니면 누를 때 신청 + 완료 팝업. */

@@ -7,6 +7,7 @@ import { REGION } from "../ai/config";
 import { ALLOWED_EMAIL_SUFFIXES_ENV, checkSchoolEmail, parseAllowedEmailSuffixes } from "../ai/emailPolicy";
 import { GEMINI_API_KEY } from "../ai/deps";
 import type { Candidate } from "./eligibility";
+import { withPlacePreview } from "./places";
 import { addScores, defaultEvaluator, FirestoreScoreData, type ScoredCandidate } from "./score";
 import { FirestoreMatchStore, type MatchStore, searchMatches } from "./search";
 
@@ -48,7 +49,9 @@ export function createSearchCallable(
     try {
       const result = await searchMatches(store(), request.auth.uid, now());
       if (result.status !== "OK") return result;
-      return { ...result, candidates: await scorer(request.auth.uid, result.candidates) };
+      // 후보는 모두 기준 공강(reference) 안에서 겹치므로 요일은 reference 것을 쓴다.
+      const scored = await scorer(request.auth.uid, result.candidates);
+      return { ...result, candidates: scored.map((c) => withPlacePreview(c, result.reference.dayOfWeek)) };
     } catch (error) {
       const requestId = randomUUID();
       logger.error("search_matches_failed", { requestId, message: error instanceof Error ? error.message : String(error) });
