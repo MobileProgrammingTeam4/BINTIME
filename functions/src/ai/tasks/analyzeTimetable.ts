@@ -157,10 +157,10 @@ export const analyzeTimetableTask: AiTask<AnalyzeTimetableInput, AnalyzeTimetabl
   name: "analyzeTimetable",
   input,
   output,
-  // BT-048: gemini-3.8-flash 는 이미지 한 장에 평균 15~20초, 30초 제한에서 14회 중 5회 실패했다(E 비교).
-  // 제한은 SDK 가 Gemini 서버 마감(X-Server-Timeout)으로도 보내 504 가 마감 직전에 오고, gemini.ts 가 504 를
-  // 한 번 재시도하므로 최악값은 약 2배다. 55초 × 2 + 0.5초 ≈ 110초로 함수 제한 120초 안에 둔다(docs/BT-048.md).
-  timeoutMs: 55_000,
+  // BT-048(#146): gemini-3.8-flash + ULTRA_HIGH(thinking 기본) 은 5장 한 호출에 47~62초가 걸렸다.
+  // #143 부터 timeoutMs 는 재시도까지 포함한 전체 시간이고 마감 504 는 재시도하지 않으므로 최악값도 100초다.
+  // 함수 제한 120초(index.ts)에서 이미지 읽기·횟수 차감·검증 여유 약 20초, 앱 Callable 제한 130초(docs/BT-048.md).
+  timeoutMs: 100_000,
   dailyLimit: 10,
   // 수업 최대 60개 배열 안의 정수 범위(분 0~1440 등)·문자열 길이 제약을 그대로 보내면 Gemini 가
   // 400 "too many states for serving" 으로 거부한다(2026-11-18 운영 1회, 로컬 재현). 구조만 보내고
@@ -213,8 +213,8 @@ export const analyzeTimetableTask: AiTask<AnalyzeTimetableInput, AnalyzeTimetabl
       systemInstruction: PROMPT,
       contents: [{ role: "user", parts }],
       temperature: 0,
-      // 60개 × 약 80토큰 + 여유
-      maxOutputTokens: 8192,
+      // 출력(60개 × 약 80토큰)과 생각 토큰을 함께 센다. 5장 한 호출에서 생각만 7,860토큰을 써 8192 에서 잘린 적이 있다(#146).
+      maxOutputTokens: 16_384,
     };
   },
 };
